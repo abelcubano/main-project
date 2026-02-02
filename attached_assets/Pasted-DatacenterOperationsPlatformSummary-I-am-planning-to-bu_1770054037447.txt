@@ -1,0 +1,19 @@
+DatacenterOperationsPlatformSummary
+
+I am planning to build a web-based datacenter operations, billing, and customer engagement platform inspired by Ubersmith, focused exclusively on colocation and managed datacenter services. This is not shared hosting software. It is designed to centralize customer management, services, billing, ticketing, physical infrastructure inventory, and service marketing into a single unified system.
+
+The platform includes a public-facing marketing landing page dedicated to Remote Hands and Smart Hands services, clearly explaining datacenter capabilities such as rack and stack, fiber testing and troubleshooting, cross-connects, hardware replacement, and project-based datacenter work. This landing page is designed to convert visitors into customers by clearly presenting service plans, scopes of work, and value propositions, acting as the commercial entry point to the platform.
+
+The system provides both a customer portal and an internal administrative backend with role-based access. It acts as a single source of truth for customers, services, invoices, support tickets, and datacenter infrastructure.
+
+Core functionality includes customer and company management with multiple users per company, service assignment, and full service lifecycle tracking. Datacenter-oriented services include colocation racks, cabinets, U-space, power circuits, amperage and kW allocation, cross-connects, IP addresses, bandwidth, and recurring managed services. Each service supports recurring and one-time billing, status tracking, and linkage to physical infrastructure.
+
+Billing features include automatic recurring invoice generation, manual charges, credits, adjustments, invoice history, and downloadable PDF invoices with clear invoice statuses.
+
+The system includes a full ticketing module allowing customers to open support requests categorized by technical, billing, or remote hands, with priorities, SLA tracking, internal notes, technician assignment, and attachment support.
+
+A critical component is devices and infrastructure inventory management, covering both customer-owned and datacenter-owned equipment, with full physical location tracking, rack mapping, power and network associations, and linkage to customer services and tickets.
+
+The platform is designed to be modular, scalable, secure, and role-based, supporting administrators, billing staff, support technicians, and customers. Future phases may include payment gateway integrations and advanced automation, but these are out of scope for the initial MVP.
+
+The final product should be considered a simplified, modular, datacenter-focused alternative to Ubersmith, optimized for operational efficiency, clarity, and service-driven revenue, with both operational tooling and a built-in marketing front end.
