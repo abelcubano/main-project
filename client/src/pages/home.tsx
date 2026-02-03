@@ -39,6 +39,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
+// Import local assets
+import techRack from "../assets/images/technician-rack.jpg";
+import dcHero from "../assets/images/datacenter-hero.jpg";
+import cableMgmt from "../assets/images/cable-management.jpg";
+
 const easeOut: Transition["ease"] = [0.16, 1, 0.3, 1];
 
 const container = {
@@ -57,31 +62,36 @@ const item = {
 
 const sites = [
   {
+    name: "iM Critical Datacenter",
+    address: "100 NE 80th Terrace, Miami, FL 33138",
+    lat: "25.8485",
+    lng: "-80.1915",
+    services: ["Primary Hub", "Rack & Stack", "24/7 Remote Hands"],
+  },
+  {
     name: "Equinix MI1",
+    address: "Downtown Miami, FL",
     lat: "25.7743",
     lng: "-80.1937",
     services: ["Deployments", "Hands & eyes", "Emergency response"],
   },
   {
     name: "Digital Realty Miami",
+    address: "Miami, FL",
     lat: "25.7825",
     lng: "-80.1918",
     services: ["Installs", "Troubleshooting", "Rollouts"],
   },
   {
     name: "EdgeConneX Miami",
+    address: "Miami, FL",
     lat: "25.8242",
     lng: "-80.2831",
     services: ["Fiber testing", "Cable work", "Power checks"],
   },
   {
-    name: "EdgeConneX Miami Gardens",
-    lat: "25.9421",
-    lng: "-80.2434",
-    services: ["Emergency work", "24/7 Support"],
-  },
-  {
     name: "CoreSite Miami",
+    address: "Miami, FL",
     lat: "25.7761",
     lng: "-80.1926",
     services: ["Rack & stack", "Upgrades", "Decommissions"],
@@ -108,37 +118,37 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] border-black/5 p-0 overflow-hidden bg-white">
-        <div className="bg-primary/5 px-6 py-8 border-b border-black/5">
+        <div className="bg-blue-600 px-6 py-8 text-white">
           <div className="flex items-center gap-3 mb-2">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-white">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-white">
               <HardHat className="h-5 w-5" />
             </div>
             <DialogTitle className="text-xl font-display">Request Smart Hands</DialogTitle>
           </div>
-          <DialogDescription className="text-muted-foreground">
-            Fast-response on-site engineering for South Florida data centers.
+          <DialogDescription className="text-blue-100">
+            Professional on-site engineering for South Florida data centers.
           </DialogDescription>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="John Doe" required className="border-black/10 focus-visible:ring-primary/20" data-testid="input-contact-name" />
+              <Input id="name" placeholder="John Doe" required className="border-blue-100 focus-visible:ring-blue-600" data-testid="input-contact-name" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="company">Company</Label>
-              <Input id="company" placeholder="Acme Corp" required className="border-black/10 focus-visible:ring-primary/20" data-testid="input-contact-company" />
+              <Input id="company" placeholder="Acme Corp" required className="border-blue-100 focus-visible:ring-blue-600" data-testid="input-contact-company" />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Work Email</Label>
-            <Input id="email" type="email" placeholder="john@company.com" required className="border-black/10 focus-visible:ring-primary/20" data-testid="input-contact-email" />
+            <Input id="email" type="email" placeholder="john@company.com" required className="border-blue-100 focus-visible:ring-blue-600" data-testid="input-contact-email" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="location">Facility</Label>
               <Select required>
-                <SelectTrigger className="border-black/10 focus:ring-primary/20" data-testid="select-contact-location">
+                <SelectTrigger className="border-blue-100 focus:ring-blue-600" data-testid="select-contact-location">
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,7 +162,7 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
             <div className="space-y-2">
               <Label htmlFor="urgency">Urgency</Label>
               <Select defaultValue="standard">
-                <SelectTrigger className="border-black/10 focus:ring-primary/20" data-testid="select-contact-urgency">
+                <SelectTrigger className="border-blue-100 focus:ring-blue-600" data-testid="select-contact-urgency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -167,13 +177,13 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
             <Label htmlFor="notes">Task Details</Label>
             <Textarea 
               id="notes" 
-              placeholder="Describe the work needed (e.g. Rack & Stack, Fiber troubleshooting, Cross-connect verification)" 
+              placeholder="Describe the work needed..." 
               required 
-              className="min-h-[100px] border-black/10 focus-visible:ring-primary/20 resize-none"
+              className="min-h-[100px] border-blue-100 focus-visible:ring-blue-600 resize-none"
               data-testid="textarea-contact-notes"
             />
           </div>
-          <Button type="submit" className="w-full h-11" disabled={loading} data-testid="button-contact-submit">
+          <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white" disabled={loading} data-testid="button-contact-submit">
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -183,9 +193,6 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
               "Submit Request"
             )}
           </Button>
-          <p className="text-[10px] text-center text-muted-foreground uppercase tracking-wider font-semibold">
-            24/7 Dispatch • South Florida Only
-          </p>
         </form>
       </DialogContent>
     </Dialog>
@@ -194,43 +201,30 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 
 function TopNav({ onRequest }: { onRequest: () => void }) {
   return (
-    <div className="sticky top-0 z-40 border-b border-black/5 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 md:px-6">
+    <div className="sticky top-0 z-40 border-b border-blue-100 bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 md:px-6">
         <div className="flex items-center gap-3">
-          <div
-            className="grid h-9 w-9 place-items-center rounded-xl border border-black/10 bg-black/5 shadow-sm"
-            data-testid="img-logo"
-            aria-hidden
-          >
-            <HardHat className="h-4.5 w-4.5 text-black/80" />
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-200">
+            <HardHat className="h-5 w-5" />
           </div>
           <div className="leading-tight">
-            <div className="font-display text-sm font-semibold tracking-tight text-foreground" data-testid="text-brand">
+            <div className="font-display text-lg font-bold tracking-tight text-blue-900">
               South Florida Smart Hands
             </div>
-            <div className="text-xs text-muted-foreground" data-testid="text-tagline">
-              On-site engineers • Hands & eyes • Emergency response
+            <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">
+              On-site DC Operations
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <a
-            href="#locations"
-            className="hidden text-sm text-muted-foreground hover:text-foreground md:block"
-            data-testid="link-nav-locations"
-          >
-            Locations
-          </a>
-          <a
-            href="#services"
-            className="hidden text-sm text-muted-foreground hover:text-foreground md:block"
-            data-testid="link-nav-services"
-          >
-            Services
-          </a>
-          <Button size="sm" className="h-9" onClick={onRequest} data-testid="button-nav-request-help">
-            Request Smart Hands
+        <div className="flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-6">
+            <a href="#locations" className="text-sm font-semibold text-blue-900/70 hover:text-blue-600 transition-colors">Locations</a>
+            <a href="#services" className="text-sm font-semibold text-blue-900/70 hover:text-blue-600 transition-colors">Services</a>
+            <a href="#about" className="text-sm font-semibold text-blue-900/70 hover:text-blue-600 transition-colors">About</a>
+          </nav>
+          <Button size="sm" className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-full" onClick={onRequest}>
+            Request Dispatch
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -239,316 +233,248 @@ function TopNav({ onRequest }: { onRequest: () => void }) {
   );
 }
 
-function FeatureCard({
-  icon: Icon,
-  title,
-  desc,
-  testId,
-}: {
-  icon: typeof ShieldCheck;
-  title: string;
-  desc: string;
-  testId: string;
-}) {
-  return (
-    <Card
-      className="group relative overflow-hidden border-black/10 bg-white p-5 shadow-sm transition hover:shadow-md"
-      data-testid={testId}
-    >
-      <div className="relative flex items-start gap-4">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-black/5 bg-primary/5">
-          <Icon className="h-5 w-5 text-primary" strokeWidth={1.75} />
-        </div>
-        <div className="min-w-0">
-          <div className="font-display text-sm font-semibold tracking-tight text-foreground" data-testid={`${testId}-title`}>
-            {title}
-          </div>
-          <div className="mt-1 text-sm text-muted-foreground" data-testid={`${testId}-desc`}>
-            {desc}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 export default function HomePage() {
   const [showContact, setShowContact] = useState(false);
 
   return (
-    <div className="min-h-dvh bg-background" data-testid="page-home">
+    <div className="min-h-dvh bg-white selection:bg-blue-100 selection:text-blue-900" data-testid="page-home">
       <TopNav onRequest={() => setShowContact(true)} />
       <ContactModal open={showContact} onOpenChange={setShowContact} />
 
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-hero-grid opacity-30" />
-          <div className="absolute inset-0 bg-hero-glow" />
-          <div className="absolute inset-0 bg-hero-noise opacity-[0.2]" />
-        </div>
-
-        <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6 md:py-20">
-          <motion.div variants={container} initial="hidden" animate="show" className="grid gap-10">
-            <motion.div variants={item} className="grid gap-8 md:grid-cols-12 md:items-end">
-              <div className="md:col-span-8">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="border-primary/10 bg-primary/5 text-primary font-medium"
-                    data-testid="badge-service-first"
-                  >
-                    Service provider • Not SaaS
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="border-black/5 bg-black/5 text-black/60 font-medium"
-                    data-testid="badge-region"
-                  >
-                    South Florida coverage
-                  </Badge>
-                </div>
-
-                <h1
-                  className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-6xl"
-                  data-testid="text-hero-title"
-                >
-                  On-site engineering, <span className="text-primary italic">dispatched in minutes.</span>
-                </h1>
-                <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg" data-testid="text-hero-subtitle">
-                  Reliable, fast-response Smart Hands inside South Florida data centers for deployments, troubleshooting,
-                  and 24/7 emergency response.
-                </p>
-
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <Button size="lg" className="h-12 px-8 text-base shadow-lg shadow-primary/20" onClick={() => setShowContact(true)} data-testid="button-hero-request-smarthands">
-                    Request Smart Hands
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 border-black/10 bg-white shadow-sm hover:bg-black/[0.02]"
-                    data-testid="button-hero-call"
-                  >
-                    <PhoneCall className="mr-2 h-4 w-4" />
-                    Call 24/7 Dispatch
-                  </Button>
-                </div>
-              </div>
-
-              <Card className="border-black/10 bg-white p-5 shadow-xl md:col-span-4" data-testid="card-hero-smarthands">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-display text-sm font-semibold text-foreground" data-testid="text-smarthands-card-title">
-                      Primary service
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground font-medium" data-testid="text-smarthands-card-subtitle">
-                      Smart Hands & DC Operations
-                    </div>
-                  </div>
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10" aria-hidden>
-                    <CircuitBoard className="h-4.5 w-4.5 text-primary" strokeWidth={1.75} />
-                  </div>
-                </div>
-
-                <Separator className="my-4 bg-black/5" />
-
-                <div className="grid gap-2 text-sm text-muted-foreground" data-testid="list-smarthands-includes">
-                  <div className="flex items-start gap-2" data-testid="item-smarthands-rack-stack">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                    Rack & stack, cable management
-                  </div>
-                  <div className="flex items-start gap-2" data-testid="item-smarthands-deployments">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                    Server & network deployments
-                  </div>
-                  <div className="flex items-start gap-2" data-testid="item-smarthands-fiber">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                    Fiber testing & power audits
-                  </div>
-                  <div className="flex items-start gap-2" data-testid="item-smarthands-emergency">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                    24/7 emergency response
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-primary/20 bg-primary/[0.02] text-primary text-[10px] font-bold" data-testid="badge-sla">
-                    SLA-GUARANTEED
-                  </Badge>
-                  <Badge variant="outline" className="border-black/10 bg-transparent text-foreground/70 text-[10px]" data-testid="badge-docs">
-                    PHOTO LOGS
-                  </Badge>
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={item} className="grid gap-3 md:grid-cols-3" id="services">
-              <FeatureCard
-                icon={HardHat}
-                title="Smart Hands (Primary)"
-                desc="Physical operational support, rack & stack, and rapid hands-on troubleshooting."
-                testId="card-feature-smarthands"
-              />
-              <FeatureCard
-                icon={Cable}
-                title="Rapid Deployments"
-                desc="Server/network builds, coordination, fiber testing, and power audits."
-                testId="card-feature-deploy"
-              />
-              <FeatureCard
-                icon={ShieldCheck}
-                title="Managed Operations"
-                desc="Operational discipline with clear updates, repeatable process, and 24/7 readiness."
-                testId="card-feature-reliability"
-              />
-            </motion.div>
-
-            <motion.div variants={item} className="grid gap-6" id="locations">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <div
-                    className="font-display text-2xl font-semibold tracking-tight text-foreground"
-                    data-testid="text-locations-title"
-                  >
-                    South Florida footprint
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground" data-testid="text-locations-subtitle">
-                    Engineers stationed locally for rapid dispatch to key facilities.
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  className="h-10 border-black/10 bg-white shadow-sm"
-                  onClick={() => setShowContact(true)}
-                  data-testid="button-location-ask"
-                >
-                  Request site access
-                  <ArrowRight className="ml-2 h-4 w-4" />
+      {/* Hero Section */}
+      <section className="relative pt-10 pb-20 lg:pt-20 overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(45%_45%_at_50%_50%,rgba(59,130,246,0.05)_0%,transparent_100%)]" />
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
+              <Badge className="mb-6 bg-blue-50 text-blue-700 border-blue-200 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
+                24/7 South Florida Operations
+              </Badge>
+              <h1 className="text-5xl md:text-7xl font-display font-extrabold text-blue-900 leading-[1.1] mb-6">
+                Your Hands & Eyes <span className="text-blue-600">Inside the Data Center.</span>
+              </h1>
+              <p className="text-xl text-blue-900/60 leading-relaxed mb-10 max-w-xl">
+                Professional engineering dispatch for rack & stack, cable management, and critical troubleshooting across all South Florida facilities.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button size="lg" className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-xl shadow-xl shadow-blue-200" onClick={() => setShowContact(true)}>
+                  Request Smart Hands
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button size="lg" variant="outline" className="h-14 px-8 border-blue-200 text-blue-900 text-lg font-bold rounded-xl hover:bg-blue-50 transition-all">
+                  <PhoneCall className="mr-2 h-5 w-5 text-blue-600" />
+                  Direct Dispatch
                 </Button>
               </div>
-
-              <div className="grid gap-6 md:grid-cols-12">
-                <div className="md:col-span-7">
-                  <div className="relative aspect-video overflow-hidden rounded-2xl border border-black/10 bg-primary/[0.01] shadow-inner" data-testid="map-container">
-                    {/* Simulated Map Background */}
-                    <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#3b82f6 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} />
-                    
-                    {/* Map Pins */}
-                    {sites.map((site, idx) => (
-                      <div
-                        key={idx}
-                        className="absolute flex flex-col items-center group cursor-pointer transition-transform hover:scale-110"
-                        style={{
-                          top: `${25 + (idx * 14)}%`,
-                          left: `${35 + (idx * 10)}%`
-                        }}
-                        data-testid={`map-pin-${idx}`}
-                      >
-                        <div className="mb-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-bold shadow-md border border-black/5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          {site.name}
-                        </div>
-                        <div className="relative h-6 w-6">
-                           <div className="absolute inset-0 animate-ping rounded-full bg-primary/30" />
-                           <MapPin className="relative h-6 w-6 text-primary fill-primary/20 shadow-sm" />
-                        </div>
+            </motion.div>
+            
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.1 }} className="relative">
+              <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-100 border-8 border-white">
+                <img src={techRack} alt="Technician working on server rack" className="w-full aspect-[4/3] object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent" />
+                <div className="absolute bottom-8 left-8 right-8">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg">
+                        <ShieldCheck className="h-6 w-6" />
                       </div>
-                    ))}
-                    
-                    <div className="absolute bottom-4 left-4 rounded-lg bg-white/90 p-3 text-[10px] font-bold tracking-tight backdrop-blur-sm border border-black/5 shadow-sm text-primary uppercase">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" /> 
-                        24/7 Live Dispatch Coverage
+                      <div>
+                        <div className="text-blue-900 font-bold">Guaranteed Response</div>
+                        <div className="text-blue-600 text-sm font-medium">SLA-backed emergency dispatch</div>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
+              {/* Decorative elements */}
+              <div className="absolute -top-6 -right-6 w-32 h-32 bg-blue-600/5 rounded-full blur-3xl" />
+              <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl" />
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
-                <div className="grid gap-3 md:col-span-5">
-                  {sites.map((site, idx) => (
-                    <Card key={idx} className="group border-black/5 bg-white p-4 transition-all hover:border-primary/30 hover:shadow-md cursor-pointer" data-testid={`site-list-item-${idx}`} onClick={() => setShowContact(true)}>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="font-display text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{site.name}</div>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {site.services.map((svc, sIdx) => (
-                              <Badge key={sIdx} variant="secondary" className="bg-primary/5 text-[10px] text-primary/70 font-semibold border-none">
-                                {svc}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="h-8 w-8 flex items-center justify-center rounded-full bg-black/5 group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                          <ArrowRight className="h-4 w-4" />
+      {/* Services Grid */}
+      <section id="services" className="py-24 bg-blue-50/50 relative">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-display font-bold text-blue-900 mb-4">Operational Services</h2>
+            <p className="text-blue-900/60 max-w-2xl mx-auto text-lg font-medium">
+              Physical, on-site support by experienced engineers who understand the importance of uptime.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="p-8 border-white bg-white shadow-xl shadow-blue-100/50 rounded-3xl hover:translate-y-[-4px] transition-all duration-300">
+              <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-8 shadow-lg shadow-blue-200">
+                <Server className="h-7 w-7" />
+              </div>
+              <h3 className="text-2xl font-bold text-blue-900 mb-4">Rack & Stack</h3>
+              <p className="text-blue-900/60 leading-relaxed mb-6">
+                Professional hardware installation, cabinet layout optimization, and precise labeling for all deployments.
+              </p>
+              <img src={dcHero} alt="Datacenter rows" className="rounded-2xl h-40 w-full object-cover mb-2" />
+            </Card>
+
+            <Card className="p-8 border-white bg-white shadow-xl shadow-blue-100/50 rounded-3xl hover:translate-y-[-4px] transition-all duration-300">
+              <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-8 shadow-lg shadow-blue-200">
+                <Cable className="h-7 w-7" />
+              </div>
+              <h3 className="text-2xl font-bold text-blue-900 mb-4">Cable Management</h3>
+              <p className="text-blue-900/60 leading-relaxed mb-6">
+                Expert fiber and copper routing, structured cabling, and certified testing to ensure maximum signal integrity.
+              </p>
+              <img src={cableMgmt} alt="Cable management" className="rounded-2xl h-40 w-full object-cover mb-2" />
+            </Card>
+
+            <Card className="p-8 border-white bg-white shadow-xl shadow-blue-100/50 rounded-3xl hover:translate-y-[-4px] transition-all duration-300">
+              <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-8 shadow-lg shadow-blue-200">
+                <Zap className="h-7 w-7" />
+              </div>
+              <h3 className="text-2xl font-bold text-blue-900 mb-4">Urgent Triage</h3>
+              <p className="text-blue-900/60 leading-relaxed mb-6">
+                Rapid diagnosis of hardware failures, power cycles, component replacements, and connectivity troubleshooting.
+              </p>
+              <div className="bg-blue-900 rounded-2xl p-6 h-40 flex flex-col justify-end">
+                <div className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-1">Average Response</div>
+                <div className="text-white text-4xl font-black italic">Under 60min</div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Locations Section with Map */}
+      <section id="locations" className="py-24 bg-white overflow-hidden">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="grid lg:grid-cols-12 gap-12 items-start">
+            <div className="lg:col-span-5">
+              <Badge className="mb-4 bg-blue-600 text-white border-transparent px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                Coverage Area
+              </Badge>
+              <h2 className="text-4xl font-display font-bold text-blue-900 mb-6">South Florida Presence</h2>
+              <p className="text-lg text-blue-900/60 mb-10 font-medium">
+                Strategically positioned engineers across Miami and Broward to provide sub-60 minute dispatch to major facilities.
+              </p>
+              
+              <div className="space-y-4">
+                {sites.map((site, idx) => (
+                  <Card key={idx} className="p-5 border-blue-50 bg-white shadow-md shadow-blue-50 rounded-2xl hover:border-blue-200 transition-all cursor-pointer group">
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <MapPin className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="text-blue-900 font-bold text-lg mb-1">{site.name}</div>
+                        <div className="text-blue-600/70 text-sm font-medium mb-3">{site.address}</div>
+                        <div className="flex flex-wrap gap-2">
+                          {site.services.map((svc, sIdx) => (
+                            <span key={sIdx} className="text-[10px] font-bold text-blue-900/40 uppercase tracking-wider">{svc}</span>
+                          ))}
                         </div>
                       </div>
-                    </Card>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 h-[650px] sticky top-32">
+              <div className="relative h-full w-full rounded-[3rem] overflow-hidden border-8 border-blue-50 shadow-2xl bg-blue-50/30">
+                {/* Visual Map Representation */}
+                <div className="absolute inset-0 bg-[#f8fafc] flex items-center justify-center">
+                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#3b82f6 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+                  
+                  {/* Miami Coastline Abstract */}
+                  <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <path d="M70,0 Q65,20 68,40 T65,70 T72,100 L100,100 L100,0 Z" fill="#eff6ff" />
+                  </svg>
+                  
+                  {/* Map Points */}
+                  {sites.map((site, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.5 + (idx * 0.1) }}
+                      className="absolute cursor-pointer group z-10"
+                      style={{
+                        top: `${20 + (idx * 15)}%`,
+                        left: `${50 - (idx * 5)}%`
+                      }}
+                    >
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 whitespace-nowrap bg-white px-4 py-2 rounded-xl shadow-xl border border-blue-100 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 pointer-events-none">
+                        <div className="font-bold text-blue-900">{site.name}</div>
+                        <div className="text-xs text-blue-600">{site.address}</div>
+                      </div>
+                      <div className="relative">
+                        <div className="h-10 w-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-300 transform rotate-45 group-hover:rotate-0 transition-transform">
+                          <HardHat className="h-5 w-5 -rotate-45 group-hover:rotate-0 transition-transform" />
+                        </div>
+                        <div className="absolute -inset-2 bg-blue-600/20 rounded-full blur-lg animate-pulse" />
+                      </div>
+                    </motion.div>
                   ))}
                 </div>
+                
+                <div className="absolute bottom-8 right-8 left-8 p-6 bg-blue-900/90 backdrop-blur-md rounded-3xl text-white border border-white/10 shadow-2xl">
+                  <div className="flex items-center gap-6">
+                    <div className="h-16 w-16 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
+                      <Zap className="h-8 w-8 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold mb-1 italic tracking-tight underline decoration-blue-500 underline-offset-4">Dispatch Center Active</div>
+                      <div className="text-blue-200/70 text-sm font-medium">Real-time tracking available for all active operational tickets.</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </motion.div>
-
-            <motion.div
-              variants={item}
-              className="grid gap-4 md:grid-cols-3"
-              data-testid="section-secondary-services"
-            >
-              <Card className="border-black/5 bg-white p-5 shadow-sm hover:shadow-md transition-shadow" data-testid="card-secondary-colo">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/5">
-                    <Server className="h-5 w-5 text-primary" strokeWidth={1.75} />
-                  </div>
-                  <div className="font-display text-sm font-semibold text-foreground">
-                    Colocation Services
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  Private cabinets, partial racks, and power planning for multi-facility footprints.
-                </p>
-              </Card>
-
-              <Card className="border-black/5 bg-white p-5 shadow-sm hover:shadow-md transition-shadow" data-testid="card-secondary-pbx">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/5">
-                    <BadgeCheck className="h-5 w-5 text-primary" strokeWidth={1.75} />
-                  </div>
-                  <div className="font-display text-sm font-semibold text-foreground">
-                    Connectivity & Voice
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  SIP Trunks, PBX deployments, and cross-connect coordination services.
-                </p>
-              </Card>
-
-              <Card className="border-black/5 bg-white p-5 shadow-sm hover:shadow-md transition-shadow" data-testid="card-secondary-dev">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/5">
-                    <CircuitBoard className="h-5 w-5 text-primary" strokeWidth={1.75} />
-                  </div>
-                  <div className="font-display text-sm font-semibold text-foreground">
-                    Specialized Dev
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  Network monitoring systems, software programming, and custom operational tools.
-                </p>
-              </Card>
-            </motion.div>
-          </motion.div>
-        </div>
-      </div>
-
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6" data-testid="section-footer">
-        <div className="flex flex-col gap-3 border-t border-black/5 pt-8 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-muted-foreground font-medium" data-testid="text-footer-left">
-            South Florida Smart Hands • Built for Uptime
-          </div>
-          <div className="text-sm text-muted-foreground" data-testid="text-footer-right">
-            Dispatched to MI1, DLR, CoreSite and EdgeConneX.
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-20 bg-blue-900 text-white">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="grid md:grid-cols-4 gap-12 mb-16">
+            <div className="col-span-2">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <HardHat className="h-5 w-5" />
+                </div>
+                <div className="font-display text-2xl font-black uppercase tracking-tighter">SF Smart Hands</div>
+              </div>
+              <p className="text-blue-100/60 max-w-sm text-lg font-medium leading-relaxed">
+                South Florida's premier data center operations team. Providing reliable, physical presence when you can't be there.
+              </p>
+            </div>
+            <div>
+              <div className="text-blue-400 font-bold uppercase tracking-widest text-xs mb-6">Operations</div>
+              <ul className="space-y-4">
+                <li><a href="#" className="text-blue-100/80 hover:text-white font-bold transition-colors">Emergency Dispatch</a></li>
+                <li><a href="#" className="text-blue-100/80 hover:text-white font-bold transition-colors">Rack & Stack</a></li>
+                <li><a href="#" className="text-blue-100/80 hover:text-white font-bold transition-colors">Audit Services</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-blue-400 font-bold uppercase tracking-widest text-xs mb-6">Dispatch Office</div>
+              <p className="text-blue-100/80 font-bold leading-relaxed">
+                iM Critical Datacenter<br />
+                100 NE 80th Terrace<br />
+                Miami, FL 33138
+              </p>
+            </div>
+          </div>
+          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-blue-200/40 text-sm font-bold uppercase tracking-widest">© 2026 South Florida Smart Hands</div>
+            <div className="flex gap-8">
+              <a href="#" className="text-blue-200/40 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Terms of Service</a>
+              <a href="#" className="text-blue-200/40 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">SLA Policy</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
