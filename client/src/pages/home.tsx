@@ -242,7 +242,6 @@ export default function HomePage() {
     <div className="min-h-dvh bg-blue-50/20 selection:bg-blue-600 selection:text-white" data-testid="page-home">
       <TopNav onRequest={() => setShowContact(true)} />
       <ContactModal open={showContact} onOpenChange={setShowContact} />
-
       {/* Hero Section */}
       <section className="relative pt-8 pb-16 overflow-hidden bg-gradient-to-b from-white to-blue-50/30">
         <div className="absolute inset-0 bg-hero-grid opacity-15" />
@@ -293,7 +292,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
       {/* Services Grid */}
       <section id="services" className="py-16 relative bg-white">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6 relative z-10">
@@ -333,7 +331,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
       {/* Locations Section with Map */}
       <section id="locations" className="py-16 bg-blue-50/40 border-y border-blue-100">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
@@ -412,7 +409,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
       {/* Footer */}
       <footer className="py-16 bg-blue-950 text-white border-t border-white/5">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
@@ -422,7 +418,7 @@ export default function HomePage() {
                 <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/10">
                   <HardHat className="h-5 w-5" />
                 </div>
-                <div className="font-display text-2xl font-black uppercase tracking-tighter italic">SF Smart Hands</div>
+                <div className="font-display uppercase tracking-tighter italic text-[12px] font-normal">SF Smart Hands</div>
               </div>
               <p className="text-lg text-blue-200/40 max-w-sm font-medium leading-relaxed italic">
                 Professional engineering dispatch for the South Florida market. Built for uptime.
