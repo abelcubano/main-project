@@ -223,6 +223,8 @@ function TopNav({ onRequest }: { onRequest: () => void }) {
           <nav className="hidden md:flex items-center gap-6">
             <a href="#locations" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Locations</a>
             <a href="#services" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Services</a>
+            <Link href="/portal" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Customer Portal</Link>
+            <Link href="/admin" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Admin</Link>
           </nav>
           <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg font-bold text-[11px]" onClick={onRequest}>
             Request Dispatch
