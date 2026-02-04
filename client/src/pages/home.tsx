@@ -1,30 +1,29 @@
 import { Link } from "wouter";
 import { useState } from "react";
 import {
-  AlarmClock,
   ArrowRight,
-  BadgeCheck,
-  Cable,
-  CircuitBoard,
+  Check,
+  ChevronRight,
+  Code,
+  Globe,
   HardHat,
   Loader2,
   MapPin,
-  PhoneCall,
-  ShieldCheck,
+  Phone,
   Server,
-  Zap,
+  Shield,
+  Wifi,
+  X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Transition } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,73 +38,117 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-// Import local assets
-import techRack from "../assets/images/technician-rack.jpg";
-import dcHero from "../assets/images/datacenter-hero.jpg";
-import cableMgmt from "../assets/images/cable-management.jpg";
-
 const easeOut: Transition["ease"] = [0.16, 1, 0.3, 1];
 
-const container = {
-  hidden: { opacity: 0, y: 5 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { staggerChildren: 0.05, duration: 0.3, ease: easeOut },
-  },
+const fadeIn = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: easeOut } },
 };
 
-const item = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: easeOut } },
+const stagger = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
-const sites = [
+const services = [
   {
-    name: "iM Critical Datacenter",
-    address: "100 NE 80th Terrace, Miami, FL 33138",
-    lat: 80,
-    lng: 50,
-    services: ["Primary Hub", "Rack & Stack", "24/7 Remote Hands"],
+    icon: HardHat,
+    title: "SmartHands",
+    desc: "On-site datacenter technicians for installations, troubleshooting, and emergency response.",
   },
   {
-    name: "Equinix MI1",
-    address: "50 NE 9th Street, Miami, FL 33132",
-    lat: 70,
-    lng: 48,
-    services: ["Deployments", "Hands & eyes", "Emergency response"],
+    icon: Server,
+    title: "Colocation",
+    desc: "Secure rack space with redundant power and cooling at our main hub facility.",
   },
   {
-    name: "Digital Realty Miami",
-    address: "36 NE 2nd Street, Miami, FL 33132",
-    lat: 68,
-    lng: 47,
-    services: ["Installs", "Troubleshooting", "Rollouts"],
+    icon: Globe,
+    title: "DIA Internet",
+    desc: "Dedicated Internet Access with guaranteed bandwidth and low latency connectivity.",
   },
   {
-    name: "EdgeConneX Miami",
-    address: "2132 NW 114th Avenue, Miami, FL 33172",
-    lat: 55,
-    lng: 30,
-    services: ["Fiber testing", "Cable work", "Power checks"],
+    icon: Shield,
+    title: "DDoS Protection",
+    desc: "Enterprise-grade mitigation to protect your infrastructure from volumetric attacks.",
   },
   {
-    name: "EdgeConneX Miami Gardens",
-    address: "475 NE 185th Street, Miami Gardens, FL 33179",
-    lat: 25,
-    lng: 55,
-    services: ["Emergency work", "24/7 Support"],
+    icon: Phone,
+    title: "SIP Trunk & PBX",
+    desc: "Voice over IP solutions with reliable trunk services and hosted PBX systems.",
   },
   {
-    name: "CoreSite Miami",
-    address: "2115 NW 22nd Street, Miami, FL 33142",
-    lat: 60,
-    lng: 40,
-    services: ["Rack & stack", "Upgrades", "Decommissions"],
+    icon: Code,
+    title: "Custom Development",
+    desc: "Software programming and infrastructure automation tailored to your operations.",
   },
 ];
 
-function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+const locations = [
+  {
+    name: "iM Critical Miami",
+    address: "100 NE 2nd St, Miami, FL 33138",
+    isHub: true,
+    smartHandsOnly: false,
+    services: {
+      smartHands: true,
+      colocation: true,
+      diaInternet: true,
+      ddosProtection: true,
+      darkFiber: false,
+    },
+  },
+  {
+    name: "Equinix Miami",
+    address: "50 NE 9th St, Miami, FL",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+  {
+    name: "Digital Realty Miami",
+    address: "36 NE 2nd St, Miami, FL 33132",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+  {
+    name: "South Reach Networks",
+    address: "36 NE 2nd St, Miami, FL 33132",
+    isHub: false,
+    smartHandsOnly: false,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: true },
+  },
+  {
+    name: "365 Data Centers FLL",
+    address: "Fort Lauderdale, FL",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+  {
+    name: "EdgeConneX EDCMIA01",
+    address: "2132 NW 114th Ave, Miami, FL 33172",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+  {
+    name: "QTS Data Centers MIA1",
+    address: "11234 NW 20th St, Doral, FL",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+  {
+    name: "CoreSite Miami MI1",
+    address: "2100 NW 84th Ave, Doral, FL",
+    isHub: false,
+    smartHandsOnly: true,
+    services: { smartHands: true, colocation: false, diaInternet: false, ddosProtection: false, darkFiber: false },
+  },
+];
+
+function ContactModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -119,7 +162,7 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
   });
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,8 +182,8 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
         setFormData({ name: "", company: "", email: "", phone: "", facility: "", urgency: "standard", details: "" });
         onOpenChange(false);
         toast({
-          title: "Request Sent",
-          description: "A dispatch engineer will contact you shortly.",
+          title: "Request Submitted",
+          description: "Our team will contact you shortly.",
         });
       } else {
         toast({
@@ -149,7 +192,7 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Connection Error",
         description: "Unable to submit request. Please try again.",
@@ -162,85 +205,69 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px] border-blue-100 p-0 overflow-hidden bg-white shadow-xl">
-        <div className="bg-blue-600 px-5 py-6 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-xl" />
-          <div className="relative z-10 flex items-center gap-3">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 text-white backdrop-blur-sm border border-white/20">
-              <HardHat className="h-4 w-4" />
-            </div>
-            <div>
-              <DialogTitle className="text-lg font-display font-bold">Request Smart Hands</DialogTitle>
-              <DialogDescription className="text-blue-100 text-xs font-medium">
-                Professional engineering for South Florida facilities.
-              </DialogDescription>
-            </div>
-          </div>
+      <DialogContent className="sm:max-w-md border-slate-200 p-0 overflow-hidden bg-white">
+        <div className="bg-slate-900 px-6 py-5 text-white">
+          <DialogTitle className="text-base font-semibold">Request Service</DialogTitle>
+          <DialogDescription className="text-slate-400 text-xs mt-1">
+            Submit a dispatch request or service inquiry.
+          </DialogDescription>
         </div>
-        <form onSubmit={handleSubmit} className="px-5 py-5 space-y-3 bg-gradient-to-b from-white to-blue-50/20">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-blue-900 text-xs font-bold">Full Name</Label>
-              <Input id="name" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="John Doe" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-name" />
+              <Label className="text-slate-700 text-xs font-medium">Name</Label>
+              <Input value={formData.name} onChange={(e) => handleChange("name", e.target.value)} required className="h-9 text-sm border-slate-200" data-testid="input-dispatch-name" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="company" className="text-blue-900 text-xs font-bold">Company</Label>
-              <Input id="company" value={formData.company} onChange={(e) => handleChange("company", e.target.value)} placeholder="Acme Corp" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-company" />
+              <Label className="text-slate-700 text-xs font-medium">Company</Label>
+              <Input value={formData.company} onChange={(e) => handleChange("company", e.target.value)} required className="h-9 text-sm border-slate-200" data-testid="input-dispatch-company" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-blue-900 text-xs font-bold">Work Email</Label>
-              <Input id="email" type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="john@company.com" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-email" />
+              <Label className="text-slate-700 text-xs font-medium">Email</Label>
+              <Input type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required className="h-9 text-sm border-slate-200" data-testid="input-dispatch-email" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="phone" className="text-blue-900 text-xs font-bold">Phone (Optional)</Label>
-              <Input id="phone" type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="(305) 555-0123" className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-phone" />
+              <Label className="text-slate-700 text-xs font-medium">Phone</Label>
+              <Input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} className="h-9 text-sm border-slate-200" data-testid="input-dispatch-phone" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="location" className="text-blue-900 text-xs font-bold">Facility</Label>
-              <Select value={formData.facility} onValueChange={(value) => handleChange("facility", value)} required>
-                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm" data-testid="select-dispatch-facility">
-                  <SelectValue placeholder="Select location" />
+              <Label className="text-slate-700 text-xs font-medium">Location</Label>
+              <Select value={formData.facility} onValueChange={(v) => handleChange("facility", v)} required>
+                <SelectTrigger className="h-9 text-sm border-slate-200" data-testid="select-dispatch-facility">
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sites.map(site => (
-                    <SelectItem key={site.name} value={site.name} className="text-sm">{site.name}</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.name} value={loc.name} className="text-sm">{loc.name}</SelectItem>
                   ))}
-                  <SelectItem value="Other Facility" className="text-sm">Other Facility</SelectItem>
+                  <SelectItem value="Other" className="text-sm">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="urgency" className="text-blue-900 text-xs font-bold">Urgency</Label>
-              <Select value={formData.urgency} onValueChange={(value) => handleChange("urgency", value)}>
-                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm" data-testid="select-dispatch-urgency">
+              <Label className="text-slate-700 text-xs font-medium">Urgency</Label>
+              <Select value={formData.urgency} onValueChange={(v) => handleChange("urgency", v)}>
+                <SelectTrigger className="h-9 text-sm border-slate-200" data-testid="select-dispatch-urgency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard" className="text-sm">Standard (Next Day)</SelectItem>
-                  <SelectItem value="priority" className="text-sm">Priority (4-8 Hours)</SelectItem>
-                  <SelectItem value="emergency" className="text-sm">Emergency (Under 2 Hours)</SelectItem>
+                  <SelectItem value="standard" className="text-sm">Standard</SelectItem>
+                  <SelectItem value="priority" className="text-sm">Priority (4-8h)</SelectItem>
+                  <SelectItem value="emergency" className="text-sm">Emergency (&lt;2h)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-blue-900 text-xs font-bold">Task Details</Label>
-            <Textarea 
-              id="notes" 
-              value={formData.details}
-              onChange={(e) => handleChange("details", e.target.value)}
-              placeholder="Describe work needed..." 
-              required 
-              className="min-h-[80px] border-blue-100 focus-visible:ring-blue-600 resize-none text-sm"
-              data-testid="textarea-dispatch-details"
-            />
+            <Label className="text-slate-700 text-xs font-medium">Details</Label>
+            <Textarea value={formData.details} onChange={(e) => handleChange("details", e.target.value)} required className="min-h-[80px] text-sm border-slate-200 resize-none" data-testid="textarea-dispatch-details" />
           </div>
-          <Button type="submit" className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md shadow-blue-100 transition-all text-sm" disabled={loading} data-testid="button-dispatch-submit">
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Submit Dispatch Request"}
+          <Button type="submit" className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium" disabled={loading} data-testid="button-dispatch-submit">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Request"}
           </Button>
         </form>
       </DialogContent>
@@ -248,37 +275,11 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
   );
 }
 
-function TopNav({ onRequest }: { onRequest: () => void }) {
-  return (
-    <div className="sticky top-0 z-40 border-b border-blue-100 bg-white/90 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-2.5 md:px-6">
-        <div className="flex items-center gap-2.5">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-md shadow-blue-100">
-            <HardHat className="h-4 w-4" />
-          </div>
-          <div className="leading-tight">
-            <div className="font-display text-base font-black tracking-tight text-blue-900 uppercase italic">
-              SF Smart Hands
-            </div>
-            <div className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">
-              Live Dispatch
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-5">
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#locations" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Locations</a>
-            <a href="#services" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Services</a>
-            <Link href="/portal" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Customer Portal</Link>
-            <Link href="/admin" className="text-[11px] font-bold uppercase tracking-widest text-blue-900/60 hover:text-blue-600 transition-colors">Admin</Link>
-          </nav>
-          <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg font-bold text-[11px]" onClick={onRequest}>
-            Request Dispatch
-          </Button>
-        </div>
-      </div>
-    </div>
+function ServiceAvailability({ available }: { available: boolean }) {
+  return available ? (
+    <Check className="h-3.5 w-3.5 text-emerald-600" />
+  ) : (
+    <X className="h-3.5 w-3.5 text-slate-300" />
   );
 }
 
@@ -286,216 +287,282 @@ export default function HomePage() {
   const [showContact, setShowContact] = useState(false);
 
   return (
-    <div className="min-h-dvh bg-blue-50/20 selection:bg-blue-600 selection:text-white" data-testid="page-home">
-      <TopNav onRequest={() => setShowContact(true)} />
+    <div className="min-h-dvh bg-slate-50" data-testid="page-home">
       <ContactModal open={showContact} onOpenChange={setShowContact} />
-      {/* Hero Section */}
-      <section className="relative pt-8 pb-16 overflow-hidden bg-gradient-to-b from-white to-blue-50/30">
-        <div className="absolute inset-0 bg-hero-grid opacity-15" />
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-8 items-center">
-            <motion.div initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-              <div className="inline-flex items-center gap-2 mb-4 bg-blue-100/40 border border-blue-200 px-3 py-1 rounded-full">
-                <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest">Active Dispatch Coverage</span>
-              </div>
-              <h1 className="text-4xl md:text-6xl font-display font-black text-blue-950 leading-[1.05] mb-5 uppercase italic tracking-tighter">
-                Physical <span className="text-blue-600 not-italic">Presence</span> <br />
-                <span className="text-blue-900">Virtual</span> Control.
-              </h1>
-              <p className="text-base text-blue-900/70 leading-normal mb-8 max-w-md font-medium">
-                Professional Smart Hands for sub-60 minute dispatch to every major South Florida data center facility.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white text-sm font-black uppercase rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-95" onClick={() => setShowContact(true)}>
-                  Request Smart Hands
-                </Button>
-                <Button size="lg" variant="outline" className="h-12 px-8 border-blue-200 bg-white text-blue-900 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all active:scale-95">
-                  <PhoneCall className="mr-2 h-4 w-4 text-blue-600" />
-                  Live Dispatch
-                </Button>
-              </div>
-            </motion.div>
-            
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="relative">
-              <div className="relative rounded-[2rem] overflow-hidden shadow-xl border-[8px] border-white bg-white">
-                <img src={techRack} alt="Technician" className="w-full aspect-[16/10] object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-blue-950/40 via-transparent to-transparent" />
-                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="bg-white/95 backdrop-blur rounded-2xl p-4 border border-white/20 shadow-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
-                        <Zap className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="text-blue-950 text-lg font-black italic uppercase tracking-tighter leading-none mb-0.5">Sub-60 Dispatch</div>
-                        <div className="text-blue-600 text-[10px] font-bold uppercase tracking-widest">Guaranteed Arrival</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-      {/* Services Grid */}
-      <section id="services" className="py-16 relative bg-white">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-            <div className="max-w-xl">
-              <h2 className="text-3xl font-display font-black text-blue-950 uppercase italic tracking-tighter mb-2">Expert Dispatch.</h2>
-              <p className="text-sm text-blue-900/60 font-medium leading-relaxed">
-                Our engineers are vetted, experienced, and equipped with the tools needed to resolve physical issues on the first trip.
-              </p>
+
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/">
+              <span className="text-lg font-bold text-slate-900 tracking-tight">911-DC</span>
+            </Link>
+            <div className="hidden md:flex items-center gap-6">
+              <a href="#services" className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Services</a>
+              <a href="#locations" className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Locations</a>
+              <Link href="/portal">
+                <span className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Portal</span>
+              </Link>
             </div>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              { title: "Rack & Stack", img: dcHero, icon: Server, desc: "Professional installation, mapping, and documentation." },
-              { title: "Cable Management", img: cableMgmt, icon: Cable, desc: "Structured cabling, fiber routing, and certified signal testing." },
-              { title: "Emergency Triage", img: techRack, icon: Zap, desc: "Sub-60 minute arrival for hardware failures and power issues." }
-            ].map((svc, i) => (
-              <motion.div key={i} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
-                <Card className="group overflow-hidden border-blue-50 bg-white shadow-lg shadow-blue-900/5 rounded-2xl p-3 h-full flex flex-col">
-                  <div className="relative rounded-xl overflow-hidden h-40 mb-4">
-                    <img src={svc.img} alt={svc.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-blue-900/10 mix-blend-multiply" />
-                    <div className="absolute top-3 right-3 h-10 w-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-md group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <svc.icon className="h-5 w-5" />
-                    </div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin">
+              <Button variant="ghost" size="sm" className="text-xs text-slate-600 h-8">Admin</Button>
+            </Link>
+            <Button size="sm" onClick={() => setShowContact(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs font-medium px-4" data-testid="button-request-service">
+              Request Service
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative bg-slate-900 overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-30" />
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-blue-600/10 to-transparent" />
+        
+        <div className="relative max-w-6xl mx-auto px-6 py-24">
+          <motion.div variants={fadeIn} initial="hidden" animate="show" className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
+              <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="text-[10px] font-medium text-blue-400 uppercase tracking-wider">South Florida Coverage</span>
+            </div>
+            
+            <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight">
+              Datacenter Operations<br />
+              <span className="text-blue-400">You Can Rely On</span>
+            </h1>
+            
+            <p className="mt-4 text-sm text-slate-400 leading-relaxed max-w-lg">
+              911-DC provides SmartHands services, colocation, connectivity, and infrastructure solutions across major South Florida datacenters. Professional support when uptime matters most.
+            </p>
+            
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button onClick={() => setShowContact(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-6 text-sm font-medium">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <a href="#services">
+                <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 h-10 px-6 text-sm font-medium">
+                  View Services
+                </Button>
+              </a>
+            </div>
+            
+            <div className="mt-12 flex items-center gap-8 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                  <HardHat className="h-4 w-4 text-blue-400" />
+                </div>
+                <span>24/7 Response</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                  <MapPin className="h-4 w-4 text-blue-400" />
+                </div>
+                <span>8+ Facilities</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                </div>
+                <span>Enterprise Grade</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Services */}
+      <section id="services" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div variants={fadeIn} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-12">
+            <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">What We Offer</span>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">Our Services</h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+              Comprehensive datacenter and infrastructure solutions for enterprise operations.
+            </p>
+          </motion.div>
+
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid md:grid-cols-3 gap-4">
+            {services.map((svc, i) => (
+              <motion.div key={i} variants={fadeIn}>
+                <Card className="p-5 border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm transition-all h-full">
+                  <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 mb-4">
+                    <svc.icon className="h-4.5 w-4.5" />
                   </div>
-                  <div className="px-2 pb-2">
-                    <h3 className="text-xl font-display font-black text-blue-950 uppercase italic tracking-tighter mb-2">{svc.title}</h3>
-                    <p className="text-xs text-blue-900/60 font-medium leading-relaxed">
-                      {svc.desc}
-                    </p>
-                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">{svc.title}</h3>
+                  <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">{svc.desc}</p>
                 </Card>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
-      {/* Locations Section with Map */}
-      <section id="locations" className="py-16 bg-blue-50/40 border-y border-blue-100">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
-          <div className="grid lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-5">
-              <h2 className="text-3xl font-display font-black text-blue-950 uppercase italic tracking-tighter mb-6">Supported Facilities.</h2>
-              <div className="space-y-3 mb-8">
-                {sites.map((site, idx) => (
-                  <Card key={idx} className="p-4 border-blue-100 bg-white shadow-md rounded-2xl hover:border-blue-400 transition-all group">
-                    <div className="flex items-start gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                        <MapPin className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-blue-950 font-black uppercase italic tracking-tight text-lg mb-0.5 truncate">{site.name}</div>
-                        <div className="text-blue-600/70 text-[11px] font-bold tracking-tight mb-2 truncate">{site.address}</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {site.services.slice(0, 2).map((svc, sIdx) => (
-                            <span key={sIdx} className="text-[9px] font-black text-blue-900/30 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded-md">{svc}</span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-              <div className="flex flex-col gap-4">
-                <Button size="lg" className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase rounded-xl text-xs shadow-md shadow-blue-100" onClick={() => setShowContact(true)}>
-                  Don’t see your location? Ask here!
-                </Button>
-                <div className="p-6 bg-blue-950 rounded-2xl text-white">
-                  <div className="text-blue-400 text-[9px] font-black uppercase tracking-widest mb-2">Central Dispatch Hub</div>
-                  <div className="text-lg font-display font-bold uppercase italic tracking-tighter leading-none mb-1">iM Critical Datacenter</div>
-                  <div className="text-blue-200/50 text-xs font-medium">100 NE 80th Terrace, Miami, FL 33138</div>
-                </div>
-              </div>
-            </div>
 
-            <div className="lg:col-span-7 h-[500px] relative">
-              <div className="h-full w-full rounded-[2.5rem] overflow-hidden border-[12px] border-white shadow-xl bg-white relative">
-                <div className="absolute inset-0 bg-[#f1f5f9]">
-                  <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-                  
-                  {sites.map((site, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.1 * idx }}
-                      className="absolute group z-10"
-                      style={{ top: `${site.lat}%`, left: `${site.lng}%`, transform: 'translate(-50%, -50%)' }}
-                    >
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white px-3 py-1.5 rounded-lg shadow-xl border border-blue-50 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap pointer-events-none scale-90">
-                        <div className="font-black uppercase italic tracking-tighter text-blue-950 text-xs">{site.name}</div>
-                      </div>
-                      <div className="relative">
-                        <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-xl transform hover:scale-110 transition-transform cursor-pointer border-2 border-white">
-                          <HardHat className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                  
-                  <div className="absolute bottom-6 left-6 p-4 bg-blue-900/95 backdrop-blur-sm rounded-2xl text-white shadow-lg border border-white/10 max-w-[200px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Live Response</span>
+      {/* Locations */}
+      <section id="locations" className="py-20 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div variants={fadeIn} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-12">
+            <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">Coverage</span>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">Datacenter Locations</h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+              Service availability varies by facility. Our main hub offers full infrastructure services.
+            </p>
+          </motion.div>
+
+          {/* Main Hub */}
+          <motion.div variants={fadeIn} initial="hidden" whileInView="show" viewport={{ once: true }} className="mb-8">
+            <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-white overflow-hidden">
+              <div className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0">
+                    <Server className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900">iM Critical Miami</h3>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-600 text-white uppercase">Main Hub</span>
                     </div>
-                    <div className="text-sm font-display font-bold uppercase italic tracking-tighter leading-tight">
-                      Sub-60 min arrival guaranteed in all zones.
+                    <p className="text-xs text-slate-500 mt-0.5">100 NE 2nd St, Miami, FL 33138</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700">
+                        <HardHat className="h-3 w-3 text-blue-600" /> SmartHands
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700">
+                        <Server className="h-3 w-3 text-blue-600" /> Colocation
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700">
+                        <Globe className="h-3 w-3 text-blue-600" /> DIA Internet
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700">
+                        <Shield className="h-3 w-3 text-blue-600" /> DDoS Protection
+                      </span>
                     </div>
                   </div>
                 </div>
+                <Button onClick={() => setShowContact(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-5 text-xs font-medium shrink-0">
+                  Request Service
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
               </div>
-            </div>
-          </div>
+            </Card>
+          </motion.div>
+
+          {/* Location Grid */}
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {locations.filter((loc) => !loc.isHub).map((loc, i) => (
+              <motion.div key={i} variants={fadeIn}>
+                <Card className="p-4 border-slate-100 bg-white h-full">
+                  <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-semibold text-slate-900 leading-tight">{loc.name}</h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">{loc.address}</p>
+                    </div>
+                  </div>
+                  <Separator className="my-3 bg-slate-100" />
+                  {loc.smartHandsOnly ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <Check className="h-3 w-3 text-emerald-600" />
+                        <span className="text-slate-700 font-medium">SmartHands</span>
+                      </div>
+                      <p className="text-[9px] text-slate-400">No Colocation · No DIA Internet</p>
+                    </div>
+                  ) : loc.services.darkFiber ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <Check className="h-3 w-3 text-emerald-600" />
+                        <span className="text-slate-700 font-medium">SmartHands</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <Check className="h-3 w-3 text-emerald-600" />
+                        <span className="text-slate-700 font-medium">Dark Fiber Access</span>
+                      </div>
+                      <p className="text-[9px] text-slate-400">No Colocation · No DIA Internet</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 text-[10px] text-slate-500">
+                      <div className="flex items-center gap-1">
+                        <ServiceAvailability available={loc.services.smartHands} />
+                        <span>SmartHands</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ServiceAvailability available={loc.services.colocation} />
+                        <span>Colo</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ServiceAvailability available={loc.services.diaInternet} />
+                        <span>DIA</span>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Not Listed */}
+          <motion.div variants={fadeIn} initial="hidden" whileInView="show" viewport={{ once: true }} className="mt-8 text-center">
+            <Card className="inline-flex items-center gap-3 px-5 py-3 border-dashed border-slate-200 bg-white">
+              <span className="text-xs text-slate-500">Don't see your site listed?</span>
+              <Button variant="link" onClick={() => setShowContact(true)} className="h-auto p-0 text-xs font-medium text-blue-600">
+                Contact us about availability
+                <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </Card>
+          </motion.div>
         </div>
       </section>
+
+      {/* CTA */}
+      <section className="py-16 bg-slate-900">
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <motion.div variants={fadeIn} initial="hidden" whileInView="show" viewport={{ once: true }}>
+            <h2 className="text-xl font-bold text-white">Ready to work with us?</h2>
+            <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
+              Get reliable datacenter operations support from our professional team.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Button onClick={() => setShowContact(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-6 text-sm font-medium">
+                Request Service
+              </Button>
+              <a href="tel:+13055550123">
+                <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 h-10 px-6 text-sm font-medium">
+                  <Phone className="mr-2 h-4 w-4" />
+                  Call Us
+                </Button>
+              </a>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="py-16 bg-blue-950 text-white border-t border-white/5">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
-          <div className="grid md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-2">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/10">
-                  <HardHat className="h-5 w-5" />
-                </div>
-                <div className="font-display uppercase tracking-tighter italic text-[12px] font-normal">SF Smart Hands</div>
-              </div>
-              <p className="text-lg text-blue-200/40 max-w-sm font-medium leading-relaxed italic">
-                Professional engineering dispatch for the South Florida market. Built for uptime.
-              </p>
+      <footer className="py-12 bg-slate-950 text-slate-400">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-6">
+              <span className="text-base font-bold text-white">911-DC</span>
+              <Separator orientation="vertical" className="h-4 bg-slate-800" />
+              <span className="text-xs">Datacenter Operations</span>
             </div>
-            <div>
-              <div className="text-blue-500 text-[10px] font-black uppercase tracking-[0.2em] mb-6">Operations</div>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-sm font-bold hover:text-blue-400 transition-colors">Emergency Dispatch</a></li>
-                <li><a href="#" className="text-sm font-bold hover:text-blue-400 transition-colors">Rack & Stack</a></li>
-                <li><a href="#" className="text-sm font-bold hover:text-blue-400 transition-colors">Audit & Inventory</a></li>
-              </ul>
-            </div>
-            <div>
-              <div className="text-blue-500 text-[10px] font-black uppercase tracking-[0.2em] mb-6">HQ</div>
-              <p className="text-base font-bold leading-relaxed italic">
-                iM Critical Datacenter<br />
-                100 NE 80th Terrace<br />
-                Miami, FL 33138
-              </p>
-              <div className="mt-6 pt-6 border-t border-white/5">
-                <div className="text-3xl font-display font-black tracking-tighter text-blue-200 leading-none">(305) 555-0123</div>
-              </div>
+            <div className="flex items-center gap-6 text-xs">
+              <a href="#services" className="hover:text-white transition-colors">Services</a>
+              <a href="#locations" className="hover:text-white transition-colors">Locations</a>
+              <Link href="/portal"><span className="hover:text-white transition-colors">Portal</span></Link>
+              <Link href="/admin"><span className="hover:text-white transition-colors">Admin</span></Link>
             </div>
           </div>
-          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-blue-200/20 text-[8px] font-black uppercase tracking-[0.4em]">© 2026 South Florida Smart Hands</div>
-            <div className="flex gap-8">
-              <a href="#" className="text-blue-200/20 hover:text-blue-400 text-[9px] font-black uppercase tracking-widest transition-colors">Privacy</a>
-              <a href="#" className="text-blue-200/20 hover:text-blue-400 text-[9px] font-black uppercase tracking-widest transition-colors">Terms</a>
+          <Separator className="my-8 bg-slate-800" />
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-slate-500">
+            <span>© 2026 911-DC. All rights reserved.</span>
+            <div className="flex items-center gap-4">
+              <a href="#" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-slate-400 transition-colors">Terms of Service</a>
             </div>
           </div>
         </div>

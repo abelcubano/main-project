@@ -1,15 +1,26 @@
-# South Florida Smart Hands - Datacenter Operations Platform
+# 911-DC - Datacenter Operations Platform
 
 ## Overview
 
-This is a web-based datacenter operations, billing, and customer engagement platform focused on colocation and managed datacenter services. The platform serves as a simplified, modular alternative to Ubersmith, optimized for operational efficiency and service-driven revenue.
+911-DC is a datacenter-focused company primarily oriented to SmartHands services, also offering colocation, connectivity, DDoS protection, SIP/PBX, and custom development services across South Florida.
 
 The application includes:
-- **Public-facing marketing landing page** for Remote Hands and Smart Hands services
-- **Customer portal** for service management, billing, and support tickets
-- **Admin backend** for internal operations with role-based access control
+- **Public-facing landing page** - Professional B2B design with blue/slate color scheme, showcasing services and 8 datacenter locations with service availability matrix
+- **Customer portal** - Service management, billing, and support tickets
+- **Admin console** - Internal operations with role-based access control
 
-Core features planned include customer/company management, service lifecycle tracking, billing with recurring invoices, ticketing with SLA tracking, and device/infrastructure inventory management.
+### Services Offered
+- SmartHands Datacenter Services (available at all locations)
+- Colocation (main hub only)
+- DIA Internet (main hub only)
+- DDoS Protection (main hub only)
+- SIP Trunk and PBX
+- Software Programming and Custom Development
+
+### Datacenter Locations
+- **Main Hub**: iM Critical Miami (100 NE 2nd St, Miami, FL 33138) - Full services
+- Equinix Miami, Digital Realty Miami, 365 Data Centers FLL, EdgeConneX, QTS MIA1, CoreSite MI1 - SmartHands only
+- South Reach Networks - SmartHands + Dark Fiber Access
 
 ## User Preferences
 
