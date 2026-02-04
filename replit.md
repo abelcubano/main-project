@@ -64,7 +64,17 @@ The database schema is shared between frontend and backend through the `shared/`
 - **Replit Plugins**: Dev banner, cartographer, and runtime error overlay for Replit environment
 - **Vite Plugin Meta Images**: Auto-updates OpenGraph meta tags with deployment URL
 
+### Email Notifications
+- **Library**: Nodemailer with SMTP transport
+- **SMTP Provider**: Titan Email (smtp.titan.email:465 with SSL)
+- **Configuration**: Environment variables for host, port, from/to addresses
+- **Secrets**: MAIL_PASSWORD stored securely in Replit Secrets
+- **Features**: 
+  - Dispatch request notifications sent to info@911dc.us
+  - HTML and plain text email formats
+  - HTML injection prevention via entity escaping
+  - Error logging for failed sends
+
 ### Planned Integrations (Future)
 - Payment gateway integration (Stripe dependency already included)
-- Email notifications (Nodemailer dependency included)
 - PDF invoice generation

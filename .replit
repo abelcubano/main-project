@@ -41,3 +41,12 @@ waitForPort = 5000
 [agent]
 stack = "MOCKUP_JS"
 mockupState = "FULLSTACK"
+
+[userenv]
+
+[userenv.shared]
+MAIL_HOST = "smtp.titan.email"
+MAIL_PORT = "465"
+MAIL_FROM = "abel.monzon@911dc.us"
+MAIL_TO = "info@911dc.us"
+MAIL_USER = "abel.monzon@911dc.us"

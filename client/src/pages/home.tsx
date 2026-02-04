@@ -108,18 +108,56 @@ const sites = [
 function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    company: "",
+    email: "",
+    phone: "",
+    facility: "",
+    urgency: "standard",
+    details: "",
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      onOpenChange(false);
-      toast({
-        title: "Request Sent",
-        description: "A dispatch engineer will contact you shortly.",
+
+    try {
+      const response = await fetch("/api/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
-    }, 1200);
+
+      const result = await response.json();
+
+      if (result.success) {
+        setFormData({ name: "", company: "", email: "", phone: "", facility: "", urgency: "standard", details: "" });
+        onOpenChange(false);
+        toast({
+          title: "Request Sent",
+          description: "A dispatch engineer will contact you shortly.",
+        });
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: result.error || "Please try again or contact us directly.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "Unable to submit request. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -143,36 +181,42 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="name" className="text-blue-900 text-xs font-bold">Full Name</Label>
-              <Input id="name" placeholder="John Doe" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" />
+              <Input id="name" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="John Doe" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-name" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="company" className="text-blue-900 text-xs font-bold">Company</Label>
-              <Input id="company" placeholder="Acme Corp" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" />
+              <Input id="company" value={formData.company} onChange={(e) => handleChange("company", e.target.value)} placeholder="Acme Corp" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-company" />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-blue-900 text-xs font-bold">Work Email</Label>
-            <Input id="email" type="email" placeholder="john@company.com" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-blue-900 text-xs font-bold">Work Email</Label>
+              <Input id="email" type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="john@company.com" required className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-email" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone" className="text-blue-900 text-xs font-bold">Phone (Optional)</Label>
+              <Input id="phone" type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="(305) 555-0123" className="border-blue-100 focus-visible:ring-blue-600 h-9 text-sm" data-testid="input-dispatch-phone" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="location" className="text-blue-900 text-xs font-bold">Facility</Label>
-              <Select required>
-                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm">
+              <Select value={formData.facility} onValueChange={(value) => handleChange("facility", value)} required>
+                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm" data-testid="select-dispatch-facility">
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
                   {sites.map(site => (
                     <SelectItem key={site.name} value={site.name} className="text-sm">{site.name}</SelectItem>
                   ))}
-                  <SelectItem value="other" className="text-sm">Other Facility</SelectItem>
+                  <SelectItem value="Other Facility" className="text-sm">Other Facility</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="urgency" className="text-blue-900 text-xs font-bold">Urgency</Label>
-              <Select defaultValue="standard">
-                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm">
+              <Select value={formData.urgency} onValueChange={(value) => handleChange("urgency", value)}>
+                <SelectTrigger className="border-blue-100 focus:ring-blue-600 h-9 text-sm" data-testid="select-dispatch-urgency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,12 +231,15 @@ function ContactModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
             <Label htmlFor="notes" className="text-blue-900 text-xs font-bold">Task Details</Label>
             <Textarea 
               id="notes" 
+              value={formData.details}
+              onChange={(e) => handleChange("details", e.target.value)}
               placeholder="Describe work needed..." 
               required 
               className="min-h-[80px] border-blue-100 focus-visible:ring-blue-600 resize-none text-sm"
+              data-testid="textarea-dispatch-details"
             />
           </div>
-          <Button type="submit" className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md shadow-blue-100 transition-all text-sm" disabled={loading}>
+          <Button type="submit" className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md shadow-blue-100 transition-all text-sm" disabled={loading} data-testid="button-dispatch-submit">
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Submit Dispatch Request"}
           </Button>
         </form>
