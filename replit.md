@@ -7,7 +7,7 @@
 The application includes:
 - **Public-facing landing page** - Professional B2B design with blue/slate color scheme, showcasing services and 8 datacenter locations with service availability matrix
 - **Customer portal** - Service management, billing, and support tickets
-- **Admin console** - Internal operations with role-based access control
+- **Admin console** - Internal operations with role-based access control, full CRUD for services and invoices
 
 ### Services Offered
 - SmartHands Datacenter Services (available at all locations)
@@ -54,6 +54,13 @@ The server uses a modular structure with routes in `server/routes.ts` and a stor
 - **Migrations**: Drizzle Kit for schema migrations (`drizzle-kit push`)
 
 The database schema is shared between frontend and backend through the `shared/` directory, enabling type-safe API contracts.
+
+### Database Schema
+- **users** - User accounts with bcrypt-hashed passwords and role-based access (admin/user)
+- **services** - Customer services linked to users (colocation, SmartHands, connectivity, etc.)
+- **invoices** - Customer invoices with line items, totals, and status tracking
+- **invoice_items** - Individual line items for each invoice
+- **dispatch_requests** - SmartHands dispatch requests for datacenter operations
 
 ### Build System
 - **Client Build**: Vite bundles React app to `dist/public/`
