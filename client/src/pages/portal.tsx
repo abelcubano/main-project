@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 import {
   ArrowRight,
   Bell,
@@ -94,7 +95,14 @@ function NavItem({ icon: Icon, label, active, badge }: { icon: typeof LayoutDash
 }
 
 export default function PortalPage() {
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
+
+  async function handleLogout() {
+    await logout();
+    setLocation("/portal/login");
+  }
 
   const services: Service[] = [
     { id: "svc-001", name: "Cabinet C12 (42U)", type: "Colocation", status: "active", location: "iM Critical Miami", details: "2kW · 2x 20A circuits" },
@@ -160,12 +168,10 @@ export default function PortalPage() {
         </nav>
 
         <div className="p-3 border-t border-slate-100">
-          <Link href="/">
-            <Button variant="ghost" className="w-full h-8 text-xs text-slate-600 hover:text-slate-900 justify-start">
-              <LogOut className="mr-2 h-3.5 w-3.5" />
-              Exit to Website
-            </Button>
-          </Link>
+          <Button variant="ghost" onClick={handleLogout} className="w-full h-8 text-xs text-slate-600 hover:text-slate-900 justify-start" data-testid="button-logout">
+            <LogOut className="mr-2 h-3.5 w-3.5" />
+            Sign Out
+          </Button>
         </div>
       </aside>
 
@@ -187,10 +193,12 @@ export default function PortalPage() {
               <Bell className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">JD</div>
+              <div className="h-7 w-7 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+                {user?.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U"}
+              </div>
               <div className="leading-tight">
-                <div className="text-xs font-medium text-slate-900">John Doe</div>
-                <div className="text-[10px] text-slate-500">ExampleCo</div>
+                <div className="text-xs font-medium text-slate-900">{user?.name || "User"}</div>
+                <div className="text-[10px] text-slate-500">{user?.companyName || "Customer"}</div>
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </div>

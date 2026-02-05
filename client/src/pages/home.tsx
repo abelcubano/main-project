@@ -300,13 +300,13 @@ export default function HomePage() {
             <div className="hidden md:flex items-center gap-6">
               <a href="#services" className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Services</a>
               <a href="#locations" className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Locations</a>
-              <Link href="/portal">
+              <Link href="/portal/login">
                 <span className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">Portal</span>
               </Link>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/admin">
+            <Link href="/admin/login">
               <Button variant="ghost" size="sm" className="text-xs text-slate-600 h-8">Admin</Button>
             </Link>
             <Button size="sm" onClick={() => setShowContact(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs font-medium px-4" data-testid="button-request-service">
@@ -553,8 +553,8 @@ export default function HomePage() {
             <div className="flex items-center gap-6 text-xs">
               <a href="#services" className="hover:text-white transition-colors">Services</a>
               <a href="#locations" className="hover:text-white transition-colors">Locations</a>
-              <Link href="/portal"><span className="hover:text-white transition-colors">Portal</span></Link>
-              <Link href="/admin"><span className="hover:text-white transition-colors">Admin</span></Link>
+              <Link href="/portal/login"><span className="hover:text-white transition-colors">Portal</span></Link>
+              <Link href="/admin/login"><span className="hover:text-white transition-colors">Admin</span></Link>
             </div>
           </div>
           <Separator className="my-8 bg-slate-800" />
