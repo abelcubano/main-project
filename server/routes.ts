@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { sendDispatchEmail, verifyEmailConnection, type DispatchRequest } from "./email";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema } from "@shared/schema";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -251,6 +251,221 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[ADMIN] Delete user error:", error);
       res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Customer services endpoints
+  app.get("/api/services", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const servicesList = user.role === "admin" 
+        ? await storage.getAllServices()
+        : await storage.getServicesByUser(user.id);
+      res.json(servicesList);
+    } catch (error: any) {
+      console.error("[SERVICES] Get services error:", error);
+      res.status(500).json({ error: "Failed to fetch services" });
+    }
+  });
+
+  app.get("/api/services/:id", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const service = await storage.getService(serviceId);
+      
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      
+      if (user.role !== "admin" && service.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(service);
+    } catch (error: any) {
+      console.error("[SERVICES] Get service error:", error);
+      res.status(500).json({ error: "Failed to fetch service" });
+    }
+  });
+
+  // Admin service management
+  app.post("/api/admin/services", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const validation = insertServiceSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: validation.error.flatten().fieldErrors 
+        });
+      }
+      
+      const service = await storage.createService(validation.data);
+      res.json(service);
+    } catch (error: any) {
+      console.error("[ADMIN] Create service error:", error);
+      res.status(500).json({ error: "Failed to create service" });
+    }
+  });
+
+  app.put("/api/admin/services/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const service = await storage.updateService(serviceId, req.body);
+      
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      
+      res.json(service);
+    } catch (error: any) {
+      console.error("[ADMIN] Update service error:", error);
+      res.status(500).json({ error: "Failed to update service" });
+    }
+  });
+
+  app.delete("/api/admin/services/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const deleted = await storage.deleteService(serviceId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ADMIN] Delete service error:", error);
+      res.status(500).json({ error: "Failed to delete service" });
+    }
+  });
+
+  // Customer invoices endpoints
+  app.get("/api/invoices", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const invoicesList = user.role === "admin" 
+        ? await storage.getAllInvoices()
+        : await storage.getInvoicesByUser(user.id);
+      res.json(invoicesList);
+    } catch (error: any) {
+      console.error("[INVOICES] Get invoices error:", error);
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      if (user.role !== "admin" && invoice.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const items = await storage.getInvoiceItems(invoiceId);
+      res.json({ ...invoice, items });
+    } catch (error: any) {
+      console.error("[INVOICES] Get invoice error:", error);
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // Admin invoice management
+  app.post("/api/admin/invoices", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { items, ...invoiceData } = req.body;
+      const validation = insertInvoiceSchema.safeParse(invoiceData);
+      
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: validation.error.flatten().fieldErrors 
+        });
+      }
+      
+      const invoice = await storage.createInvoice(validation.data);
+      
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await storage.createInvoiceItem({
+            ...item,
+            invoiceId: invoice.id,
+          });
+        }
+      }
+      
+      const createdItems = await storage.getInvoiceItems(invoice.id);
+      res.json({ ...invoice, items: createdItems });
+    } catch (error: any) {
+      console.error("[ADMIN] Create invoice error:", error);
+      res.status(500).json({ error: "Failed to create invoice" });
+    }
+  });
+
+  app.put("/api/admin/invoices/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { items, ...updates } = req.body;
+      
+      const invoice = await storage.updateInvoice(invoiceId, updates);
+      
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      if (items && Array.isArray(items)) {
+        await storage.deleteInvoiceItems(invoiceId);
+        for (const item of items) {
+          await storage.createInvoiceItem({
+            ...item,
+            invoiceId: invoice.id,
+          });
+        }
+      }
+      
+      const updatedItems = await storage.getInvoiceItems(invoice.id);
+      res.json({ ...invoice, items: updatedItems });
+    } catch (error: any) {
+      console.error("[ADMIN] Update invoice error:", error);
+      res.status(500).json({ error: "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/admin/invoices/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const deleted = await storage.deleteInvoice(invoiceId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ADMIN] Delete invoice error:", error);
+      res.status(500).json({ error: "Failed to delete invoice" });
+    }
+  });
+
+  // Get all customers (for admin dropdowns)
+  app.get("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customers = await storage.getUsersByRole("customer");
+      res.json(customers.map(c => ({
+        id: c.id,
+        name: c.name,
+        companyName: c.companyName,
+        email: c.email,
+      })));
+    } catch (error: any) {
+      console.error("[ADMIN] Get customers error:", error);
+      res.status(500).json({ error: "Failed to fetch customers" });
     }
   });
 

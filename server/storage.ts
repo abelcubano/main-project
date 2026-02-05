@@ -1,6 +1,12 @@
-import { type User, type InsertUser, type Session, users, sessions } from "@shared/schema";
+import { 
+  type User, type InsertUser, type Session, 
+  type Service, type InsertService,
+  type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem,
+  users, sessions, services, invoices, invoiceItems 
+} from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -17,6 +23,24 @@ export interface IStorage {
   deleteSession(token: string): Promise<boolean>;
   deleteUserSessions(userId: string): Promise<boolean>;
   updateLastLogin(userId: string): Promise<void>;
+  
+  getService(id: string): Promise<Service | undefined>;
+  getServicesByUser(userId: string): Promise<Service[]>;
+  getAllServices(): Promise<Service[]>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: string, updates: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: string): Promise<boolean>;
+  
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoicesByUser(userId: string): Promise<Invoice[]>;
+  getAllInvoices(): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, updates: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+  
+  getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
+  deleteInvoiceItems(invoiceId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -86,6 +110,77 @@ export class DatabaseStorage implements IStorage {
 
   async updateLastLogin(userId: string): Promise<void> {
     await db.update(users).set({ lastLogin: new Date() }).where(eq(users.id, userId));
+  }
+
+  async getService(id: string): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
+  }
+
+  async getServicesByUser(userId: string): Promise<Service[]> {
+    return db.select().from(services).where(eq(services.userId, userId)).orderBy(desc(services.createdAt));
+  }
+
+  async getAllServices(): Promise<Service[]> {
+    return db.select().from(services).orderBy(desc(services.createdAt));
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    const [created] = await db.insert(services).values(service).returning();
+    return created;
+  }
+
+  async updateService(id: string, updates: Partial<InsertService>): Promise<Service | undefined> {
+    const [updated] = await db.update(services).set(updates).where(eq(services.id, id)).returning();
+    return updated;
+  }
+
+  async deleteService(id: string): Promise<boolean> {
+    const result = await db.delete(services).where(eq(services.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
+  }
+
+  async getInvoicesByUser(userId: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.userId, userId)).orderBy(desc(invoices.issueDate));
+  }
+
+  async getAllInvoices(): Promise<Invoice[]> {
+    return db.select().from(invoices).orderBy(desc(invoices.issueDate));
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const [created] = await db.insert(invoices).values(invoice).returning();
+    return created;
+  }
+
+  async updateInvoice(id: string, updates: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const [updated] = await db.update(invoices).set(updates).where(eq(invoices.id, id)).returning();
+    return updated;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    const result = await db.delete(invoices).where(eq(invoices.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+    return db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+  }
+
+  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [created] = await db.insert(invoiceItems).values(item).returning();
+    return created;
+  }
+
+  async deleteInvoiceItems(invoiceId: string): Promise<boolean> {
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+    return true;
   }
 }
 

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
+import type { Service as DbService, Invoice as DbInvoice } from "@shared/schema";
 import {
   ArrowRight,
   Bell,
@@ -70,6 +72,7 @@ function StatusBadge({ status }: { status: string }) {
     suspended: "bg-amber-50 text-amber-700 border-amber-200",
     paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
     open: "bg-blue-50 text-blue-700 border-blue-200",
+    pending: "bg-amber-50 text-amber-700 border-amber-200",
     past_due: "bg-rose-50 text-rose-700 border-rose-200",
     new: "bg-blue-50 text-blue-700 border-blue-200",
     waiting: "bg-amber-50 text-amber-700 border-amber-200",
@@ -95,7 +98,7 @@ function NavItem({ icon: Icon, label, active, badge }: { icon: typeof LayoutDash
 }
 
 export default function PortalPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
 
@@ -104,17 +107,52 @@ export default function PortalPage() {
     setLocation("/portal/login");
   }
 
-  const services: Service[] = [
-    { id: "svc-001", name: "Cabinet C12 (42U)", type: "Colocation", status: "active", location: "iM Critical Miami", details: "2kW · 2x 20A circuits" },
-    { id: "svc-002", name: "DIA 100Mbps", type: "Internet", status: "active", location: "iM Critical Miami", details: "Dedicated Internet Access" },
-    { id: "svc-003", name: "Cross-connect MMF LC", type: "Network", status: "provisioning", location: "iM Critical Miami", details: "ETA 2-3 business days" },
-  ];
+  const { data: servicesData = [] } = useQuery<DbService[]>({
+    queryKey: ["services"],
+    queryFn: async () => {
+      const res = await fetch("/api/services", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
+    enabled: !!token,
+  });
 
-  const invoices: Invoice[] = [
-    { id: "inv-01", number: "INV-10241", status: "paid", date: "2026-01-05", total: "$1,840.00" },
-    { id: "inv-02", number: "INV-10302", status: "open", date: "2026-02-01", total: "$1,840.00" },
-    { id: "inv-03", number: "INV-10310", status: "past_due", date: "2025-12-01", total: "$120.00" },
-  ];
+  const { data: invoicesData = [] } = useQuery<DbInvoice[]>({
+    queryKey: ["invoices"],
+    queryFn: async () => {
+      const res = await fetch("/api/invoices", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+    enabled: !!token,
+  });
+
+  const services: Service[] = servicesData.map((s) => ({
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    status: s.status as "active" | "provisioning" | "suspended",
+    location: s.location,
+    details: s.details || "",
+  }));
+
+  const invoices: Invoice[] = invoicesData.map((inv) => {
+    let status: "paid" | "open" | "past_due" = "open";
+    if (inv.status === "paid") status = "paid";
+    else if (inv.status === "past_due") status = "past_due";
+    else status = "open";
+    return {
+      id: inv.id,
+      number: inv.invoiceNumber,
+      status,
+      date: new Date(inv.issueDate).toLocaleDateString(),
+      total: `$${Number(inv.total).toFixed(2)}`,
+    };
+  });
 
   const tickets: Ticket[] = [
     { id: "t-001", subject: "SmartHands: install replacement SSD", category: "smart_hands", priority: "normal", status: "open", updatedAt: "2h ago" },
@@ -122,11 +160,16 @@ export default function PortalPage() {
     { id: "t-003", subject: "Network: packet loss on cross-connect", category: "technical", priority: "urgent", status: "new", updatedAt: "10m ago" },
   ];
 
+  const activeServices = services.filter((s) => s.status === "active").length;
+  const provisioningServices = services.filter((s) => s.status === "provisioning").length;
+  const openInvoices = invoices.filter((inv) => inv.status === "open").length;
+  const pastDueInvoices = invoices.filter((inv) => inv.status === "past_due").length;
+
   const filteredServices = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return services;
     return services.filter((s) => [s.name, s.type, s.location].some((v) => v.toLowerCase().includes(q)));
-  }, [query]);
+  }, [query, services]);
 
   return (
     <div className="min-h-dvh flex bg-slate-50" data-testid="page-portal">
@@ -151,12 +194,12 @@ export default function PortalPage() {
           <NavItem icon={LayoutDashboard} label="Dashboard" active />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Services</div>
-          <NavItem icon={Server} label="My Services" badge={3} />
+          <NavItem icon={Server} label="My Services" badge={services.length || undefined} />
           <NavItem icon={MapPin} label="Locations" />
           <NavItem icon={Network} label="Network" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Billing</div>
-          <NavItem icon={FileText} label="Invoices" badge={1} />
+          <NavItem icon={FileText} label="Invoices" badge={openInvoices + pastDueInvoices || undefined} />
           <NavItem icon={CreditCard} label="Payments" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Support</div>
@@ -180,8 +223,7 @@ export default function PortalPage() {
         {/* Header */}
         <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700">ExampleCo</span>
-            <span className="text-[10px] text-slate-400">Account #1001</span>
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700">{user?.companyName || "Customer Account"}</span>
           </div>
           <div className="flex items-center gap-3">
             <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs">
@@ -220,8 +262,8 @@ export default function PortalPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Active Services</div>
-                    <div className="mt-1 text-2xl font-bold text-slate-900">3</div>
-                    <div className="mt-0.5 text-[10px] text-blue-600">1 provisioning</div>
+                    <div className="mt-1 text-2xl font-bold text-slate-900">{activeServices}</div>
+                    <div className="mt-0.5 text-[10px] text-blue-600">{provisioningServices > 0 ? `${provisioningServices} provisioning` : "All operational"}</div>
                   </div>
                   <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                     <Server className="h-4 w-4" />
@@ -232,8 +274,8 @@ export default function PortalPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Open Invoices</div>
-                    <div className="mt-1 text-2xl font-bold text-slate-900">1</div>
-                    <div className="mt-0.5 text-[10px] text-slate-500">Due Feb 15</div>
+                    <div className="mt-1 text-2xl font-bold text-slate-900">{openInvoices + pastDueInvoices}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-500">{pastDueInvoices > 0 ? <span className="text-rose-600">{pastDueInvoices} past due</span> : "All current"}</div>
                   </div>
                   <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                     <FileText className="h-4 w-4" />

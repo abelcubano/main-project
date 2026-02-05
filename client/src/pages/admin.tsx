@@ -107,7 +107,7 @@ export default function AdminPage() {
   const { user, token, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [currentView, setCurrentView] = useState<"dashboard" | "users">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "users" | "services" | "invoices">("dashboard");
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -213,9 +213,9 @@ export default function AdminPage() {
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Business</div>
           <NavItem icon={Building2} label="Customers" />
-          <NavItem icon={Server} label="Services" />
+          <NavItem icon={Server} label="Services" active={currentView === "services"} onClick={() => setCurrentView("services")} />
           <NavItem icon={CreditCard} label="Billing" />
-          <NavItem icon={FileText} label="Invoices" />
+          <NavItem icon={FileText} label="Invoices" active={currentView === "invoices"} onClick={() => setCurrentView("invoices")} />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">System</div>
           <NavItem icon={Users} label="Users" active={currentView === "users"} onClick={() => setCurrentView("users")} badge={users.length || undefined} />
@@ -260,11 +260,12 @@ export default function AdminPage() {
           </div>
         </header>
 
-        {/* Dashboard/Users Content */}
+        {/* Dashboard/Users/Services/Invoices Content */}
         <main className="flex-1 overflow-y-auto p-5">
-          {currentView === "dashboard" ? (
+          {currentView === "dashboard" && (
             <DashboardView tickets={tickets} onManageUsers={() => setCurrentView("users")} />
-          ) : (
+          )}
+          {currentView === "users" && (
             <UsersView 
               users={filteredUsers} 
               loading={loadingUsers}
@@ -274,6 +275,12 @@ export default function AdminPage() {
               onEditUser={handleEditUser}
               onDeleteUser={handleDeleteUser}
             />
+          )}
+          {currentView === "services" && (
+            <ServicesView token={token} />
+          )}
+          {currentView === "invoices" && (
+            <InvoicesView token={token} />
           )}
         </main>
       </div>
@@ -730,6 +737,650 @@ function UserModal({
             </Button>
             <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs" data-testid="button-save-user">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingUser ? "Update" : "Create")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ServiceData = {
+  id: string;
+  userId: string;
+  name: string;
+  type: string;
+  status: string;
+  location: string;
+  details: string | null;
+  monthlyPrice: string;
+  startDate: string;
+};
+
+type CustomerOption = {
+  id: string;
+  name: string;
+  companyName: string | null;
+};
+
+function ServicesView({ token }: { token: string | null }) {
+  const { toast } = useToast();
+  const [services, setServices] = useState<ServiceData[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceData | null>(null);
+  const [query, setQuery] = useState("");
+
+  async function loadServices() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/services", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setServices(await res.json());
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to load services", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCustomers() {
+    try {
+      const res = await fetch("/api/admin/customers", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setCustomers(await res.json());
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadServices();
+    loadCustomers();
+  }, []);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to delete this service?")) return;
+    try {
+      const res = await fetch(`/api/admin/services/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Service deleted" });
+        loadServices();
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to delete service", variant: "destructive" });
+    }
+  }
+
+  const filteredServices = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter((s) => [s.name, s.type, s.location].some((v) => v?.toLowerCase().includes(q)));
+  }, [query, services]);
+
+  return (
+    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Services</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Manage customer services and allocations</p>
+        </div>
+        <Button size="sm" onClick={() => { setEditingService(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-service">
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          New Service
+        </Button>
+      </div>
+
+      <Card className="border-slate-200 bg-white overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search services..." className="h-8 w-64 pl-8 text-xs border-slate-200" />
+          </div>
+          <div className="text-xs text-slate-500">{services.length} services</div>
+        </div>
+        {loading ? (
+          <div className="p-8 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50 border-slate-100">
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Service</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Type</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Location</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Monthly</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredServices.map((s) => (
+                <TableRow key={s.id} className="border-slate-100 hover:bg-slate-50">
+                  <TableCell>
+                    <div>
+                      <div className="text-xs font-medium text-slate-900">{s.name}</div>
+                      <div className="text-[10px] text-slate-500">{s.details}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">{s.type}</TableCell>
+                  <TableCell className="text-xs text-slate-600">{s.location}</TableCell>
+                  <TableCell><StatusBadge status={s.status} type="status" /></TableCell>
+                  <TableCell className="text-xs font-medium text-slate-900">${Number(s.monthlyPrice).toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingService(s); setShowModal(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      <ServiceModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        editingService={editingService}
+        customers={customers}
+        token={token}
+        onSuccess={() => { setShowModal(false); loadServices(); }}
+      />
+    </motion.div>
+  );
+}
+
+function ServiceModal({ open, onOpenChange, editingService, customers, token, onSuccess }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingService: ServiceData | null;
+  customers: CustomerOption[];
+  token: string | null;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    userId: "",
+    name: "",
+    type: "Colocation",
+    status: "active",
+    location: "iM Critical Miami",
+    details: "",
+    monthlyPrice: "",
+    startDate: new Date().toISOString().split("T")[0],
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (editingService) {
+        setFormData({
+          userId: editingService.userId,
+          name: editingService.name,
+          type: editingService.type,
+          status: editingService.status,
+          location: editingService.location,
+          details: editingService.details || "",
+          monthlyPrice: editingService.monthlyPrice,
+          startDate: new Date(editingService.startDate).toISOString().split("T")[0],
+        });
+      } else {
+        setFormData({
+          userId: customers[0]?.id || "",
+          name: "",
+          type: "Colocation",
+          status: "active",
+          location: "iM Critical Miami",
+          details: "",
+          monthlyPrice: "",
+          startDate: new Date().toISOString().split("T")[0],
+        });
+      }
+    }
+  }, [open, editingService, customers]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const url = editingService ? `/api/admin/services/${editingService.id}` : "/api/admin/services";
+      const method = editingService ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...formData, startDate: new Date(formData.startDate) }),
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: editingService ? "Service updated" : "Service created" });
+        onSuccess();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error || "Failed to save service", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save service", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const locations = [
+    "iM Critical Miami",
+    "Equinix Miami",
+    "Digital Realty Miami",
+    "365 Data Centers FLL",
+    "EdgeConneX Miami",
+    "QTS MIA1",
+    "CoreSite MI1",
+    "South Reach Networks",
+  ];
+
+  const serviceTypes = ["Colocation", "Internet", "Network", "Cross-Connect", "SmartHands", "DDoS Protection"];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold">{editingService ? "Edit Service" : "New Service"}</DialogTitle>
+          <DialogDescription className="text-xs text-slate-500">
+            {editingService ? "Update service details" : "Create a new customer service"}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Customer</Label>
+            <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name} {c.companyName && `(${c.companyName})`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Service Name</Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-9 text-sm" required placeholder="e.g., Cabinet C12 (42U)" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Type</Label>
+              <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {serviceTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Location</Label>
+              <Select value={formData.location} onValueChange={(v) => setFormData({ ...formData, location: v })}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {locations.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Status</Label>
+              <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="provisioning">Provisioning</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Details</Label>
+            <Input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className="h-9 text-sm" placeholder="e.g., 2kW · 2x 20A circuits" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Monthly Price ($)</Label>
+              <Input type="number" step="0.01" value={formData.monthlyPrice} onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })} className="h-9 text-sm" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Start Date</Label>
+              <Input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className="h-9 text-sm" required />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 text-xs">Cancel</Button>
+            <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingService ? "Update" : "Create")}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type InvoiceData = {
+  id: string;
+  userId: string;
+  invoiceNumber: string;
+  status: string;
+  issueDate: string;
+  dueDate: string;
+  subtotal: string;
+  tax: string;
+  total: string;
+};
+
+function InvoicesView({ token }: { token: string | null }) {
+  const { toast } = useToast();
+  const [invoices, setInvoices] = useState<InvoiceData[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null);
+  const [query, setQuery] = useState("");
+
+  async function loadInvoices() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setInvoices(await res.json());
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to load invoices", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCustomers() {
+    try {
+      const res = await fetch("/api/admin/customers", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setCustomers(await res.json());
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadInvoices();
+    loadCustomers();
+  }, []);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to delete this invoice?")) return;
+    try {
+      const res = await fetch(`/api/admin/invoices/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Invoice deleted" });
+        loadInvoices();
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" });
+    }
+  }
+
+  const filteredInvoices = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return invoices;
+    return invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q));
+  }, [query, invoices]);
+
+  return (
+    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Manage customer invoices and billing</p>
+        </div>
+        <Button size="sm" onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-invoice">
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          New Invoice
+        </Button>
+      </div>
+
+      <Card className="border-slate-200 bg-white overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search invoices..." className="h-8 w-64 pl-8 text-xs border-slate-200" />
+          </div>
+          <div className="text-xs text-slate-500">{invoices.length} invoices</div>
+        </div>
+        {loading ? (
+          <div className="p-8 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50 border-slate-100">
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Invoice #</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Issue Date</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Due Date</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Total</TableHead>
+                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInvoices.map((inv) => (
+                <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50">
+                  <TableCell className="text-xs font-medium text-slate-900">{inv.invoiceNumber}</TableCell>
+                  <TableCell className="text-xs text-slate-600">{new Date(inv.issueDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-slate-600">{new Date(inv.dueDate).toLocaleDateString()}</TableCell>
+                  <TableCell><StatusBadge status={inv.status} type="status" /></TableCell>
+                  <TableCell className="text-xs font-semibold text-slate-900">${Number(inv.total).toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingInvoice(inv); setShowModal(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(inv.id)} className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      <InvoiceModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        editingInvoice={editingInvoice}
+        customers={customers}
+        token={token}
+        onSuccess={() => { setShowModal(false); loadInvoices(); }}
+      />
+    </motion.div>
+  );
+}
+
+function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, onSuccess }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingInvoice: InvoiceData | null;
+  customers: CustomerOption[];
+  token: string | null;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    userId: "",
+    invoiceNumber: "",
+    status: "pending",
+    issueDate: new Date().toISOString().split("T")[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    subtotal: "",
+    tax: "0",
+    total: "",
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (editingInvoice) {
+        setFormData({
+          userId: editingInvoice.userId,
+          invoiceNumber: editingInvoice.invoiceNumber,
+          status: editingInvoice.status,
+          issueDate: new Date(editingInvoice.issueDate).toISOString().split("T")[0],
+          dueDate: new Date(editingInvoice.dueDate).toISOString().split("T")[0],
+          subtotal: editingInvoice.subtotal,
+          tax: editingInvoice.tax,
+          total: editingInvoice.total,
+        });
+      } else {
+        const nextNum = `INV-${Date.now().toString().slice(-6)}`;
+        setFormData({
+          userId: customers[0]?.id || "",
+          invoiceNumber: nextNum,
+          status: "pending",
+          issueDate: new Date().toISOString().split("T")[0],
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          subtotal: "",
+          tax: "0",
+          total: "",
+        });
+      }
+    }
+  }, [open, editingInvoice, customers]);
+
+  useEffect(() => {
+    const subtotal = parseFloat(formData.subtotal) || 0;
+    const tax = parseFloat(formData.tax) || 0;
+    setFormData(prev => ({ ...prev, total: (subtotal + tax).toFixed(2) }));
+  }, [formData.subtotal, formData.tax]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const url = editingInvoice ? `/api/admin/invoices/${editingInvoice.id}` : "/api/admin/invoices";
+      const method = editingInvoice ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ...formData,
+          issueDate: new Date(formData.issueDate),
+          dueDate: new Date(formData.dueDate),
+        }),
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: editingInvoice ? "Invoice updated" : "Invoice created" });
+        onSuccess();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error || "Failed to save invoice", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save invoice", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold">{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          <DialogDescription className="text-xs text-slate-500">
+            {editingInvoice ? "Update invoice details" : "Create a new customer invoice"}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Customer</Label>
+              <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name} {c.companyName && `(${c.companyName})`}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Invoice Number</Label>
+              <Input value={formData.invoiceNumber} onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })} className="h-9 text-sm" required />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Issue Date</Label>
+              <Input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className="h-9 text-sm" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Due Date</Label>
+              <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className="h-9 text-sm" required />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Subtotal ($)</Label>
+              <Input type="number" step="0.01" value={formData.subtotal} onChange={(e) => setFormData({ ...formData, subtotal: e.target.value })} className="h-9 text-sm" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Tax ($)</Label>
+              <Input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Total ($)</Label>
+              <Input value={formData.total} className="h-9 text-sm bg-slate-50" readOnly />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Status</Label>
+            <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="past_due">Past Due</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 text-xs">Cancel</Button>
+            <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingInvoice ? "Update" : "Create")}
             </Button>
           </div>
         </form>
