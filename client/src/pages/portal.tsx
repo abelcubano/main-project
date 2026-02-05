@@ -85,9 +85,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function NavItem({ icon: Icon, label, active, badge }: { icon: typeof LayoutDashboard; label: string; active?: boolean; badge?: number }) {
+function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: typeof LayoutDashboard; label: string; active?: boolean; badge?: number; onClick?: () => void }) {
   return (
-    <button className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left text-xs font-medium transition-all ${active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}>
+    <button 
+      onClick={onClick}
+      data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left text-xs font-medium transition-all ${active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+    >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1">{label}</span>
       {badge !== undefined && (
@@ -97,10 +101,13 @@ function NavItem({ icon: Icon, label, active, badge }: { icon: typeof LayoutDash
   );
 }
 
+type PortalView = "dashboard" | "services" | "invoices" | "tickets" | "settings";
+
 export default function PortalPage() {
   const { user, logout, token } = useAuth();
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
+  const [activeView, setActiveView] = useState<PortalView>("dashboard");
 
   async function handleLogout() {
     await logout();
@@ -191,23 +198,23 @@ export default function PortalPage() {
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-2">Overview</div>
-          <NavItem icon={LayoutDashboard} label="Dashboard" active />
+          <NavItem icon={LayoutDashboard} label="Dashboard" active={activeView === "dashboard"} onClick={() => setActiveView("dashboard")} />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Services</div>
-          <NavItem icon={Server} label="My Services" badge={services.length || undefined} />
+          <NavItem icon={Server} label="My Services" badge={services.length || undefined} active={activeView === "services"} onClick={() => setActiveView("services")} />
           <NavItem icon={MapPin} label="Locations" />
           <NavItem icon={Network} label="Network" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Billing</div>
-          <NavItem icon={FileText} label="Invoices" badge={openInvoices + pastDueInvoices || undefined} />
+          <NavItem icon={FileText} label="Invoices" badge={openInvoices + pastDueInvoices || undefined} active={activeView === "invoices"} onClick={() => setActiveView("invoices")} />
           <NavItem icon={CreditCard} label="Payments" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Support</div>
-          <NavItem icon={Ticket} label="My Tickets" badge={3} />
+          <NavItem icon={Ticket} label="My Tickets" badge={3} active={activeView === "tickets"} onClick={() => setActiveView("tickets")} />
           <NavItem icon={Cable} label="SmartHands" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Account</div>
-          <NavItem icon={Settings} label="Settings" />
+          <NavItem icon={Settings} label="Settings" active={activeView === "settings"} onClick={() => setActiveView("settings")} />
         </nav>
 
         <div className="p-3 border-t border-slate-100">
@@ -247,8 +254,151 @@ export default function PortalPage() {
           </div>
         </header>
 
-        {/* Dashboard Content */}
+        {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-5">
+          {activeView === "services" && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">My Services</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Active allocations and provisioning</p>
+              </div>
+              <Card className="border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-900">{services.length} Services</div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                    <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search services..." className="h-7 w-48 pl-7 text-xs border-slate-200" data-testid="input-search-services" />
+                  </div>
+                </div>
+                <div className="p-4 grid gap-3">
+                  {filteredServices.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-500">No services found</div>
+                  ) : (
+                    filteredServices.map((s) => (
+                      <div key={s.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer" data-testid={`service-${s.id}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-900">{s.name}</span>
+                              <StatusBadge status={s.status} />
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">{s.location}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">{s.details}</div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">{s.type}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeView === "invoices" && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Billing history and payment status</p>
+              </div>
+              <Card className="border-slate-200 bg-white overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50 border-slate-100">
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Invoice #</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Date</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-8 text-xs text-slate-500">No invoices found</TableCell></TableRow>
+                    ) : (
+                      invoices.map((inv) => (
+                        <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`invoice-${inv.id}`}>
+                          <TableCell className="text-xs font-medium text-slate-900">{inv.number}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{inv.date}</TableCell>
+                          <TableCell><StatusBadge status={inv.status} /></TableCell>
+                          <TableCell className="text-xs font-semibold text-slate-900 text-right">{inv.total}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeView === "tickets" && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-lg font-semibold text-slate-900">My Tickets</h1>
+                  <p className="text-xs text-slate-500 mt-0.5">Support requests and updates</p>
+                </div>
+                <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-ticket">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  New Ticket
+                </Button>
+              </div>
+              <Card className="border-slate-200 bg-white overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50 border-slate-100">
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Subject</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Category</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Priority</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Updated</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tickets.map((t) => (
+                      <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`ticket-${t.id}`}>
+                        <TableCell className="text-xs font-medium text-slate-900">{t.subject}</TableCell>
+                        <TableCell className="text-xs text-slate-600 capitalize">{t.category.replace("_", " ")}</TableCell>
+                        <TableCell><StatusBadge status={t.priority} /></TableCell>
+                        <TableCell><StatusBadge status={t.status} /></TableCell>
+                        <TableCell className="text-xs text-slate-500 text-right">{t.updatedAt}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeView === "settings" && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">Account Settings</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Manage your account preferences</p>
+              </div>
+              <Card className="border-slate-200 bg-white p-5">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Name</label>
+                    <div className="mt-1 text-sm text-slate-900">{user?.name || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Company</label>
+                    <div className="mt-1 text-sm text-slate-900">{user?.companyName || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Email</label>
+                    <div className="mt-1 text-sm text-slate-900">{user?.email || "—"}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Username</label>
+                    <div className="mt-1 text-sm text-slate-900">{user?.username || "—"}</div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeView === "dashboard" && (
           <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
             {/* Page Header */}
             <div>
@@ -454,6 +604,7 @@ export default function PortalPage() {
               </Card>
             </div>
           </motion.div>
+          )}
         </main>
       </div>
     </div>
