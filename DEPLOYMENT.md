@@ -167,8 +167,11 @@ npm run db:push
 ```
 
 This creates the following tables:
-- `dispatches` - Service request records
-- `users` - User accounts (if authentication is added)
+- `users` - User accounts with bcrypt-hashed passwords and role-based access (admin/user)
+- `services` - Customer services linked to users (colocation, SmartHands, connectivity, etc.)
+- `invoices` - Customer invoices with totals, due dates, and status tracking
+- `invoice_items` - Individual line items for each invoice
+- `dispatch_requests` - SmartHands dispatch requests for datacenter operations
 
 ---
 
