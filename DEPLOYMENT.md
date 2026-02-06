@@ -395,6 +395,118 @@ const transporter = nodemailer.createTransport({
 
 ---
 
+## Updating the Project
+
+When code changes are made (on Replit or pushed to the Git repository), follow these steps on the production server to apply the update.
+
+### Step 1: Back Up the Database (Recommended)
+
+Before any update, create a database backup in case you need to roll back:
+
+```bash
+# Create the backups folder if it doesn't exist yet
+mkdir -p /var/www/backups
+
+pg_dump -U dc911 dc911db > /var/www/backups/backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+### Step 2: Pull the Latest Code
+
+Navigate to the project folder and pull the latest changes:
+
+```bash
+cd /var/www/911-dc
+git pull origin main
+```
+
+> If you are using a different branch, replace `main` with your branch name (e.g., `git pull origin master`).
+
+If you see merge conflicts, resolve them before continuing. You can check the status with:
+
+```bash
+git status
+```
+
+### Step 3: Install Any New Dependencies
+
+If `package.json` was updated with new libraries, install them:
+
+```bash
+npm install
+```
+
+### Step 4: Apply Database Changes (If Any)
+
+If the database schema was modified (changes in `shared/schema.ts`), push the updated schema:
+
+```bash
+npm run db:push
+```
+
+This will create any new tables or columns without deleting existing data.
+
+### Step 5: Rebuild the Application
+
+Compile the frontend and backend for production:
+
+```bash
+npm run build
+```
+
+### Step 6: Restart the Service
+
+Restart the application so the changes take effect:
+
+```bash
+sudo systemctl restart 911dc
+```
+
+### Step 7: Verify the Update
+
+Check that the service is running correctly:
+
+```bash
+# Check service status
+sudo systemctl status 911dc
+
+# Check recent logs for errors
+journalctl -u 911dc --since "5 minutes ago"
+```
+
+Open your browser and visit `http://your-domain.com` to confirm the site is working.
+
+### Quick Update (All-in-One Command)
+
+For routine updates where you just need to pull, install, build, and restart:
+
+```bash
+cd /var/www/911-dc && git pull origin main && npm install && npm run build && sudo systemctl restart 911dc
+```
+
+### Rolling Back an Update
+
+If something goes wrong after an update, you can revert to the previous version:
+
+```bash
+# Go back to the previous commit
+cd /var/www/911-dc
+git log --oneline -5          # See recent commits
+git checkout <previous_commit_hash> -- .
+
+# Rebuild and restart
+npm install
+npm run build
+sudo systemctl restart 911dc
+```
+
+To restore the database from a backup:
+
+```bash
+psql -U dc911 dc911db < /var/www/backups/backup_YYYYMMDD_HHMMSS.sql
+```
+
+---
+
 ## Maintenance Commands
 
 ```bash
@@ -406,13 +518,6 @@ systemctl restart 911dc
 
 # Stop application
 systemctl stop 911dc
-
-# Update application
-cd /var/www/911-dc
-git pull
-npm install
-npm run build
-systemctl restart 911dc
 
 # Database: View tables
 psql -U dc911 -d dc911db -c "\dt"
