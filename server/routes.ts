@@ -292,7 +292,11 @@ export async function registerRoutes(
   // Admin service management
   app.post("/api/admin/services", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const validation = insertServiceSchema.safeParse(req.body);
+      const body = { ...req.body };
+      if (body.startDate && typeof body.startDate === 'string') {
+        body.startDate = new Date(body.startDate);
+      }
+      const validation = insertServiceSchema.safeParse(body);
       if (!validation.success) {
         return res.status(400).json({ 
           error: "Validation failed",
@@ -311,7 +315,11 @@ export async function registerRoutes(
   app.put("/api/admin/services/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-      const service = await storage.updateService(serviceId, req.body);
+      const body = { ...req.body };
+      if (body.startDate && typeof body.startDate === 'string') {
+        body.startDate = new Date(body.startDate);
+      }
+      const service = await storage.updateService(serviceId, body);
       
       if (!service) {
         return res.status(404).json({ error: "Service not found" });
