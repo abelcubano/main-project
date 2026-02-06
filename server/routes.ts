@@ -464,13 +464,20 @@ export async function registerRoutes(
   // Get customer users for dropdowns (services/invoices)
   app.get("/api/admin/customer-users", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const customerUsers = await storage.getUsersByRole("customer");
-      res.json(customerUsers.map(c => ({
-        id: c.id,
-        name: c.name,
-        companyName: c.companyName,
-        email: c.email,
-      })));
+      const allCustomers = await storage.getAllCustomers();
+      const result: Array<{ id: string; name: string; companyName: string | null; email: string | null }> = [];
+      for (const customer of allCustomers) {
+        const users = await storage.getUsersByCustomer(customer.id);
+        if (users.length > 0) {
+          result.push({
+            id: users[0].id,
+            name: customer.name,
+            companyName: customer.name,
+            email: customer.email,
+          });
+        }
+      }
+      res.json(result);
     } catch (error: any) {
       console.error("[ADMIN] Get customer users error:", error);
       res.status(500).json({ error: "Failed to fetch customer users" });
