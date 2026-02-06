@@ -216,8 +216,7 @@ export default function AdminPage() {
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Business</div>
           <NavItem icon={Building2} label="Customers" active={currentView === "customers"} onClick={() => setCurrentView("customers")} />
           <NavItem icon={Server} label="Services" active={currentView === "services"} onClick={() => setCurrentView("services")} />
-          <NavItem icon={CreditCard} label="Billing" />
-          <NavItem icon={FileText} label="Invoices" active={currentView === "invoices"} onClick={() => setCurrentView("invoices")} />
+          <NavItem icon={CreditCard} label="Billing" active={currentView === "invoices"} onClick={() => setCurrentView("invoices")} />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">System</div>
           <NavItem icon={Users} label="Users" active={currentView === "users"} onClick={() => setCurrentView("users")} badge={users.length || undefined} />
