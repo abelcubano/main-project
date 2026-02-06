@@ -7,6 +7,7 @@ import {
   Boxes,
   Building2,
   ChevronDown,
+  ChevronRight,
   CreditCard,
   Eye,
   EyeOff,
@@ -748,32 +749,54 @@ function UserModal({
   );
 }
 
-type CustomerData = {
+type CompanyData = {
   id: string;
   name: string;
-  companyName: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+  contactName: string | null;
+  notes: string | null;
+  active: boolean;
+};
+
+type CompanyUser = {
+  id: string;
+  name: string;
   email: string;
+  username: string;
+  customerRole: string | null;
+  active: boolean;
 };
 
 function CustomersView({ token }: { token: string | null }) {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<CustomerData[]>([]);
+  const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedUsers, setExpandedUsers] = useState<CompanyUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<CompanyData | null>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [addToCustomerId, setAddToCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCustomers();
+    loadCompanies();
   }, []);
 
-  async function loadCustomers() {
+  async function loadCompanies() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/customers", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setCustomers(data);
+        setCompanies(await res.json());
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to load customers", variant: "destructive" });
@@ -782,31 +805,97 @@ function CustomersView({ token }: { token: string | null }) {
     }
   }
 
-  const filtered = customers.filter(c =>
+  async function loadCompanyUsers(customerId: string) {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExpandedUsers(data.users || []);
+      }
+    } catch {
+      setExpandedUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  function toggleExpand(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setExpandedUsers([]);
+    } else {
+      setExpandedId(id);
+      loadCompanyUsers(id);
+    }
+  }
+
+  async function handleDeleteCompany(id: string) {
+    if (!confirm("Delete this customer and unlink all associated users?")) return;
+    try {
+      const res = await fetch(`/api/admin/customers/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Customer deleted" });
+        loadCompanies();
+        if (expandedId === id) { setExpandedId(null); setExpandedUsers([]); }
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to delete customer", variant: "destructive" });
+    }
+  }
+
+  async function handleRemoveUser(customerId: string, userId: string) {
+    if (!confirm("Remove this user from the customer?")) return;
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "User removed" });
+        loadCompanyUsers(customerId);
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to remove user", variant: "destructive" });
+    }
+  }
+
+  const filtered = companies.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.companyName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.contactName || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const roleLabel = (role: string | null) => {
+    switch (role) {
+      case "account_admin": return "Account Admin";
+      case "manager": return "Manager";
+      case "technician": return "Technician";
+      default: return role || "—";
+    }
+  };
 
   return (
     <div className="space-y-4" data-testid="customers-view">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Customer Accounts</h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">{customers.length} total customers</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{companies.length} total customers (companies)</p>
         </div>
+        <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} data-testid="button-add-customer">
+          <Plus className="mr-1.5 h-3.5 w-3.5" />Add Customer
+        </Button>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input
-            placeholder="Search customers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 text-xs"
-            data-testid="input-customer-search"
-          />
+          <Input placeholder="Search customers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-8 text-xs" data-testid="input-customer-search" />
         </div>
       </div>
 
@@ -814,33 +903,317 @@ function CustomersView({ token }: { token: string | null }) {
         <div className="text-center py-10 text-xs text-slate-500">Loading customers...</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-xs text-slate-500">
-          {searchQuery ? "No customers match your search." : "No customer accounts found."}
+          {searchQuery ? "No customers match your search." : "No customer accounts found. Click 'Add Customer' to create one."}
         </div>
       ) : (
-        <div className="border border-slate-200 rounded-lg overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Name</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Company</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Email</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((customer) => (
-                <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50/50" data-testid={`row-customer-${customer.id}`}>
-                  <td className="px-4 py-2.5 font-medium text-slate-900">{customer.name}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{customer.companyName || "—"}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{customer.email}</td>
-                  <td className="px-4 py-2.5 text-slate-400 font-mono text-[10px]">{customer.id.slice(0, 8)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {filtered.map((company) => (
+            <div key={company.id} className="border border-slate-200 rounded-lg overflow-hidden" data-testid={`card-customer-${company.id}`}>
+              <div className="flex items-center px-4 py-3 bg-white hover:bg-slate-50/50 cursor-pointer" onClick={() => toggleExpand(company.id)}>
+                {expandedId === company.id ? <ChevronDown className="h-3.5 w-3.5 text-slate-400 mr-2 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400 mr-2 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-900">{company.name}</span>
+                    {!company.active && <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-700">Inactive</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {[company.contactName, company.email, company.phone].filter(Boolean).join(" · ") || "No contact info"}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditingCompany(company); setShowCompanyModal(true); }} data-testid={`button-edit-customer-${company.id}`}>
+                    <Pencil className="h-3 w-3 text-slate-500" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteCompany(company.id)} data-testid={`button-delete-customer-${company.id}`}>
+                    <Trash2 className="h-3 w-3 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+
+              {expandedId === company.id && (
+                <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3">
+                  {company.address && (
+                    <div className="text-[10px] text-slate-500 mb-3">
+                      {[company.address, company.city, company.state, company.zip].filter(Boolean).join(", ")}
+                    </div>
+                  )}
+                  {company.notes && (
+                    <div className="text-[10px] text-slate-500 mb-3 italic">{company.notes}</div>
+                  )}
+
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Associated Users</span>
+                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => { setAddToCustomerId(company.id); setShowUserModal(true); }} data-testid={`button-add-user-${company.id}`}>
+                      <Plus className="mr-1 h-3 w-3" />Add User
+                    </Button>
+                  </div>
+
+                  {loadingUsers ? (
+                    <div className="text-center py-4 text-[10px] text-slate-400">Loading users...</div>
+                  ) : expandedUsers.length === 0 ? (
+                    <div className="text-center py-4 text-[10px] text-slate-400">No users associated with this customer.</div>
+                  ) : (
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 font-semibold text-slate-500">Name</th>
+                          <th className="text-left py-1.5 font-semibold text-slate-500">Username</th>
+                          <th className="text-left py-1.5 font-semibold text-slate-500">Email</th>
+                          <th className="text-left py-1.5 font-semibold text-slate-500">Role</th>
+                          <th className="text-right py-1.5 font-semibold text-slate-500"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {expandedUsers.map((u) => (
+                          <tr key={u.id} className="border-b border-slate-100" data-testid={`row-customer-user-${u.id}`}>
+                            <td className="py-1.5 text-slate-900 font-medium">{u.name}</td>
+                            <td className="py-1.5 text-slate-600">{u.username}</td>
+                            <td className="py-1.5 text-slate-600">{u.email}</td>
+                            <td className="py-1.5">
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-50 text-blue-700">{roleLabel(u.customerRole)}</span>
+                            </td>
+                            <td className="py-1.5 text-right">
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleRemoveUser(company.id, u.id)} data-testid={`button-remove-user-${u.id}`}>
+                                <X className="h-3 w-3 text-red-400" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
+
+      <CompanyModal
+        open={showCompanyModal}
+        onOpenChange={setShowCompanyModal}
+        editing={editingCompany}
+        token={token}
+        onSuccess={() => { setShowCompanyModal(false); loadCompanies(); }}
+      />
+
+      <CustomerUserModal
+        open={showUserModal}
+        onOpenChange={setShowUserModal}
+        customerId={addToCustomerId}
+        token={token}
+        onSuccess={() => { setShowUserModal(false); if (addToCustomerId) loadCompanyUsers(addToCustomerId); }}
+      />
     </div>
+  );
+}
+
+function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editing: CompanyData | null;
+  token: string | null;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (editing) {
+      setForm({
+        name: editing.name,
+        address: editing.address || "",
+        city: editing.city || "",
+        state: editing.state || "",
+        zip: editing.zip || "",
+        phone: editing.phone || "",
+        email: editing.email || "",
+        contactName: editing.contactName || "",
+        notes: editing.notes || "",
+      });
+    } else {
+      setForm({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
+    }
+  }, [editing, open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) { toast({ title: "Company name is required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/customers/${editing.id}` : "/api/admin/customers";
+      const res = await fetch(url, {
+        method: editing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        toast({ title: editing ? "Customer updated" : "Customer created" });
+        onSuccess();
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to save", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save customer", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-sm">{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
+          <DialogDescription className="text-[11px]">{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <Label className="text-[11px]">Company Name *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-name" />
+          </div>
+          <div>
+            <Label className="text-[11px]">Contact Name</Label>
+            <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-contact-name" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[11px]">Email</Label>
+              <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-email" />
+            </div>
+            <div>
+              <Label className="text-[11px]">Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-phone" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-[11px]">Address</Label>
+            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-address" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <Label className="text-[11px]">City</Label>
+              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-city" />
+            </div>
+            <div>
+              <Label className="text-[11px]">State</Label>
+              <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-state" />
+            </div>
+            <div>
+              <Label className="text-[11px]">ZIP</Label>
+              <Input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-zip" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-[11px]">Notes</Label>
+            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-notes" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" size="sm" className="h-8 text-xs" disabled={saving} data-testid="button-save-customer">
+              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              {editing ? "Update" : "Create"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customerId: string | null;
+  token: string | null;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ name: "", username: "", email: "", password: "", customerRole: "technician" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm({ name: "", username: "", email: "", password: "", customerRole: "technician" });
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.username.trim() || !form.email.trim() || !form.password.trim()) {
+      toast({ title: "All fields are required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        toast({ title: "User added" });
+        onSuccess();
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to add user", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to add user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-sm">Add User to Customer</DialogTitle>
+          <DialogDescription className="text-[11px]">Create a new user account linked to this company.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <Label className="text-[11px]">Full Name *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-name" />
+          </div>
+          <div>
+            <Label className="text-[11px]">Username *</Label>
+            <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-username" />
+          </div>
+          <div>
+            <Label className="text-[11px]">Email *</Label>
+            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-email" />
+          </div>
+          <div>
+            <Label className="text-[11px]">Password *</Label>
+            <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-password" />
+          </div>
+          <div>
+            <Label className="text-[11px]">Role</Label>
+            <Select value={form.customerRole} onValueChange={(v) => setForm({ ...form, customerRole: v })}>
+              <SelectTrigger className="h-8 text-xs mt-1" data-testid="select-user-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="account_admin">Account Admin</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="technician">Technician</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" size="sm" className="h-8 text-xs" disabled={saving} data-testid="button-save-user">
+              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Add User
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -859,7 +1232,7 @@ type ServiceData = {
 type CustomerOption = {
   id: string;
   name: string;
-  companyName: string | null;
+  companyName?: string | null;
 };
 
 function ServicesView({ token }: { token: string | null }) {
@@ -889,7 +1262,7 @@ function ServicesView({ token }: { token: string | null }) {
 
   async function loadCustomers() {
     try {
-      const res = await fetch("/api/admin/customers", {
+      const res = await fetch("/api/admin/customer-users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -1109,7 +1482,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
               </SelectTrigger>
               <SelectContent>
                 {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name} {c.companyName && `(${c.companyName})`}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1216,7 +1589,7 @@ function InvoicesView({ token }: { token: string | null }) {
 
   async function loadCustomers() {
     try {
-      const res = await fetch("/api/admin/customers", {
+      const res = await fetch("/api/admin/customer-users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -1430,7 +1803,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name} {c.companyName && `(${c.companyName})`}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

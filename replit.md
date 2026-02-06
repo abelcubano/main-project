@@ -56,7 +56,8 @@ The server uses a modular structure with routes in `server/routes.ts` and a stor
 The database schema is shared between frontend and backend through the `shared/` directory, enabling type-safe API contracts.
 
 ### Database Schema
-- **users** - User accounts with bcrypt-hashed passwords and role-based access (admin/user)
+- **customers** - Company/organization accounts (name, address, contact info, notes)
+- **users** - User accounts with bcrypt-hashed passwords, linked to customers via customerId, with customerRole (account_admin/manager/technician) and system role (admin/customer)
 - **services** - Customer services linked to users (colocation, SmartHands, connectivity, etc.)
 - **invoices** - Customer invoices with line items, totals, and status tracking
 - **invoice_items** - Individual line items for each invoice

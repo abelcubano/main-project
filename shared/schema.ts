@@ -3,6 +3,21 @@ import { pgTable, text, varchar, timestamp, boolean, integer, decimal } from "dr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const customers = pgTable("customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  phone: text("phone"),
+  email: text("email"),
+  contactName: text("contact_name"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -11,6 +26,8 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: text("role").notNull().default("customer"),
   companyName: text("company_name"),
+  customerId: varchar("customer_id").references(() => customers.id),
+  customerRole: text("customer_role"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   lastLogin: timestamp("last_login"),
@@ -24,6 +41,11 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const insertCustomerSchema = createInsertSchema(customers).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -31,6 +53,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   role: true,
   companyName: true,
+  customerId: true,
+  customerRole: true,
   active: true,
 });
 
@@ -39,6 +63,8 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;

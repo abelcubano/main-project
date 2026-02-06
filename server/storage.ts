@@ -3,13 +3,21 @@ import {
   type Service, type InsertService,
   type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem,
-  users, sessions, services, invoices, invoiceItems 
+  type Customer, type InsertCustomer,
+  users, sessions, services, invoices, invoiceItems, customers 
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  getCustomer(id: string): Promise<Customer | undefined>;
+  getAllCustomers(): Promise<Customer[]>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<boolean>;
+  getUsersByCustomer(customerId: string): Promise<User[]>;
+
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -44,6 +52,35 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer;
+  }
+
+  async getAllCustomers(): Promise<Customer[]> {
+    return db.select().from(customers).orderBy(desc(customers.createdAt));
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [created] = await db.insert(customers).values(customer).returning();
+    return created;
+  }
+
+  async updateCustomer(id: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [updated] = await db.update(customers).set(updates).where(eq(customers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    await db.update(users).set({ customerId: null, customerRole: null }).where(eq(users.customerId, id));
+    const result = await db.delete(customers).where(eq(customers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getUsersByCustomer(customerId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.customerId, customerId));
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;

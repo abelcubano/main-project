@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { sendDispatchEmail, verifyEmailConnection, type DispatchRequest } from "./email";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema } from "@shared/schema";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -453,19 +453,148 @@ export async function registerRoutes(
     }
   });
 
-  // Get all customers (for admin dropdowns)
-  app.get("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+  // Get customer users for dropdowns (services/invoices)
+  app.get("/api/admin/customer-users", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const customers = await storage.getUsersByRole("customer");
-      res.json(customers.map(c => ({
+      const customerUsers = await storage.getUsersByRole("customer");
+      res.json(customerUsers.map(c => ({
         id: c.id,
         name: c.name,
         companyName: c.companyName,
         email: c.email,
       })));
     } catch (error: any) {
+      console.error("[ADMIN] Get customer users error:", error);
+      res.status(500).json({ error: "Failed to fetch customer users" });
+    }
+  });
+
+  // Customer (Company) CRUD
+  app.get("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const allCustomers = await storage.getAllCustomers();
+      res.json(allCustomers);
+    } catch (error: any) {
       console.error("[ADMIN] Get customers error:", error);
       res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      const customerUsers = await storage.getUsersByCustomer(customerId);
+      res.json({ ...customer, users: customerUsers.map(u => ({ id: u.id, name: u.name, email: u.email, username: u.username, customerRole: u.customerRole, active: u.active })) });
+    } catch (error: any) {
+      console.error("[ADMIN] Get customer error:", error);
+      res.status(500).json({ error: "Failed to fetch customer" });
+    }
+  });
+
+  app.post("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const validation = insertCustomerSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      }
+      const customer = await storage.createCustomer(validation.data);
+      res.json(customer);
+    } catch (error: any) {
+      console.error("[ADMIN] Create customer error:", error);
+      res.status(500).json({ error: "Failed to create customer" });
+    }
+  });
+
+  app.put("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const customer = await storage.updateCustomer(customerId, req.body);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error: any) {
+      console.error("[ADMIN] Update customer error:", error);
+      res.status(500).json({ error: "Failed to update customer" });
+    }
+  });
+
+  app.delete("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const deleted = await storage.deleteCustomer(customerId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ADMIN] Delete customer error:", error);
+      res.status(500).json({ error: "Failed to delete customer" });
+    }
+  });
+
+  // Add/remove user from customer
+  app.post("/api/admin/customers/:id/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { username, password, email, name, customerRole } = req.body;
+      
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email,
+        name,
+        role: "customer",
+        customerId,
+        customerRole: customerRole || "technician",
+        active: true,
+      });
+
+      res.json({ id: user.id, name: user.name, email: user.email, username: user.username, customerRole: user.customerRole, active: user.active });
+    } catch (error: any) {
+      console.error("[ADMIN] Add customer user error:", error);
+      if (error.code === "23505") {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      res.status(500).json({ error: "Failed to add user to customer" });
+    }
+  });
+
+  app.put("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.customerId) ? req.params.customerId[0] : req.params.customerId;
+      const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+      const { customerRole, name, email } = req.body;
+      
+      const updates: any = {};
+      if (customerRole) updates.customerRole = customerRole;
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      
+      const user = await storage.updateUser(userId, updates);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ id: user.id, name: user.name, email: user.email, username: user.username, customerRole: user.customerRole, active: user.active });
+    } catch (error: any) {
+      console.error("[ADMIN] Update customer user error:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+      await storage.updateUser(userId, { customerId: null, customerRole: null } as any);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ADMIN] Remove customer user error:", error);
+      res.status(500).json({ error: "Failed to remove user from customer" });
     }
   });
 
