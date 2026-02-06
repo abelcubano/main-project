@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   CreditCard,
+  Download,
   Eye,
   EyeOff,
   FileText,
@@ -1570,6 +1571,55 @@ function InvoicesView({ token }: { token: string | null }) {
   const [showModal, setShowModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null);
   const [query, setQuery] = useState("");
+  const [billingRunning, setBillingRunning] = useState(false);
+
+  async function handleRunBilling() {
+    if (!confirm("This will generate invoices for all customers with active services for this month. Continue?")) return;
+    setBillingRunning(true);
+    try {
+      const res = await fetch("/api/admin/billing/run", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Billing Complete",
+          description: `${data.generated} invoice(s) generated, ${data.skipped} skipped${data.errors.length > 0 ? `, ${data.errors.length} error(s)` : ""}`,
+        });
+        loadInvoices();
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to run billing", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to run billing cycle", variant: "destructive" });
+    } finally {
+      setBillingRunning(false);
+    }
+  }
+
+  async function handleDownloadPdf(invoiceId: string, invoiceNumber: string) {
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `invoice-${invoiceNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to download PDF", variant: "destructive" });
+    }
+  }
 
   async function loadInvoices() {
     setLoading(true);
@@ -1632,10 +1682,16 @@ function InvoicesView({ token }: { token: string | null }) {
           <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
           <p className="text-xs text-slate-500 mt-0.5">Manage customer invoices and billing</p>
         </div>
-        <Button size="sm" onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-invoice">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          New Invoice
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleRunBilling} disabled={billingRunning} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" data-testid="button-run-billing">
+            {billingRunning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CreditCard className="mr-1.5 h-3.5 w-3.5" />}
+            Run Billing
+          </Button>
+          <Button size="sm" onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-invoice">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New Invoice
+          </Button>
+        </div>
       </div>
 
       <Card className="border-slate-200 bg-white overflow-hidden">
@@ -1672,6 +1728,9 @@ function InvoicesView({ token }: { token: string | null }) {
                   <TableCell className="text-xs font-semibold text-slate-900">${Number(inv.total).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf(inv.id, inv.invoiceNumber)} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => { setEditingInvoice(inv); setShowModal(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>

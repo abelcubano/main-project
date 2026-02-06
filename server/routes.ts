@@ -2,6 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendDispatchEmail, verifyEmailConnection, type DispatchRequest } from "./email";
+import { generateInvoicePdf } from "./pdf";
+import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema } from "@shared/schema";
@@ -381,6 +383,63 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[INVOICES] Get invoice error:", error);
       res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // PDF invoice download
+  app.get("/api/invoices/:id/pdf", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const invoice = await storage.getInvoice(invoiceId);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      if (user.role !== "admin" && invoice.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const items = await storage.getInvoiceItems(invoiceId);
+      const invoiceUser = await storage.getUser(invoice.userId);
+      let customer = null;
+      if (invoiceUser?.customerId) {
+        customer = await storage.getCustomer(invoiceUser.customerId) || null;
+      }
+
+      const doc = generateInvoicePdf({
+        invoice,
+        items,
+        customer,
+        userName: invoiceUser?.name || "Unknown",
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+      doc.on("error", (err: any) => {
+        console.error("[PDF] Stream error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "PDF generation failed" });
+        }
+      });
+      doc.pipe(res);
+    } catch (error: any) {
+      console.error("[PDF] Generate invoice PDF error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate PDF" });
+      }
+    }
+  });
+
+  // Run billing cycle
+  app.post("/api/admin/billing/run", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const result = await runMonthlyBilling();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[BILLING] Run billing error:", error);
+      res.status(500).json({ error: "Failed to run billing cycle" });
     }
   });
 

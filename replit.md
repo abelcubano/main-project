@@ -90,10 +90,25 @@ The database schema is shared between frontend and backend through the `shared/`
 - **Secrets**: MAIL_PASSWORD stored securely in Replit Secrets
 - **Features**: 
   - Dispatch request notifications sent to info@911dc.us
+  - Invoice notification emails to customer contacts
   - HTML and plain text email formats
   - HTML injection prevention via entity escaping
   - Error logging for failed sends
 
+### PDF Generation
+- **Library**: PDFKit
+- **Template**: Professional invoice PDF with 911-DC branding, company details, customer info, line items table, totals, and payment terms
+- **Endpoint**: GET /api/invoices/:id/pdf (accessible by admins and invoice owner)
+
+### Automated Billing
+- **Service**: server/billing.ts - scans active services grouped by customer company
+- **Trigger**: POST /api/admin/billing/run (admin only, manual trigger from Invoices view)
+- **Features**:
+  - Generates monthly invoices with each active service as a line item
+  - Prevents duplicate invoices for the same billing period via invoice number pattern matching (INV-YYYYMM-XXXX)
+  - Sends email notifications to customer contacts when invoices are generated
+  - Groups services by customer company for consolidated invoicing
+
 ### Planned Integrations (Future)
 - Payment gateway integration (Stripe dependency already included)
-- PDF invoice generation
+- Automated scheduled billing (cron-based)

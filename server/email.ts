@@ -163,6 +163,106 @@ Submitted: ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" }
   }
 }
 
+export interface InvoiceEmailData {
+  customerName: string;
+  contactName: string;
+  email: string;
+  invoiceNumber: string;
+  total: string;
+  dueDate: string;
+  issueDate: string;
+  itemCount: number;
+}
+
+export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ success: boolean; error?: string }> {
+  const fromAddress = process.env.MAIL_FROM || "abel.monzon@911dc.us";
+
+  const safeName = escapeHtml(data.contactName);
+  const safeCompany = escapeHtml(data.customerName);
+
+  const subject = `Invoice ${data.invoiceNumber} - 911-DC`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 24px; border-radius: 12px 12px 0 0; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .content { background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; }
+    .amount { font-size: 28px; font-weight: bold; color: #1e3a5f; margin: 16px 0; }
+    .detail { margin-bottom: 8px; font-size: 14px; color: #475569; }
+    .detail strong { color: #1e293b; }
+    .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>New Invoice from 911-DC</h1>
+    </div>
+    <div class="content">
+      <p>Hello ${safeName},</p>
+      <p>A new invoice has been generated for <strong>${safeCompany}</strong>.</p>
+      
+      <div class="amount">$${data.total}</div>
+      
+      <div class="detail"><strong>Invoice #:</strong> ${escapeHtml(data.invoiceNumber)}</div>
+      <div class="detail"><strong>Issue Date:</strong> ${escapeHtml(data.issueDate)}</div>
+      <div class="detail"><strong>Due Date:</strong> ${escapeHtml(data.dueDate)}</div>
+      <div class="detail"><strong>Items:</strong> ${data.itemCount} service(s)</div>
+      
+      <p style="margin-top: 20px;">Please review your invoice and arrange payment by the due date. For questions, contact billing@911dc.us.</p>
+      
+      <div class="footer">
+        911-DC | Datacenter Operations & SmartHands Services | Miami, FL<br>
+        This is an automated notification.
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const textBody = `
+NEW INVOICE FROM 911-DC
+=======================
+
+Hello ${data.contactName},
+
+A new invoice has been generated for ${data.customerName}.
+
+Amount: $${data.total}
+Invoice #: ${data.invoiceNumber}
+Issue Date: ${data.issueDate}
+Due Date: ${data.dueDate}
+Items: ${data.itemCount} service(s)
+
+Please review your invoice and arrange payment by the due date.
+For questions, contact billing@911dc.us.
+
+911-DC | Datacenter Operations & SmartHands Services | Miami, FL
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"911-DC Billing" <${fromAddress}>`,
+      to: data.email,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
+
+    console.log(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[EMAIL ERROR] Failed to send invoice email:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
     await transporter.verify();
