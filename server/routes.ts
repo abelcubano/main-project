@@ -388,6 +388,12 @@ export async function registerRoutes(
   app.post("/api/admin/invoices", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { items, ...invoiceData } = req.body;
+      if (invoiceData.issueDate && typeof invoiceData.issueDate === 'string') {
+        invoiceData.issueDate = new Date(invoiceData.issueDate);
+      }
+      if (invoiceData.dueDate && typeof invoiceData.dueDate === 'string') {
+        invoiceData.dueDate = new Date(invoiceData.dueDate);
+      }
       const validation = insertInvoiceSchema.safeParse(invoiceData);
       
       if (!validation.success) {
@@ -420,7 +426,12 @@ export async function registerRoutes(
     try {
       const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const { items, ...updates } = req.body;
-      
+      if (updates.issueDate && typeof updates.issueDate === 'string') {
+        updates.issueDate = new Date(updates.issueDate);
+      }
+      if (updates.dueDate && typeof updates.dueDate === 'string') {
+        updates.dueDate = new Date(updates.dueDate);
+      }
       const invoice = await storage.updateInvoice(invoiceId, updates);
       
       if (!invoice) {
