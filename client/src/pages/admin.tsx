@@ -107,7 +107,7 @@ export default function AdminPage() {
   const { user, token, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [currentView, setCurrentView] = useState<"dashboard" | "users" | "services" | "invoices">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "users" | "services" | "invoices" | "customers">("dashboard");
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -212,7 +212,7 @@ export default function AdminPage() {
           <NavItem icon={MapPin} label="Dispatch" />
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Business</div>
-          <NavItem icon={Building2} label="Customers" />
+          <NavItem icon={Building2} label="Customers" active={currentView === "customers"} onClick={() => setCurrentView("customers")} />
           <NavItem icon={Server} label="Services" active={currentView === "services"} onClick={() => setCurrentView("services")} />
           <NavItem icon={CreditCard} label="Billing" />
           <NavItem icon={FileText} label="Invoices" active={currentView === "invoices"} onClick={() => setCurrentView("invoices")} />
@@ -281,6 +281,9 @@ export default function AdminPage() {
           )}
           {currentView === "invoices" && (
             <InvoicesView token={token} />
+          )}
+          {currentView === "customers" && (
+            <CustomersView token={token} />
           )}
         </main>
       </div>
@@ -742,6 +745,102 @@ function UserModal({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type CustomerData = {
+  id: string;
+  name: string;
+  companyName: string | null;
+  email: string;
+};
+
+function CustomersView({ token }: { token: string | null }) {
+  const { toast } = useToast();
+  const [customers, setCustomers] = useState<CustomerData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  async function loadCustomers() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/customers", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomers(data);
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load customers", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = customers.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.companyName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4" data-testid="customers-view">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Customer Accounts</h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">{customers.length} total customers</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <Input
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-xs"
+            data-testid="input-customer-search"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-xs text-slate-500">Loading customers...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-10 text-xs text-slate-500">
+          {searchQuery ? "No customers match your search." : "No customer accounts found."}
+        </div>
+      ) : (
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Name</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Company</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Email</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((customer) => (
+                <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50/50" data-testid={`row-customer-${customer.id}`}>
+                  <td className="px-4 py-2.5 font-medium text-slate-900">{customer.name}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{customer.companyName || "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{customer.email}</td>
+                  <td className="px-4 py-2.5 text-slate-400 font-mono text-[10px]">{customer.id.slice(0, 8)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
