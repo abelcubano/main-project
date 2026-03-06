@@ -34,6 +34,125 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 
+type PermissionKeys = {
+  permPortalAccess: boolean;
+  permBillingView: boolean;
+  permBillingReceiveInvoices: boolean;
+  permBillingMakePayments: boolean;
+  permServicesView: boolean;
+  permServicesManage: boolean;
+  permTechnicalView: boolean;
+  permTechnicalManage: boolean;
+  permSupportView: boolean;
+  permSupportCreate: boolean;
+  permSupportSmarthands: boolean;
+  permNotifyMaintenance: boolean;
+  permNotifyBilling: boolean;
+  permNotifyIncidents: boolean;
+  permAdminUsers: boolean;
+};
+
+const PERMISSION_GROUPS: { label: string; keys: { key: keyof PermissionKeys; label: string }[] }[] = [
+  { label: "Portal Access", keys: [{ key: "permPortalAccess", label: "Can log into portal" }] },
+  { label: "Billing & Financial", keys: [
+    { key: "permBillingView", label: "View invoices" },
+    { key: "permBillingReceiveInvoices", label: "Receive invoice emails" },
+    { key: "permBillingMakePayments", label: "Make payments" },
+  ]},
+  { label: "Services", keys: [
+    { key: "permServicesView", label: "View services" },
+    { key: "permServicesManage", label: "Manage services" },
+  ]},
+  { label: "Technical", keys: [
+    { key: "permTechnicalView", label: "View technical details" },
+    { key: "permTechnicalManage", label: "PDU reboot / manage" },
+  ]},
+  { label: "Support", keys: [
+    { key: "permSupportView", label: "View tickets" },
+    { key: "permSupportCreate", label: "Create tickets" },
+    { key: "permSupportSmarthands", label: "SmartHands requests" },
+  ]},
+  { label: "Notifications", keys: [
+    { key: "permNotifyMaintenance", label: "Maintenance notices" },
+    { key: "permNotifyBilling", label: "Billing notices" },
+    { key: "permNotifyIncidents", label: "Incident notices" },
+  ]},
+  { label: "Admin", keys: [{ key: "permAdminUsers", label: "Manage users" }] },
+];
+
+const DEFAULT_PERMS: PermissionKeys = {
+  permPortalAccess: true, permBillingView: false, permBillingReceiveInvoices: false,
+  permBillingMakePayments: false, permServicesView: false, permServicesManage: false,
+  permTechnicalView: false, permTechnicalManage: false, permSupportView: false,
+  permSupportCreate: false, permSupportSmarthands: false, permNotifyMaintenance: false,
+  permNotifyBilling: false, permNotifyIncidents: false, permAdminUsers: false,
+};
+
+const ROLE_TEMPLATES: { value: string; label: string; perms: PermissionKeys }[] = [
+  { value: "custom", label: "Custom", perms: DEFAULT_PERMS },
+  { value: "account_admin", label: "Account Admin (all)", perms: {
+    permPortalAccess: true, permBillingView: true, permBillingReceiveInvoices: true,
+    permBillingMakePayments: true, permServicesView: true, permServicesManage: true,
+    permTechnicalView: true, permTechnicalManage: true, permSupportView: true,
+    permSupportCreate: true, permSupportSmarthands: true, permNotifyMaintenance: true,
+    permNotifyBilling: true, permNotifyIncidents: true, permAdminUsers: true,
+  }},
+  { value: "manager", label: "Manager (billing+services+support)", perms: {
+    permPortalAccess: true, permBillingView: true, permBillingReceiveInvoices: true,
+    permBillingMakePayments: true, permServicesView: true, permServicesManage: false,
+    permTechnicalView: false, permTechnicalManage: false, permSupportView: true,
+    permSupportCreate: true, permSupportSmarthands: false, permNotifyMaintenance: true,
+    permNotifyBilling: true, permNotifyIncidents: true, permAdminUsers: false,
+  }},
+  { value: "technician", label: "Technician (technical+support)", perms: {
+    permPortalAccess: true, permBillingView: false, permBillingReceiveInvoices: false,
+    permBillingMakePayments: false, permServicesView: true, permServicesManage: false,
+    permTechnicalView: true, permTechnicalManage: true, permSupportView: true,
+    permSupportCreate: true, permSupportSmarthands: true, permNotifyMaintenance: true,
+    permNotifyBilling: false, permNotifyIncidents: true, permAdminUsers: false,
+  }},
+];
+
+function getActivePermCount(perms: Partial<PermissionKeys>): number {
+  return Object.values(perms).filter(Boolean).length;
+}
+
+function getPermSummaryBadges(perms: Partial<PermissionKeys>): string[] {
+  const badges: string[] = [];
+  if (perms.permBillingView) badges.push("Billing");
+  if (perms.permServicesView) badges.push("Services");
+  if (perms.permTechnicalView) badges.push("Technical");
+  if (perms.permSupportView) badges.push("Support");
+  if (perms.permAdminUsers) badges.push("Admin");
+  return badges;
+}
+
+function PermissionCheckboxGrid({ perms, onChange }: { perms: PermissionKeys; onChange: (perms: PermissionKeys) => void }) {
+  return (
+    <div className="space-y-[6px]" data-testid="permission-grid">
+      {PERMISSION_GROUPS.map((group) => (
+        <div key={group.label}>
+          <div className="text-[9px] font-semibold text-[#999] uppercase tracking-wider mb-[2px]">{group.label}</div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-[1px]">
+            {group.keys.map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-[4px] text-[10px] text-[#1e1e1e] cursor-pointer hover:bg-[#f3f3f3] px-1 py-[1px]">
+                <input
+                  type="checkbox"
+                  checked={perms[key]}
+                  onChange={(e) => onChange({ ...perms, [key]: e.target.checked })}
+                  className="h-[10px] w-[10px]"
+                  data-testid={`checkbox-${key}`}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type UserData = {
   id: string;
   username: string;
@@ -44,7 +163,7 @@ type UserData = {
   active: boolean;
   createdAt: string;
   lastLogin?: string;
-};
+} & Partial<PermissionKeys>;
 
 type AdminTicket = {
   id: string;
@@ -523,9 +642,9 @@ function UsersView({
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Username</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Email</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Role</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Permissions</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Company</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Last Login</th>
                 <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
               </tr>
             </thead>
@@ -541,9 +660,20 @@ function UsersView({
                   <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
                   <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
                   <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.role} /></td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]">
+                    {u.role === "customer" ? (
+                      <div className="flex flex-wrap gap-[2px]" data-testid={`perms-summary-${u.id}`}>
+                        {getPermSummaryBadges(u).map((b) => (
+                          <span key={b} className="inline-block px-[3px] py-0 text-[8px] font-medium bg-[#e8daef] text-[#6c3483]" style={{ lineHeight: "12px" }}>{b}</span>
+                        ))}
+                        {getPermSummaryBadges(u).length === 0 && <span className="text-[9px] text-[#999]">none</span>}
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-[#999]">all</span>
+                    )}
+                  </td>
                   <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.companyName || "—"}</td>
                   <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.active ? "active" : "suspended"} /></td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : "Never"}</td>
                   <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
                     <button onClick={(e) => { e.stopPropagation(); onEditUser(u); }} className="text-[#0078d4] hover:underline text-[10px] mr-2" data-testid={`button-edit-user-${u.id}`}>Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); onDeleteUser(u.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-user-${u.id}`}>Del</button>
@@ -596,6 +726,7 @@ function UserModal({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [roleTemplate, setRoleTemplate] = useState("custom");
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -605,6 +736,7 @@ function UserModal({
     companyName: "",
     active: true,
   });
+  const [perms, setPerms] = useState<PermissionKeys>({ ...DEFAULT_PERMS });
 
   useEffect(() => {
     if (open) {
@@ -618,11 +750,37 @@ function UserModal({
           companyName: editingUser.companyName || "",
           active: editingUser.active,
         });
+        setPerms({
+          permPortalAccess: editingUser.permPortalAccess ?? true,
+          permBillingView: editingUser.permBillingView ?? false,
+          permBillingReceiveInvoices: editingUser.permBillingReceiveInvoices ?? false,
+          permBillingMakePayments: editingUser.permBillingMakePayments ?? false,
+          permServicesView: editingUser.permServicesView ?? false,
+          permServicesManage: editingUser.permServicesManage ?? false,
+          permTechnicalView: editingUser.permTechnicalView ?? false,
+          permTechnicalManage: editingUser.permTechnicalManage ?? false,
+          permSupportView: editingUser.permSupportView ?? false,
+          permSupportCreate: editingUser.permSupportCreate ?? false,
+          permSupportSmarthands: editingUser.permSupportSmarthands ?? false,
+          permNotifyMaintenance: editingUser.permNotifyMaintenance ?? false,
+          permNotifyBilling: editingUser.permNotifyBilling ?? false,
+          permNotifyIncidents: editingUser.permNotifyIncidents ?? false,
+          permAdminUsers: editingUser.permAdminUsers ?? false,
+        });
+        setRoleTemplate("custom");
       } else {
         setFormData({ username: "", password: "", name: "", email: "", role: "customer", companyName: "", active: true });
+        setPerms({ ...DEFAULT_PERMS });
+        setRoleTemplate("custom");
       }
     }
   }, [open, editingUser]);
+
+  function handleTemplateChange(templateValue: string) {
+    setRoleTemplate(templateValue);
+    const tpl = ROLE_TEMPLATES.find(t => t.value === templateValue);
+    if (tpl) setPerms({ ...tpl.perms });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -632,6 +790,9 @@ function UserModal({
       const method = editingUser ? "PUT" : "POST";
       const body: any = { ...formData };
       if (editingUser && !body.password) delete body.password;
+      if (formData.role === "customer") {
+        Object.assign(body, perms);
+      }
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -653,11 +814,11 @@ function UserModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
         <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingUser ? "Edit User" : "New User"}</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">
-            {editingUser ? "Update user details" : "Create a new admin or customer account"}
+            {editingUser ? "Update user details and permissions" : "Create a new admin or customer account"}
           </DialogDescription>
         </div>
         <form onSubmit={handleSubmit} className="p-3 space-y-2">
@@ -688,7 +849,7 @@ function UserModal({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Role</label>
+              <label className="text-[10px] text-[#666] block mb-[2px]">System Role</label>
               <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
                 <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]" data-testid="select-role"><SelectValue /></SelectTrigger>
                 <SelectContent className="!rounded-none border-[#d0d0d0]">
@@ -706,6 +867,32 @@ function UserModal({
             <input type="checkbox" id="active" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="h-3 w-3" />
             <label htmlFor="active" className="text-[10px] text-[#666]">Account Active</label>
           </div>
+
+          {formData.role === "customer" && (
+            <div className="border border-[#d0d0d0] bg-[#fafafa]">
+              <div className="bg-[#e8e8e8] px-2 py-[3px] flex items-center justify-between border-b border-[#d0d0d0]">
+                <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] text-[#666]">Template:</span>
+                  <Select value={roleTemplate} onValueChange={handleTemplateChange}>
+                    <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#d0d0d0] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                      {ROLE_TEMPLATES.map((t) => (
+                        <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="p-2">
+                <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
+              </div>
+              <div className="bg-[#f3f3f3] border-t border-[#d0d0d0] px-2 py-[2px] text-[9px] text-[#666]">
+                {getActivePermCount(perms)} of 15 permissions enabled
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
             <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
             <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">
@@ -739,7 +926,7 @@ type CompanyUser = {
   username: string;
   customerRole: string | null;
   active: boolean;
-};
+} & Partial<PermissionKeys>;
 
 function CustomersView({ token }: { token: string | null }) {
   const { toast } = useToast();
@@ -828,15 +1015,6 @@ function CustomersView({ token }: { token: string | null }) {
     (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.contactName || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const roleLabel = (role: string | null) => {
-    switch (role) {
-      case "account_admin": return "Account Admin";
-      case "manager": return "Manager";
-      case "technician": return "Technician";
-      default: return role || "—";
-    }
-  };
 
   const selectedCompany = companies.find(c => c.id === selectedId);
 
@@ -937,7 +1115,7 @@ function CustomersView({ token }: { token: string | null }) {
                     <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Name</th>
                     <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Username</th>
                     <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Email</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Role</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Permissions</th>
                     <th className="text-center text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]"></th>
                   </tr>
                 </thead>
@@ -947,7 +1125,14 @@ function CustomersView({ token }: { token: string | null }) {
                       <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{u.name}</td>
                       <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
                       <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
-                      <td className="text-[11px] py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.customerRole || "technician"} /></td>
+                      <td className="py-[2px] px-2 border border-[#d0d0d0]">
+                        <div className="flex flex-wrap gap-[2px]">
+                          {getPermSummaryBadges(u).map((b) => (
+                            <span key={b} className="inline-block px-[3px] py-0 text-[8px] font-medium bg-[#e8daef] text-[#6c3483]" style={{ lineHeight: "12px" }}>{b}</span>
+                          ))}
+                          {getPermSummaryBadges(u).length === 0 && <span className="text-[9px] text-[#999]">none</span>}
+                        </div>
+                      </td>
                       <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
                         <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-remove-user-${u.id}`}>Remove</button>
                       </td>
@@ -1078,10 +1263,25 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ name: "", username: "", email: "", password: "", customerRole: "technician" });
+  const [form, setForm] = useState({ name: "", username: "", email: "", password: "" });
   const [saving, setSaving] = useState(false);
+  const [roleTemplate, setRoleTemplate] = useState("technician");
+  const [perms, setPerms] = useState<PermissionKeys>({ ...DEFAULT_PERMS });
 
-  useEffect(() => { if (open) setForm({ name: "", username: "", email: "", password: "", customerRole: "technician" }); }, [open]);
+  useEffect(() => {
+    if (open) {
+      setForm({ name: "", username: "", email: "", password: "" });
+      const techTpl = ROLE_TEMPLATES.find(t => t.value === "technician");
+      setPerms(techTpl ? { ...techTpl.perms } : { ...DEFAULT_PERMS });
+      setRoleTemplate("technician");
+    }
+  }, [open]);
+
+  function handleTemplateChange(templateValue: string) {
+    setRoleTemplate(templateValue);
+    const tpl = ROLE_TEMPLATES.find(t => t.value === templateValue);
+    if (tpl) setPerms({ ...tpl.perms });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1094,7 +1294,7 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
       const res = await fetch(`/api/admin/customers/${customerId}/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, ...perms }),
       });
       if (res.ok) {
         toast({ title: "User added" });
@@ -1114,39 +1314,56 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+      <DialogContent className="max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
         <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">Add User to Customer</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">Create a new user account linked to this company.</DialogDescription>
         </div>
         <form onSubmit={handleSubmit} className="p-3 space-y-2">
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Full Name *</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-user-name" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Full Name *</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-user-name" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Username *</label>
+              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={inputCls} data-testid="input-user-username" />
+            </div>
           </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Username *</label>
-            <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={inputCls} data-testid="input-user-username" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Email *</label>
+              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-user-email" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Password *</label>
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} data-testid="input-user-password" />
+            </div>
           </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Email *</label>
-            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-user-email" />
+
+          <div className="border border-[#d0d0d0] bg-[#fafafa]">
+            <div className="bg-[#e8e8e8] px-2 py-[3px] flex items-center justify-between border-b border-[#d0d0d0]">
+              <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-[#666]">Template:</span>
+                <Select value={roleTemplate} onValueChange={handleTemplateChange}>
+                  <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#d0d0d0] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                  <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    {ROLE_TEMPLATES.map((t) => (
+                      <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="p-2">
+              <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
+            </div>
+            <div className="bg-[#f3f3f3] border-t border-[#d0d0d0] px-2 py-[2px] text-[9px] text-[#666]">
+              {getActivePermCount(perms)} of 15 permissions enabled
+            </div>
           </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Password *</label>
-            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} data-testid="input-user-password" />
-          </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Role</label>
-            <Select value={form.customerRole} onValueChange={(v) => setForm({ ...form, customerRole: v })}>
-              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]" data-testid="select-user-role"><SelectValue /></SelectTrigger>
-              <SelectContent className="!rounded-none border-[#d0d0d0]">
-                <SelectItem value="account_admin" className="text-[11px]">Account Admin</SelectItem>
-                <SelectItem value="manager" className="text-[11px]">Manager</SelectItem>
-                <SelectItem value="technician" className="text-[11px]">Technician</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
           <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
             <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
             <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">

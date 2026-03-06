@@ -6,8 +6,9 @@ import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
+import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -19,6 +20,28 @@ const dispatchRequestSchema = z.object({
   details: z.string().min(1, "Task details are required"),
 });
 
+
+function extractUserPermissions(user: any) {
+  const perms: Record<string, boolean> = {};
+  for (const field of PERMISSION_FIELDS) {
+    perms[field] = user[field] ?? false;
+  }
+  return perms;
+}
+
+function sanitizeUser(user: any) {
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    companyName: user.companyName,
+    customerId: user.customerId,
+    customerRole: user.customerRole,
+    ...extractUserPermissions(user),
+  };
+}
 
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace("Bearer ", "") || req.cookies?.session;
@@ -39,6 +62,15 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   (req as any).user = user;
   (req as any).session = session;
+  next();
+}
+
+function requirePortalAccess(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (user && user.role === "admin") return next();
+  if (!user || !canAccessPortal(user)) {
+    return res.status(403).json({ error: "Portal access denied" });
+  }
   next();
 }
 
@@ -95,14 +127,7 @@ export async function registerRoutes(
       res.json({
         success: true,
         token: session.token,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          companyName: user.companyName,
-        },
+        user: sanitizeUser(user),
       });
     } catch (error: any) {
       console.error("[AUTH] Login error:", error);
@@ -125,26 +150,14 @@ export async function registerRoutes(
 
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     const user = (req as any).user;
-    res.json({
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      companyName: user.companyName,
-    });
+    res.json(sanitizeUser(user));
   });
 
   app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users.map(u => ({
-        id: u.id,
-        username: u.username,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        companyName: u.companyName,
+        ...sanitizeUser(u),
         active: u.active,
         createdAt: u.createdAt,
         lastLogin: u.lastLogin,
@@ -181,12 +194,7 @@ export async function registerRoutes(
       });
 
       res.json({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        companyName: user.companyName,
+        ...sanitizeUser(user),
         active: user.active,
         createdAt: user.createdAt,
       });
@@ -211,6 +219,12 @@ export async function registerRoutes(
         updates.password = await bcrypt.hash(req.body.password, 10);
       }
 
+      for (const field of PERMISSION_FIELDS) {
+        if (typeof req.body[field] === "boolean") {
+          updates[field] = req.body[field];
+        }
+      }
+
       const userId = Array.isArray(id) ? id[0] : id;
       const user = await storage.updateUser(userId, updates);
       if (!user) {
@@ -218,12 +232,7 @@ export async function registerRoutes(
       }
 
       res.json({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        companyName: user.companyName,
+        ...sanitizeUser(user),
         active: user.active,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
@@ -258,9 +267,12 @@ export async function registerRoutes(
   });
 
   // Customer services endpoints
-  app.get("/api/services", requireAuth, async (req, res) => {
+  app.get("/api/services", requireAuth, requirePortalAccess, async (req, res) => {
     try {
       const user = (req as any).user;
+      if (user.role !== "admin" && !canViewServices(user)) {
+        return res.status(403).json({ error: "You do not have permission to view services" });
+      }
       const servicesList = user.role === "admin" 
         ? await storage.getAllServices()
         : await storage.getServicesByUser(user.id);
@@ -275,9 +287,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/services/:id", requireAuth, async (req, res) => {
+  app.get("/api/services/:id", requireAuth, requirePortalAccess, async (req, res) => {
     try {
       const user = (req as any).user;
+      if (user.role !== "admin" && !canViewServices(user)) {
+        return res.status(403).json({ error: "You do not have permission to view services" });
+      }
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const service = await storage.getService(serviceId);
       
@@ -360,9 +375,12 @@ export async function registerRoutes(
   });
 
   // Customer invoices endpoints
-  app.get("/api/invoices", requireAuth, async (req, res) => {
+  app.get("/api/invoices", requireAuth, requirePortalAccess, async (req, res) => {
     try {
       const user = (req as any).user;
+      if (user.role !== "admin" && !canViewBilling(user)) {
+        return res.status(403).json({ error: "You do not have permission to view invoices" });
+      }
       const invoicesList = user.role === "admin" 
         ? await storage.getAllInvoices()
         : await storage.getInvoicesByUser(user.id);
@@ -373,9 +391,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, requirePortalAccess, async (req, res) => {
     try {
       const user = (req as any).user;
+      if (user.role !== "admin" && !canViewBilling(user)) {
+        return res.status(403).json({ error: "You do not have permission to view invoices" });
+      }
       const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const invoice = await storage.getInvoice(invoiceId);
       
@@ -396,10 +417,13 @@ export async function registerRoutes(
   });
 
   // PDF invoice download
-  app.get("/api/invoices/:id/pdf", requireAuth, async (req: any, res) => {
+  app.get("/api/invoices/:id/pdf", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = req.user;
+      if (user.role !== "admin" && !canViewBilling(user)) {
+        return res.status(403).json({ error: "You do not have permission to view invoices" });
+      }
       const invoice = await storage.getInvoice(invoiceId);
 
       if (!invoice) {
@@ -582,7 +606,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Customer not found" });
       }
       const customerUsers = await storage.getUsersByCustomer(customerId);
-      res.json({ ...customer, users: customerUsers.map(u => ({ id: u.id, name: u.name, email: u.email, username: u.username, customerRole: u.customerRole, active: u.active })) });
+      res.json({ ...customer, users: customerUsers.map(u => ({ ...sanitizeUser(u), active: u.active })) });
     } catch (error: any) {
       console.error("[ADMIN] Get customer error:", error);
       res.status(500).json({ error: "Failed to fetch customer" });
@@ -635,8 +659,15 @@ export async function registerRoutes(
   app.post("/api/admin/customers/:id/users", requireAuth, requireAdmin, async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-      const { username, password, email, name, customerRole } = req.body;
+      const { username, password, email, name, customerRole, ...rest } = req.body;
       
+      const permFields: Record<string, boolean> = {};
+      for (const field of PERMISSION_FIELDS) {
+        if (typeof rest[field] === "boolean") {
+          permFields[field] = rest[field];
+        }
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({
         username,
@@ -647,9 +678,10 @@ export async function registerRoutes(
         customerId,
         customerRole: customerRole || "technician",
         active: true,
+        ...permFields,
       });
 
-      res.json({ id: user.id, name: user.name, email: user.email, username: user.username, customerRole: user.customerRole, active: user.active });
+      res.json({ ...sanitizeUser(user), active: user.active });
     } catch (error: any) {
       console.error("[ADMIN] Add customer user error:", error);
       if (error.code === "23505") {
@@ -669,12 +701,18 @@ export async function registerRoutes(
       if (customerRole) updates.customerRole = customerRole;
       if (name) updates.name = name;
       if (email) updates.email = email;
+
+      for (const field of PERMISSION_FIELDS) {
+        if (typeof req.body[field] === "boolean") {
+          updates[field] = req.body[field];
+        }
+      }
       
       const user = await storage.updateUser(userId, updates);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json({ id: user.id, name: user.name, email: user.email, username: user.username, customerRole: user.customerRole, active: user.active });
+      res.json({ ...sanitizeUser(user), active: user.active });
     } catch (error: any) {
       console.error("[ADMIN] Update customer user error:", error);
       res.status(500).json({ error: "Failed to update user" });
@@ -728,10 +766,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/services/:id/pdu/status", requireAuth, async (req: any, res) => {
+  app.get("/api/services/:id/pdu/status", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = req.user;
+      if (user.role !== "admin" && !canViewTechnical(user)) {
+        return res.status(403).json({ error: "You do not have permission to view technical details" });
+      }
       const service = await storage.getService(serviceId);
 
       if (!service) {
@@ -762,10 +803,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/services/:id/pdu/reboot", requireAuth, async (req: any, res) => {
+  app.post("/api/services/:id/pdu/reboot", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = req.user;
+      if (user.role !== "admin" && !canManageTechnical(user)) {
+        return res.status(403).json({ error: "You do not have permission to manage technical operations" });
+      }
       const service = await storage.getService(serviceId);
 
       if (!service) {

@@ -31,6 +31,21 @@ export const users = pgTable("users", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   lastLogin: timestamp("last_login"),
+  permPortalAccess: boolean("perm_portal_access").notNull().default(true),
+  permBillingView: boolean("perm_billing_view").notNull().default(false),
+  permBillingReceiveInvoices: boolean("perm_billing_receive_invoices").notNull().default(false),
+  permBillingMakePayments: boolean("perm_billing_make_payments").notNull().default(false),
+  permServicesView: boolean("perm_services_view").notNull().default(false),
+  permServicesManage: boolean("perm_services_manage").notNull().default(false),
+  permTechnicalView: boolean("perm_technical_view").notNull().default(false),
+  permTechnicalManage: boolean("perm_technical_manage").notNull().default(false),
+  permSupportView: boolean("perm_support_view").notNull().default(false),
+  permSupportCreate: boolean("perm_support_create").notNull().default(false),
+  permSupportSmarthands: boolean("perm_support_smarthands").notNull().default(false),
+  permNotifyMaintenance: boolean("perm_notify_maintenance").notNull().default(false),
+  permNotifyBilling: boolean("perm_notify_billing").notNull().default(false),
+  permNotifyIncidents: boolean("perm_notify_incidents").notNull().default(false),
+  permAdminUsers: boolean("perm_admin_users").notNull().default(false),
 });
 
 export const sessions = pgTable("sessions", {
@@ -56,7 +71,42 @@ export const insertUserSchema = createInsertSchema(users).pick({
   customerId: true,
   customerRole: true,
   active: true,
+  permPortalAccess: true,
+  permBillingView: true,
+  permBillingReceiveInvoices: true,
+  permBillingMakePayments: true,
+  permServicesView: true,
+  permServicesManage: true,
+  permTechnicalView: true,
+  permTechnicalManage: true,
+  permSupportView: true,
+  permSupportCreate: true,
+  permSupportSmarthands: true,
+  permNotifyMaintenance: true,
+  permNotifyBilling: true,
+  permNotifyIncidents: true,
+  permAdminUsers: true,
 });
+
+export const PERMISSION_FIELDS = [
+  "permPortalAccess",
+  "permBillingView",
+  "permBillingReceiveInvoices",
+  "permBillingMakePayments",
+  "permServicesView",
+  "permServicesManage",
+  "permTechnicalView",
+  "permTechnicalManage",
+  "permSupportView",
+  "permSupportCreate",
+  "permSupportSmarthands",
+  "permNotifyMaintenance",
+  "permNotifyBilling",
+  "permNotifyIncidents",
+  "permAdminUsers",
+] as const;
+
+export type PermissionField = (typeof PERMISSION_FIELDS)[number];
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),

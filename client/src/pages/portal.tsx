@@ -176,7 +176,7 @@ function GrafanaPanel({ service }: { service: Service }) {
   );
 }
 
-function PduControls({ service, token }: { service: Service; token: string | null }) {
+function PduControls({ service, token, canManage }: { service: Service; token: string | null; canManage: boolean }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rebooting, setRebooting] = useState(false);
@@ -272,7 +272,7 @@ function PduControls({ service, token }: { service: Service; token: string | nul
               {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCw className="h-3 w-3 mr-1" />}
               Check Status
             </Button>
-            {service.snmpOidControl && (
+            {service.snmpOidControl && canManage && (
               <Button
                 size="sm"
                 onClick={() => setShowConfirm(true)}
@@ -314,9 +314,31 @@ export default function PortalPage() {
   const [query, setQuery] = useState("");
   const [activeView, setActiveView] = useState<PortalView>("dashboard");
 
+  const isAdmin = user?.role === "admin";
+  const hasPortalAccess = isAdmin || user?.permPortalAccess !== false;
+  const canSeeServices = isAdmin || user?.permServicesView === true;
+  const canSeeInvoices = isAdmin || user?.permBillingView === true;
+  const canSeeTickets = isAdmin || user?.permSupportView === true;
+  const canSeeTechnical = isAdmin || user?.permTechnicalView === true;
+  const canManageTechnical = isAdmin || user?.permTechnicalManage === true;
+  const canCreateTickets = isAdmin || user?.permSupportCreate === true;
+  const canSeeSmarthands = isAdmin || user?.permSupportSmarthands === true;
+
   async function handleLogout() {
     await logout();
     setLocation("/portal/login");
+  }
+
+  if (user && !hasPortalAccess) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50" data-testid="page-portal-denied">
+        <div className="text-center space-y-3">
+          <div className="text-lg font-semibold text-slate-900">Access Denied</div>
+          <p className="text-sm text-slate-500">Your account does not have portal access. Please contact your account administrator.</p>
+          <Button onClick={handleLogout} variant="outline" className="text-xs" data-testid="button-logout-denied">Sign Out</Button>
+        </div>
+      </div>
+    );
   }
 
   const { data: servicesData = [] } = useQuery<DbService[]>({
@@ -325,10 +347,10 @@ export default function PortalPage() {
       const res = await fetch("/api/services", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to fetch services");
+      if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!token && canSeeServices,
   });
 
   const { data: invoicesData = [] } = useQuery<DbInvoice[]>({
@@ -337,10 +359,10 @@ export default function PortalPage() {
       const res = await fetch("/api/invoices", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to fetch invoices");
+      if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!token && canSeeInvoices,
   });
 
   const services: Service[] = servicesData.map((s) => ({
@@ -413,18 +435,30 @@ export default function PortalPage() {
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-2">Overview</div>
           <NavItem icon={LayoutDashboard} label="Dashboard" active={activeView === "dashboard"} onClick={() => setActiveView("dashboard")} />
 
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Services</div>
-          <NavItem icon={Server} label="My Services" badge={services.length || undefined} active={activeView === "services"} onClick={() => setActiveView("services")} />
-          <NavItem icon={MapPin} label="Locations" />
-          <NavItem icon={Network} label="Network" />
+          {canSeeServices && (
+            <>
+              <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Services</div>
+              <NavItem icon={Server} label="My Services" badge={services.length || undefined} active={activeView === "services"} onClick={() => setActiveView("services")} />
+              <NavItem icon={MapPin} label="Locations" />
+              {canSeeTechnical && <NavItem icon={Network} label="Network" />}
+            </>
+          )}
 
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Billing</div>
-          <NavItem icon={FileText} label="Invoices" badge={openInvoices + pastDueInvoices || undefined} active={activeView === "invoices"} onClick={() => setActiveView("invoices")} />
-          <NavItem icon={CreditCard} label="Payments" />
+          {canSeeInvoices && (
+            <>
+              <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Billing</div>
+              <NavItem icon={FileText} label="Invoices" badge={openInvoices + pastDueInvoices || undefined} active={activeView === "invoices"} onClick={() => setActiveView("invoices")} />
+              <NavItem icon={CreditCard} label="Payments" />
+            </>
+          )}
 
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Support</div>
-          <NavItem icon={Ticket} label="My Tickets" badge={3} active={activeView === "tickets"} onClick={() => setActiveView("tickets")} />
-          <NavItem icon={Cable} label="SmartHands" />
+          {canSeeTickets && (
+            <>
+              <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Support</div>
+              <NavItem icon={Ticket} label="My Tickets" badge={3} active={activeView === "tickets"} onClick={() => setActiveView("tickets")} />
+              {canSeeSmarthands && <NavItem icon={Cable} label="SmartHands" />}
+            </>
+          )}
 
           <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Account</div>
           <NavItem icon={Settings} label="Settings" active={activeView === "settings"} onClick={() => setActiveView("settings")} />
@@ -466,7 +500,7 @@ export default function PortalPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-5">
-          {activeView === "services" && (
+          {activeView === "services" && canSeeServices && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
               <div>
                 <h1 className="text-lg font-semibold text-slate-900">My Services</h1>
@@ -498,8 +532,8 @@ export default function PortalPage() {
                           <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">{s.type}</span>
                         </div>
 
-                        <GrafanaPanel service={s} />
-                        <PduControls service={s} token={token} />
+                        {canSeeTechnical && <GrafanaPanel service={s} />}
+                        {canSeeTechnical && <PduControls service={s} token={token} canManage={canManageTechnical} />}
                       </div>
                     ))
                   )}
@@ -508,7 +542,7 @@ export default function PortalPage() {
             </motion.div>
           )}
 
-          {activeView === "invoices" && (
+          {activeView === "invoices" && canSeeInvoices && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
               <div>
                 <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
@@ -543,7 +577,7 @@ export default function PortalPage() {
             </motion.div>
           )}
 
-          {activeView === "tickets" && (
+          {activeView === "tickets" && canSeeTickets && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -618,7 +652,8 @@ export default function PortalPage() {
               <p className="text-xs text-slate-500 mt-0.5">Manage your services, billing, and support</p>
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {canSeeServices && (
               <Card className="p-4 border-slate-200 bg-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -631,6 +666,8 @@ export default function PortalPage() {
                   </div>
                 </div>
               </Card>
+              )}
+              {canSeeInvoices && (
               <Card className="p-4 border-slate-200 bg-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -643,6 +680,8 @@ export default function PortalPage() {
                   </div>
                 </div>
               </Card>
+              )}
+              {canSeeTickets && (
               <Card className="p-4 border-slate-200 bg-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -655,6 +694,8 @@ export default function PortalPage() {
                   </div>
                 </div>
               </Card>
+              )}
+              {canSeeSmarthands && (
               <Card className="p-4 border-slate-200 bg-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -667,9 +708,11 @@ export default function PortalPage() {
                   </div>
                 </div>
               </Card>
+              )}
             </div>
 
             <div className="grid grid-cols-12 gap-5">
+              {canSeeServices && (
               <Card className="col-span-8 border-slate-200 bg-white overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                   <div>
@@ -701,8 +744,9 @@ export default function PortalPage() {
                   )}
                 </div>
               </Card>
+              )}
 
-              <Card className="col-span-4 border-slate-200 bg-white overflow-hidden">
+              <Card className={`${canSeeServices ? "col-span-4" : "col-span-12"} border-slate-200 bg-white overflow-hidden`}>
                 <div className="px-4 py-3 border-b border-slate-100">
                   <h2 className="text-sm font-semibold text-slate-900">Quick Actions</h2>
                 </div>

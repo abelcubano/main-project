@@ -7,6 +7,21 @@ interface User {
   email: string;
   role: "admin" | "customer";
   companyName?: string;
+  permPortalAccess?: boolean;
+  permBillingView?: boolean;
+  permBillingReceiveInvoices?: boolean;
+  permBillingMakePayments?: boolean;
+  permServicesView?: boolean;
+  permServicesManage?: boolean;
+  permTechnicalView?: boolean;
+  permTechnicalManage?: boolean;
+  permSupportView?: boolean;
+  permSupportCreate?: boolean;
+  permSupportSmarthands?: boolean;
+  permNotifyMaintenance?: boolean;
+  permNotifyBilling?: boolean;
+  permNotifyIncidents?: boolean;
+  permAdminUsers?: boolean;
 }
 
 interface AuthContextType {

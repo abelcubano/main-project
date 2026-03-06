@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { sendInvoiceEmail } from "./email";
 import type { Customer, Service, Invoice } from "@shared/schema";
+import { canReceiveInvoices } from "./permissions";
 
 function generateInvoiceNumber(date: Date): string {
   const y = date.getFullYear();
@@ -95,12 +96,13 @@ export async function runMonthlyBilling(billingDate?: Date): Promise<BillingResu
       result.invoices.push(invoice);
       result.generated++;
 
-      if (customer.email) {
+      const invoiceRecipients = customerUsers.filter(u => canReceiveInvoices(u) && u.email);
+      for (const recipient of invoiceRecipients) {
         try {
           const emailResult = await sendInvoiceEmail({
             customerName: customer.name,
-            contactName: customer.contactName || customer.name,
-            email: customer.email,
+            contactName: recipient.name || customer.contactName || customer.name,
+            email: recipient.email,
             invoiceNumber: invoice.invoiceNumber,
             total: total.toFixed(2),
             dueDate: dueDate.toLocaleDateString("en-US"),
@@ -108,11 +110,14 @@ export async function runMonthlyBilling(billingDate?: Date): Promise<BillingResu
             itemCount: customerServiceList.length,
           });
           if (!emailResult.success) {
-            result.errors.push(`Email failed for ${customer.name}: ${emailResult.error}`);
+            result.errors.push(`Email failed for ${customer.name} (${recipient.email}): ${emailResult.error}`);
           }
         } catch (emailErr: any) {
-          result.errors.push(`Email failed for ${customer.name}: ${emailErr.message}`);
+          result.errors.push(`Email failed for ${customer.name} (${recipient.email}): ${emailErr.message}`);
         }
+      }
+      if (invoiceRecipients.length === 0 && customer.email) {
+        console.log(`[BILLING] No users with billing_receive_invoices permission for ${customer.name}, skipping email`);
       }
     } catch (err: any) {
       result.errors.push(`Failed for ${customer.name}: ${err.message}`);

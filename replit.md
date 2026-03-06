@@ -57,7 +57,7 @@ The database schema is shared between frontend and backend through the `shared/`
 
 ### Database Schema
 - **customers** - Company/organization accounts (name, address, contact info, notes)
-- **users** - User accounts with bcrypt-hashed passwords, linked to customers via customerId, with customerRole (account_admin/manager/technician) and system role (admin/customer)
+- **users** - User accounts with bcrypt-hashed passwords, linked to customers via customerId, with customerRole (account_admin/manager/technician) and system role (admin/customer). Includes 15 boolean permission fields (Ubersmith-style): permPortalAccess, permBillingView, permBillingReceiveInvoices, permBillingMakePayments, permServicesView, permServicesManage, permTechnicalView, permTechnicalManage, permSupportView, permSupportCreate, permSupportSmarthands, permNotifyMaintenance, permNotifyBilling, permNotifyIncidents, permAdminUsers
 - **services** - Customer services linked to users, with optional Grafana monitoring config (grafanaUrl, grafanaDashboardUid, grafanaPanelId, grafanaOrgId, grafanaVar) and SNMP/PDU config (snmpHost, snmpPort, snmpCommunity, snmpVersion, snmpOidStatus, snmpOidControl, pduPortNumber)
 - **invoices** - Customer invoices with line items, totals, and status tracking
 - **invoice_items** - Individual line items for each invoice
