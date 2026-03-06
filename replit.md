@@ -58,7 +58,7 @@ The database schema is shared between frontend and backend through the `shared/`
 ### Database Schema
 - **customers** - Company/organization accounts (name, address, contact info, notes)
 - **users** - User accounts with bcrypt-hashed passwords, linked to customers via customerId, with customerRole (account_admin/manager/technician) and system role (admin/customer)
-- **services** - Customer services linked to users (colocation, SmartHands, connectivity, etc.)
+- **services** - Customer services linked to users, with optional Grafana monitoring config (grafanaUrl, grafanaDashboardUid, grafanaPanelId, grafanaOrgId, grafanaVar) and SNMP/PDU config (snmpHost, snmpPort, snmpCommunity, snmpVersion, snmpOidStatus, snmpOidControl, pduPortNumber)
 - **invoices** - Customer invoices with line items, totals, and status tracking
 - **invoice_items** - Individual line items for each invoice
 - **dispatch_requests** - SmartHands dispatch requests for datacenter operations
@@ -108,6 +108,26 @@ The database schema is shared between frontend and backend through the `shared/`
   - Prevents duplicate invoices for the same billing period via invoice number pattern matching (INV-YYYYMM-XXXX)
   - Sends email notifications to customer contacts when invoices are generated
   - Groups services by customer company for consolidated invoicing
+
+### SNMP/PDU Management
+- **Library**: net-snmp (Node.js SNMP client)
+- **Service**: server/snmp.ts — SNMP GET (port status) and SET (reboot) operations
+- **Endpoints**: 
+  - GET /api/services/:id/pdu/status — read PDU outlet state via SNMP
+  - POST /api/services/:id/pdu/reboot — power cycle outlet via SNMP SET
+- **Security**: SNMP community strings stored in DB, never returned to customer API responses (sanitized server-side)
+- **Config per service**: host, port (default 161), community, version (v1/v2c), status OID, control OID, port number
+
+### Grafana Monitoring
+- **Integration**: Embedded Grafana panels via iframe in customer portal
+- **Config per service**: Grafana URL, Dashboard UID, Panel ID, Org ID, Host Variable
+- **Customer portal**: Time range selector (6h, 24h, 7d, 30d), auto-constructs iframe src from config
+
+### Admin Portal UI Style
+- **Design**: Native desktop application aesthetic (pgAdmin/SSMS/VS Code light theme)
+- **Layout**: Menu bar (22px), tab bar (26px), breadcrumb (18px), tree sidebar (140px), draggable split panels, status bar (18px)
+- **Colors**: bg #f3f3f3, panels #ffffff, table headers #e8e8e8, borders #d0d0d0, text #1e1e1e, accent #0078d4, selected #cce4f7
+- **Density**: 10-12px fonts, 18-22px table rows, 1px borders, no rounded corners/shadows, alternating row colors
 
 ### Planned Integrations (Future)
 - Payment gateway integration (Stripe dependency already included)

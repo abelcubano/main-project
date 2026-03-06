@@ -23,6 +23,10 @@ import {
   Settings,
   Shield,
   Ticket,
+  Power,
+  RotateCw,
+  BarChart3,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Transition } from "framer-motion";
@@ -31,6 +35,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 type Invoice = {
   id: string;
@@ -56,6 +62,15 @@ type Service = {
   status: "active" | "provisioning" | "suspended";
   location: string;
   details: string;
+  grafanaUrl?: string | null;
+  grafanaDashboardUid?: string | null;
+  grafanaPanelId?: string | null;
+  grafanaOrgId?: string | null;
+  grafanaVar?: string | null;
+  snmpHost?: string | null;
+  snmpOidStatus?: string | null;
+  snmpOidControl?: string | null;
+  pduPortNumber?: number | null;
 };
 
 const easeOut: Transition["ease"] = [0.16, 1, 0.3, 1];
@@ -103,6 +118,196 @@ function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: typeof L
 
 type PortalView = "dashboard" | "services" | "invoices" | "tickets" | "settings";
 
+function GrafanaPanel({ service }: { service: Service }) {
+  const [timeRange, setTimeRange] = useState("24h");
+
+  if (!service.grafanaUrl || !service.grafanaDashboardUid || !service.grafanaPanelId) {
+    return null;
+  }
+
+  const timeRanges: Record<string, { from: string; to: string }> = {
+    "6h": { from: "now-6h", to: "now" },
+    "24h": { from: "now-24h", to: "now" },
+    "7d": { from: "now-7d", to: "now" },
+    "30d": { from: "now-30d", to: "now" },
+  };
+
+  const range = timeRanges[timeRange];
+  let src = `${service.grafanaUrl}/d-solo/${service.grafanaDashboardUid}?panelId=${service.grafanaPanelId}&from=${range.from}&to=${range.to}&theme=light`;
+  if (service.grafanaOrgId) src += `&orgId=${service.grafanaOrgId}`;
+  if (service.grafanaVar) src += `&var-host=${encodeURIComponent(service.grafanaVar)}`;
+
+  return (
+    <div className="mt-3" data-testid={`grafana-panel-${service.id}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <BarChart3 className="h-3.5 w-3.5 text-blue-600" />
+          <span className="text-xs font-semibold text-slate-900">Network Traffic</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {(["6h", "24h", "7d", "30d"] as const).map((range) => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-2 py-0.5 text-[10px] rounded ${
+                timeRange === range
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+              data-testid={`button-timerange-${range}`}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+        <iframe
+          src={src}
+          width="100%"
+          height="200"
+          frameBorder="0"
+          className="block"
+          title={`Traffic graph for ${service.name}`}
+          data-testid={`iframe-grafana-${service.id}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PduControls({ service, token }: { service: Service; token: string | null }) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [rebooting, setRebooting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [portStatus, setPortStatus] = useState<{ state: string; rawValue: number } | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  if (!service.snmpHost || service.pduPortNumber == null) {
+    return null;
+  }
+
+  async function fetchStatus() {
+    setLoading(true);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/services/${service.id}/pdu/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setPortStatus(await res.json());
+      } else {
+        const data = await res.json();
+        setStatusError(data.error || "Failed to get status");
+      }
+    } catch {
+      setStatusError("Connection failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleReboot() {
+    setShowConfirm(false);
+    setRebooting(true);
+    try {
+      const res = await fetch(`/api/services/${service.id}/pdu/reboot`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Reboot Initiated", description: `Port ${service.pduPortNumber} reboot command sent successfully` });
+        setTimeout(fetchStatus, 3000);
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error || "Failed to reboot port", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Connection failed", variant: "destructive" });
+    } finally {
+      setRebooting(false);
+    }
+  }
+
+  const stateColors: Record<string, string> = {
+    on: "text-emerald-600",
+    off: "text-rose-600",
+    reboot: "text-amber-600",
+    unknown: "text-slate-500",
+  };
+
+  return (
+    <div className="mt-3" data-testid={`pdu-controls-${service.id}`}>
+      <div className="flex items-center gap-1.5 mb-2">
+        <Power className="h-3.5 w-3.5 text-amber-600" />
+        <span className="text-xs font-semibold text-slate-900">PDU Port Control</span>
+        <span className="text-[10px] text-slate-500">(Port #{service.pduPortNumber})</span>
+      </div>
+      <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {portStatus ? (
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-medium ${stateColors[portStatus.state] || stateColors.unknown}`}>
+                  {portStatus.state.toUpperCase()}
+                </span>
+                <span className="text-[10px] text-slate-400">(raw: {portStatus.rawValue})</span>
+              </div>
+            ) : statusError ? (
+              <span className="text-xs text-rose-600">{statusError}</span>
+            ) : (
+              <span className="text-xs text-slate-500 italic">Status not checked</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={fetchStatus}
+              disabled={loading}
+              className="h-7 text-[10px] border-slate-300"
+              data-testid={`button-check-status-${service.id}`}
+            >
+              {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCw className="h-3 w-3 mr-1" />}
+              Check Status
+            </Button>
+            {service.snmpOidControl && (
+              <Button
+                size="sm"
+                onClick={() => setShowConfirm(true)}
+                disabled={rebooting}
+                className="h-7 text-[10px] bg-amber-600 hover:bg-amber-700 text-white"
+                data-testid={`button-reboot-${service.id}`}
+              >
+                {rebooting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Power className="h-3 w-3 mr-1" />}
+                Reboot Port
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">Confirm Port Reboot</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              This will power cycle PDU port #{service.pduPortNumber} for {service.name}. Any connected equipment will temporarily lose power.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={() => setShowConfirm(false)} className="h-8 text-xs">Cancel</Button>
+            <Button size="sm" onClick={handleReboot} className="h-8 text-xs bg-amber-600 hover:bg-amber-700" data-testid={`button-confirm-reboot-${service.id}`}>
+              Confirm Reboot
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function PortalPage() {
   const { user, logout, token } = useAuth();
   const [, setLocation] = useLocation();
@@ -145,6 +350,15 @@ export default function PortalPage() {
     status: s.status as "active" | "provisioning" | "suspended",
     location: s.location,
     details: s.details || "",
+    grafanaUrl: s.grafanaUrl,
+    grafanaDashboardUid: s.grafanaDashboardUid,
+    grafanaPanelId: s.grafanaPanelId,
+    grafanaOrgId: s.grafanaOrgId,
+    grafanaVar: s.grafanaVar,
+    snmpHost: s.snmpHost,
+    snmpOidStatus: s.snmpOidStatus,
+    snmpOidControl: s.snmpOidControl,
+    pduPortNumber: s.pduPortNumber,
   }));
 
   const invoices: Invoice[] = invoicesData.map((inv) => {
@@ -180,7 +394,6 @@ export default function PortalPage() {
 
   return (
     <div className="min-h-dvh flex bg-slate-50" data-testid="page-portal">
-      {/* Sidebar */}
       <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
         <div className="p-4 border-b border-slate-100">
           <Link href="/">
@@ -225,9 +438,7 @@ export default function PortalPage() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0">
           <div className="flex items-center gap-3">
             <span className="px-2.5 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700">{user?.companyName || "Customer Account"}</span>
@@ -254,7 +465,6 @@ export default function PortalPage() {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-5">
           {activeView === "services" && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
@@ -275,7 +485,7 @@ export default function PortalPage() {
                     <div className="text-center py-8 text-xs text-slate-500">No services found</div>
                   ) : (
                     filteredServices.map((s) => (
-                      <div key={s.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer" data-testid={`service-${s.id}`}>
+                      <div key={s.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all" data-testid={`service-${s.id}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -287,6 +497,9 @@ export default function PortalPage() {
                           </div>
                           <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">{s.type}</span>
                         </div>
+
+                        <GrafanaPanel service={s} />
+                        <PduControls service={s} token={token} />
                       </div>
                     ))
                   )}
@@ -400,13 +613,11 @@ export default function PortalPage() {
 
           {activeView === "dashboard" && (
           <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
-            {/* Page Header */}
             <div>
               <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
               <p className="text-xs text-slate-500 mt-0.5">Manage your services, billing, and support</p>
             </div>
 
-            {/* Stats Row */}
             <div className="grid grid-cols-4 gap-4">
               <Card className="p-4 border-slate-200 bg-white">
                 <div className="flex items-center justify-between">
@@ -458,9 +669,7 @@ export default function PortalPage() {
               </Card>
             </div>
 
-            {/* Main Grid */}
             <div className="grid grid-cols-12 gap-5">
-              {/* Services */}
               <Card className="col-span-8 border-slate-200 bg-white overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                   <div>
@@ -474,7 +683,7 @@ export default function PortalPage() {
                 </div>
                 <div className="p-4 grid gap-3">
                   {filteredServices.map((s) => (
-                    <div key={s.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer">
+                    <div key={s.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer" onClick={() => setActiveView("services")} data-testid={`dashboard-service-${s.id}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -482,125 +691,39 @@ export default function PortalPage() {
                             <StatusBadge status={s.status} />
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">{s.location}</div>
-                          <div className="text-[10px] text-slate-400 mt-1">{s.details}</div>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">{s.type}</span>
                       </div>
                     </div>
                   ))}
+                  {filteredServices.length === 0 && (
+                    <div className="text-center py-6 text-xs text-slate-500">No services yet</div>
+                  )}
                 </div>
               </Card>
 
-              {/* Quick Actions */}
               <Card className="col-span-4 border-slate-200 bg-white overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100">
                   <h2 className="text-sm font-semibold text-slate-900">Quick Actions</h2>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Common requests</p>
                 </div>
-                <div className="p-4 space-y-2">
-                  <Button className="w-full justify-start h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs">
-                    <Ticket className="mr-2 h-3.5 w-3.5" />
-                    <span className="flex-1 text-left">Open Support Ticket</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start h-9 border-slate-200 text-slate-700 text-xs hover:bg-slate-50">
-                    <Cable className="mr-2 h-3.5 w-3.5 text-blue-600" />
-                    <span className="flex-1 text-left">Request SmartHands</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start h-9 border-slate-200 text-slate-700 text-xs hover:bg-slate-50">
-                    <CreditCard className="mr-2 h-3.5 w-3.5 text-blue-600" />
-                    <span className="flex-1 text-left">Update Payment</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
+                <div className="p-3 space-y-2">
+                  {[
+                    { icon: Globe, label: "Request Service", desc: "Start a new service request" },
+                    { icon: HardHat, label: "SmartHands", desc: "Schedule datacenter work" },
+                    { icon: Phone, label: "Contact Support", desc: "Get help from our team" },
+                  ].map((action) => (
+                    <button key={action.label} className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all text-left">
+                      <div className="h-8 w-8 rounded-md bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                        <action.icon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-slate-900">{action.label}</div>
+                        <div className="text-[10px] text-slate-500">{action.desc}</div>
+                      </div>
+                      <ArrowRight className="h-3.5 w-3.5 text-slate-400 ml-auto" />
+                    </button>
+                  ))}
                 </div>
-                <Separator className="bg-slate-100" />
-                <div className="p-4 space-y-3">
-                  <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div className="flex items-center gap-2 text-[10px] font-medium text-slate-600">
-                      <MapPin className="h-3 w-3" />
-                      Primary Site
-                    </div>
-                    <div className="mt-1.5 text-xs font-semibold text-slate-900">iM Critical Miami</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">24/7 badge access</div>
-                  </div>
-                  <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div className="flex items-center gap-2 text-[10px] font-medium text-slate-600">
-                      <Globe className="h-3 w-3" />
-                      Network
-                    </div>
-                    <div className="mt-1.5 text-xs font-semibold text-slate-900">100Mbps DIA Active</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">IPv4 + IPv6 allocated</div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Bottom Row */}
-            <div className="grid grid-cols-2 gap-5">
-              {/* Invoices */}
-              <Card className="border-slate-200 bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Recent Invoices</h2>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Billing history</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600 hover:text-blue-700">
-                    View All
-                    <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50 border-slate-100">
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Invoice</TableHead>
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Date</TableHead>
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoices.map((inv) => (
-                      <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer">
-                        <TableCell className="text-xs font-medium text-slate-900">{inv.number}</TableCell>
-                        <TableCell className="text-xs text-slate-600">{inv.date}</TableCell>
-                        <TableCell><StatusBadge status={inv.status} /></TableCell>
-                        <TableCell className="text-xs font-semibold text-slate-900 text-right">{inv.total}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-
-              {/* Tickets */}
-              <Card className="border-slate-200 bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">My Tickets</h2>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Recent activity</p>
-                  </div>
-                  <Button size="sm" className="h-7 bg-blue-600 hover:bg-blue-700 text-white text-[10px]">
-                    New Ticket
-                  </Button>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50 border-slate-100">
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Subject</TableHead>
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tickets.map((t) => (
-                      <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer">
-                        <TableCell className="text-xs font-medium text-slate-900 max-w-[200px] truncate">{t.subject}</TableCell>
-                        <TableCell><StatusBadge status={t.status} /></TableCell>
-                        <TableCell className="text-xs text-slate-500 text-right">{t.updatedAt}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </Card>
             </div>
           </motion.div>

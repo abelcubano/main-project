@@ -7,6 +7,7 @@ import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema } from "@shared/schema";
+import { getPduPortStatus, rebootPduPort } from "./snmp";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -263,7 +264,11 @@ export async function registerRoutes(
       const servicesList = user.role === "admin" 
         ? await storage.getAllServices()
         : await storage.getServicesByUser(user.id);
-      res.json(servicesList);
+      const sanitized = user.role === "admin" ? servicesList : servicesList.map((s: any) => {
+        const { snmpCommunity, ...rest } = s;
+        return rest;
+      });
+      res.json(sanitized);
     } catch (error: any) {
       console.error("[SERVICES] Get services error:", error);
       res.status(500).json({ error: "Failed to fetch services" });
@@ -284,6 +289,10 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Access denied" });
       }
       
+      if (user.role !== "admin") {
+        const { snmpCommunity, ...sanitized } = service;
+        return res.json(sanitized);
+      }
       res.json(service);
     } catch (error: any) {
       console.error("[SERVICES] Get service error:", error);
@@ -716,6 +725,75 @@ export async function registerRoutes(
         success: false,
         error: "An unexpected error occurred. Please try again.",
       });
+    }
+  });
+
+  app.get("/api/services/:id/pdu/status", requireAuth, async (req: any, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const service = await storage.getService(serviceId);
+
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+
+      if (user.role !== "admin" && service.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (!service.snmpHost || !service.snmpOidStatus || service.pduPortNumber == null) {
+        return res.status(400).json({ error: "SNMP/PDU not configured for this service" });
+      }
+
+      const status = await getPduPortStatus(
+        service.snmpHost,
+        service.snmpPort || 161,
+        service.snmpCommunity || "public",
+        service.snmpVersion || "v2c",
+        service.snmpOidStatus,
+        service.pduPortNumber
+      );
+
+      res.json(status);
+    } catch (error: any) {
+      console.error("[PDU] Get port status error:", error);
+      res.status(500).json({ error: error.message || "Failed to get PDU port status" });
+    }
+  });
+
+  app.post("/api/services/:id/pdu/reboot", requireAuth, async (req: any, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const service = await storage.getService(serviceId);
+
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+
+      if (user.role !== "admin" && service.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (!service.snmpHost || !service.snmpOidControl || service.pduPortNumber == null) {
+        return res.status(400).json({ error: "SNMP/PDU control not configured for this service" });
+      }
+
+      const result = await rebootPduPort(
+        service.snmpHost,
+        service.snmpPort || 161,
+        service.snmpCommunity || "private",
+        service.snmpVersion || "v2c",
+        service.snmpOidControl,
+        service.pduPortNumber
+      );
+
+      console.log(`[PDU] Reboot port ${service.pduPortNumber} on ${service.snmpHost} by user ${user.username}`);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[PDU] Reboot port error:", error);
+      res.status(500).json({ error: error.message || "Failed to reboot PDU port" });
     }
   });
 

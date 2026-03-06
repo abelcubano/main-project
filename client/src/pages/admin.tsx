@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Activity,
@@ -29,14 +29,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import type { Transition } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -64,44 +56,69 @@ type AdminTicket = {
   updatedAt: string;
 };
 
-const easeOut: Transition["ease"] = [0.16, 1, 0.3, 1];
+type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers";
 
-const fade = {
-  hidden: { opacity: 0, y: 6 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: easeOut } },
-};
-
-function StatusBadge({ status, type }: { status: string; type: "status" | "priority" | "role" }) {
+function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    suspended: "bg-amber-50 text-amber-700 border-amber-200",
-    new: "bg-blue-50 text-blue-700 border-blue-200",
-    open: "bg-blue-50 text-blue-700 border-blue-200",
-    waiting: "bg-amber-50 text-amber-700 border-amber-200",
-    resolved: "bg-slate-50 text-slate-600 border-slate-200",
-    low: "bg-slate-50 text-slate-600 border-slate-200",
-    normal: "bg-slate-50 text-slate-600 border-slate-200",
-    high: "bg-amber-50 text-amber-700 border-amber-200",
-    urgent: "bg-rose-50 text-rose-700 border-rose-200",
-    admin: "bg-purple-50 text-purple-700 border-purple-200",
-    customer: "bg-blue-50 text-blue-700 border-blue-200",
+    active: "bg-[#dff6dd] text-[#1e7b34]",
+    suspended: "bg-[#fff4ce] text-[#9d6b00]",
+    new: "bg-[#cce4f7] text-[#0078d4]",
+    open: "bg-[#cce4f7] text-[#0078d4]",
+    waiting: "bg-[#fff4ce] text-[#9d6b00]",
+    resolved: "bg-[#e8e8e8] text-[#666]",
+    low: "bg-[#e8e8e8] text-[#666]",
+    normal: "bg-[#e8e8e8] text-[#666]",
+    high: "bg-[#fff4ce] text-[#9d6b00]",
+    urgent: "bg-[#fde7e9] text-[#c42b1c]",
+    admin: "bg-[#e8daef] text-[#6c3483]",
+    customer: "bg-[#cce4f7] text-[#0078d4]",
+    pending: "bg-[#fff4ce] text-[#9d6b00]",
+    paid: "bg-[#dff6dd] text-[#1e7b34]",
+    past_due: "bg-[#fde7e9] text-[#c42b1c]",
+    provisioning: "bg-[#cce4f7] text-[#0078d4]",
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${colors[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-      {status}
+    <span className={`inline-block px-[4px] py-[1px] text-[10px] font-medium ${colors[status] || "bg-[#e8e8e8] text-[#666]"}`} style={{ lineHeight: "14px" }}>
+      {status.replace("_", " ")}
     </span>
   );
 }
 
-function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: typeof LayoutDashboard; label: string; active?: boolean; badge?: number; onClick?: () => void }) {
+function DraggableDivider({ onDrag }: { onDrag: (deltaY: number) => void }) {
+  const dragging = useRef(false);
+  const lastY = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    dragging.current = true;
+    lastY.current = e.clientY;
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!dragging.current) return;
+      const delta = e.clientY - lastY.current;
+      lastY.current = e.clientY;
+      onDrag(delta);
+    }
+    function handleMouseUp() {
+      dragging.current = false;
+    }
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [onDrag]);
+
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left text-xs font-medium transition-all ${active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}>
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="flex-1">{label}</span>
-      {badge !== undefined && (
-        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${active ? "bg-white/20" : "bg-blue-100 text-blue-700"}`}>{badge}</span>
-      )}
-    </button>
+    <div
+      onMouseDown={handleMouseDown}
+      className="h-[4px] cursor-row-resize bg-[#e8e8e8] border-t border-b border-[#d0d0d0] hover:bg-[#0078d4] active:bg-[#0078d4] flex-shrink-0"
+      style={{ minHeight: 4 }}
+      data-testid="draggable-divider"
+    />
   );
 }
 
@@ -109,9 +126,9 @@ export default function AdminPage() {
   const { user, token, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [currentView, setCurrentView] = useState<"dashboard" | "users" | "services" | "invoices" | "customers">("dashboard");
+  const [currentView, setCurrentView] = useState<AdminView>("dashboard");
   const [query, setQuery] = useState("");
-  const [users, setUsers] = useState<UserData[]>([]);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
@@ -129,10 +146,9 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
+        setAllUsers(await res.json());
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Error", description: "Failed to load users", variant: "destructive" });
     } finally {
       setLoadingUsers(false);
@@ -181,94 +197,153 @@ export default function AdminPage() {
 
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u) => [u.username, u.name, u.email, u.companyName].some((v) => v?.toLowerCase().includes(q)));
-  }, [query, users]);
+    if (!q) return allUsers;
+    return allUsers.filter((u) => [u.username, u.name, u.email, u.companyName].some((v) => v?.toLowerCase().includes(q)));
+  }, [query, allUsers]);
+
+  const viewLabels: Record<AdminView, string> = {
+    dashboard: "Dashboard",
+    users: "User Management",
+    services: "Services",
+    invoices: "Invoices & Billing",
+    customers: "Customer Accounts",
+  };
+
+  const sidebarItems: { section: string; items: { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number }[] }[] = [
+    {
+      section: "Overview",
+      items: [
+        { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
+        { icon: Activity, label: "Live Activity" },
+      ],
+    },
+    {
+      section: "Operations",
+      items: [
+        { icon: HardHat, label: "SmartHands", badge: 2 },
+        { icon: Ticket, label: "Tickets", badge: 3 },
+        { icon: MapPin, label: "Dispatch" },
+      ],
+    },
+    {
+      section: "Business",
+      items: [
+        { icon: Building2, label: "Customers", view: "customers" },
+        { icon: Server, label: "Services", view: "services" },
+        { icon: CreditCard, label: "Billing", view: "invoices" },
+      ],
+    },
+    {
+      section: "System",
+      items: [
+        { icon: Users, label: "Users", view: "users", badge: allUsers.length || undefined },
+        { icon: Shield, label: "Permissions" },
+        { icon: Settings, label: "Settings" },
+      ],
+    },
+  ];
 
   return (
-    <div className="min-h-dvh flex bg-slate-50" data-testid="page-admin">
-      {/* Sidebar */}
-      <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-4 border-b border-slate-100">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <div className="h-8 w-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-                <HardHat className="h-4 w-4" />
-              </div>
-              <div className="leading-tight">
-                <div className="text-sm font-bold text-slate-900">911-DC</div>
-                <div className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">Admin Console</div>
-              </div>
+    <div className="h-dvh flex flex-col bg-[#f3f3f3] overflow-hidden" data-testid="page-admin" style={{ fontSize: "11px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+      {/* Menu bar */}
+      <div className="h-[22px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0" data-testid="menu-bar">
+        <span className="font-semibold text-[11px] text-[#1e1e1e] mr-4">911-DC Admin</span>
+        <div className="flex items-center gap-3 text-[11px] text-[#666]">
+          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">File</button>
+          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Edit</button>
+          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">View</button>
+          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Tools</button>
+          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Help</button>
+        </div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 text-[10px] text-[#666]">
+          <span>{user?.name || "Admin"}</span>
+          <button onClick={handleLogout} className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1" data-testid="button-logout">Sign Out</button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="h-[26px] bg-[#ececec] border-b border-[#d0d0d0] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
+        {(["dashboard", "customers", "services", "invoices", "users"] as AdminView[]).map((v) => (
+          <button
+            key={v}
+            onClick={() => setCurrentView(v)}
+            className={`px-3 h-[24px] text-[11px] border border-b-0 border-[#d0d0d0] mr-[1px] flex items-center ${
+              currentView === v
+                ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-b-[#ffffff] -mb-[1px] z-10"
+                : "bg-[#e8e8e8] text-[#666] hover:bg-[#f3f3f3]"
+            }`}
+            data-testid={`tab-${v}`}
+          >
+            {viewLabels[v]}
+          </button>
+        ))}
+      </div>
+
+      {/* Breadcrumb bar */}
+      <div className="h-[18px] bg-[#ffffff] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 text-[10px] text-[#666]" data-testid="breadcrumb-bar">
+        <span>911-DC</span>
+        <ChevronRight className="h-[10px] w-[10px] mx-1" />
+        <span>Admin</span>
+        <ChevronRight className="h-[10px] w-[10px] mx-1" />
+        <span className="text-[#1e1e1e] font-medium">{viewLabels[currentView]}</span>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search..."
+            className="h-[16px] w-[140px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]"
+            data-testid="input-global-search"
+          />
+        </div>
+      </div>
+
+      {/* Main body */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-[140px] bg-[#ffffff] border-r border-[#d0d0d0] flex flex-col overflow-y-auto flex-shrink-0" data-testid="sidebar">
+          {sidebarItems.map((group) => (
+            <div key={group.section}>
+              <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#999] uppercase tracking-wider">{group.section}</div>
+              {group.items.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => item.view && setCurrentView(item.view)}
+                  className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
+                    item.view && currentView === item.view
+                      ? "bg-[#cce4f7] text-[#1e1e1e] font-medium"
+                      : "text-[#1e1e1e] hover:bg-[#e8e8e8]"
+                  }`}
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <item.icon className="h-[12px] w-[12px] flex-shrink-0" />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className="text-[9px] text-[#666] bg-[#e8e8e8] px-[3px]">{item.badge}</span>
+                  )}
+                </button>
+              ))}
             </div>
-          </Link>
+          ))}
+          <div className="flex-1" />
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-[4px] px-2 py-[3px] text-[11px] text-[#666] hover:bg-[#e8e8e8] border-t border-[#d0d0d0]"
+            data-testid="button-sidebar-logout"
+          >
+            <LogOut className="h-[12px] w-[12px]" />
+            <span>Sign Out</span>
+          </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-2">Overview</div>
-          <NavItem icon={LayoutDashboard} label="Dashboard" active={currentView === "dashboard"} onClick={() => setCurrentView("dashboard")} />
-          <NavItem icon={Activity} label="Live Activity" />
-
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Operations</div>
-          <NavItem icon={HardHat} label="SmartHands" badge={2} />
-          <NavItem icon={Ticket} label="Tickets" badge={3} />
-          <NavItem icon={MapPin} label="Dispatch" />
-
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Business</div>
-          <NavItem icon={Building2} label="Customers" active={currentView === "customers"} onClick={() => setCurrentView("customers")} />
-          <NavItem icon={Server} label="Services" active={currentView === "services"} onClick={() => setCurrentView("services")} />
-          <NavItem icon={CreditCard} label="Billing" active={currentView === "invoices"} onClick={() => setCurrentView("invoices")} />
-
-          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">System</div>
-          <NavItem icon={Users} label="Users" active={currentView === "users"} onClick={() => setCurrentView("users")} badge={users.length || undefined} />
-          <NavItem icon={Shield} label="Permissions" />
-          <NavItem icon={Settings} label="Settings" />
-        </nav>
-
-        <div className="p-3 border-t border-slate-100">
-          <Button variant="ghost" onClick={handleLogout} className="w-full h-8 text-xs text-slate-600 hover:text-slate-900 justify-start" data-testid="button-logout">
-            <LogOut className="mr-2 h-3.5 w-3.5" />
-            Sign Out
-          </Button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input placeholder="Search..." className="h-8 w-64 pl-8 text-xs border-slate-200 bg-slate-50" />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900 relative">
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 bg-rose-500 rounded-full" />
-            </Button>
-            <Separator orientation="vertical" className="h-5 bg-slate-200" />
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
-                {user?.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "AD"}
-              </div>
-              <div className="leading-tight">
-                <div className="text-xs font-medium text-slate-900">{user?.name || "Admin"}</div>
-                <div className="text-[10px] text-slate-500">Administrator</div>
-              </div>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-            </div>
-          </div>
-        </header>
-
-        {/* Dashboard/Users/Services/Invoices Content */}
-        <main className="flex-1 overflow-y-auto p-5">
-          {currentView === "dashboard" && (
-            <DashboardView tickets={tickets} onManageUsers={() => setCurrentView("users")} />
-          )}
+        {/* Content area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {currentView === "dashboard" && <DashboardView tickets={tickets} onManageUsers={() => setCurrentView("users")} />}
           {currentView === "users" && (
-            <UsersView 
-              users={filteredUsers} 
+            <UsersView
+              users={filteredUsers}
               loading={loadingUsers}
               query={query}
               setQuery={setQuery}
@@ -277,167 +352,126 @@ export default function AdminPage() {
               onDeleteUser={handleDeleteUser}
             />
           )}
-          {currentView === "services" && (
-            <ServicesView token={token} />
-          )}
-          {currentView === "invoices" && (
-            <InvoicesView token={token} />
-          )}
-          {currentView === "customers" && (
-            <CustomersView token={token} />
-          )}
-        </main>
+          {currentView === "services" && <ServicesView token={token} />}
+          {currentView === "invoices" && <InvoicesView token={token} />}
+          {currentView === "customers" && <CustomersView token={token} />}
+        </div>
       </div>
 
-      {/* User Modal */}
-      <UserModal 
+      {/* Status bar */}
+      <div className="h-[18px] bg-[#0078d4] flex items-center px-2 flex-shrink-0 text-[10px] text-white" data-testid="status-bar">
+        <span>Ready</span>
+        <div className="flex-1" />
+        <span className="mr-3">{allUsers.length} users</span>
+        <span>{new Date().toLocaleDateString()}</span>
+      </div>
+
+      <UserModal
         open={showUserModal}
         onOpenChange={setShowUserModal}
         editingUser={editingUser}
         token={token}
-        onSuccess={() => {
-          setShowUserModal(false);
-          loadUsers();
-        }}
+        onSuccess={() => { setShowUserModal(false); loadUsers(); }}
       />
     </div>
   );
 }
 
 function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onManageUsers: () => void }) {
+  const [topHeight, setTopHeight] = useState(260);
+  const onDrag = useCallback((delta: number) => {
+    setTopHeight((h) => Math.max(100, Math.min(500, h + delta)));
+  }, []);
+
   return (
-    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Operations overview and quick actions</p>
-        </div>
-        <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          New Ticket
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4">
-        <Card className="p-4 border-slate-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Open Tickets</div>
-              <div className="mt-1 text-2xl font-bold text-slate-900">3</div>
-              <div className="mt-0.5 text-[10px] text-slate-500">1 urgent</div>
-            </div>
-            <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-              <Ticket className="h-4 w-4" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-slate-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">SmartHands Queue</div>
-              <div className="mt-1 text-2xl font-bold text-slate-900">2</div>
-              <div className="mt-0.5 text-[10px] text-slate-500">1 high priority</div>
-            </div>
-            <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-              <HardHat className="h-4 w-4" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-slate-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Monthly Revenue</div>
-              <div className="mt-1 text-2xl font-bold text-slate-900">$3,280</div>
-              <div className="mt-0.5 text-[10px] text-emerald-600">+2 services</div>
-            </div>
-            <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <CreditCard className="h-4 w-4" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-slate-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Active Customers</div>
-              <div className="mt-1 text-2xl font-bold text-slate-900">12</div>
-              <div className="mt-0.5 text-[10px] text-slate-500">2 pending</div>
-            </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
-              <Building2 className="h-4 w-4" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Recent Tickets</h2>
-            <p className="text-[10px] text-slate-500 mt-0.5">Active requests requiring attention</p>
-          </div>
-          <Button variant="ghost" size="sm" className="h-7 text-[10px] text-blue-600 hover:text-blue-700">
-            View All
-            <ArrowRight className="ml-1 h-3 w-3" />
-          </Button>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50 border-slate-100">
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Subject</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Category</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Priority</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Assignee</TableHead>
-              <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Updated</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tickets.map((t) => (
-              <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer">
-                <TableCell className="text-xs font-medium text-slate-900">{t.subject}</TableCell>
-                <TableCell className="text-xs text-slate-600 capitalize">{t.category.replace("_", " ")}</TableCell>
-                <TableCell><StatusBadge status={t.priority} type="priority" /></TableCell>
-                <TableCell><StatusBadge status={t.status} type="status" /></TableCell>
-                <TableCell className="text-xs text-slate-600">{t.assignee}</TableCell>
-                <TableCell className="text-xs text-slate-500 text-right">{t.updatedAt}</TableCell>
-              </TableRow>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Top panel: Stats + tickets */}
+      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
+        <div className="p-2">
+          <div className="text-[12px] font-semibold text-[#1e1e1e] mb-2">Operations Overview</div>
+          <div className="grid grid-cols-4 gap-[1px] bg-[#d0d0d0] border border-[#d0d0d0] mb-2">
+            {[
+              { label: "Open Tickets", value: "3", sub: "1 urgent", color: "#c42b1c" },
+              { label: "SmartHands Queue", value: "2", sub: "1 high priority", color: "#9d6b00" },
+              { label: "Monthly Revenue", value: "$3,280", sub: "+2 services", color: "#1e7b34" },
+              { label: "Active Customers", value: "12", sub: "2 pending", color: "#666" },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-[#ffffff] p-2">
+                <div className="text-[9px] text-[#666] uppercase tracking-wide">{stat.label}</div>
+                <div className="text-[16px] font-bold text-[#1e1e1e]">{stat.value}</div>
+                <div className="text-[9px]" style={{ color: stat.color }}>{stat.sub}</div>
+              </div>
             ))}
-          </TableBody>
-        </Table>
-      </Card>
-
-      <Card className="border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-6 gap-3">
-          {[
-            { icon: Building2, label: "Customers" },
-            { icon: Server, label: "Services" },
-            { icon: FileText, label: "Invoices" },
-            { icon: Boxes, label: "Inventory" },
-            { icon: HardHat, label: "SmartHands" },
-            { icon: Users, label: "Users", onClick: onManageUsers },
-          ].map((action, i) => (
-            <Button key={i} variant="outline" onClick={action.onClick} className="h-16 flex-col gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300">
-              <action.icon className="h-4 w-4 text-blue-600" />
-              <span className="text-[10px] font-medium">{action.label}</span>
-            </Button>
-          ))}
+          </div>
+          <table className="w-full border-collapse" data-testid="table-tickets">
+            <thead>
+              <tr className="bg-[#e8e8e8]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Subject</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Category</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Priority</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Assignee</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t, i) => (
+                <tr key={t.id} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{t.subject}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0] capitalize">{t.category.replace("_", " ")}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={t.priority} /></td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={t.status} /></td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{t.assignee}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0] text-right">{t.updatedAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </Card>
-    </motion.div>
+      </div>
+
+      <DraggableDivider onDrag={onDrag} />
+
+      {/* Bottom panel: Quick actions */}
+      <div className="flex-1 overflow-auto bg-[#ffffff] border-t-0">
+        <div className="p-2">
+          <div className="text-[11px] font-semibold text-[#1e1e1e] mb-2">Quick Actions</div>
+          <div className="grid grid-cols-6 gap-[1px] bg-[#d0d0d0] border border-[#d0d0d0]">
+            {[
+              { icon: Building2, label: "Customers" },
+              { icon: Server, label: "Services" },
+              { icon: FileText, label: "Invoices" },
+              { icon: Boxes, label: "Inventory" },
+              { icon: HardHat, label: "SmartHands" },
+              { icon: Users, label: "Users", onClick: onManageUsers },
+            ].map((action) => (
+              <button
+                key={action.label}
+                onClick={action.onClick}
+                className="bg-[#ffffff] hover:bg-[#cce4f7] p-2 flex flex-col items-center gap-1"
+                data-testid={`button-quick-${action.label.toLowerCase()}`}
+              >
+                <action.icon className="h-[14px] w-[14px] text-[#0078d4]" />
+                <span className="text-[10px] text-[#1e1e1e]">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function UsersView({ 
-  users, 
-  loading, 
-  query, 
-  setQuery, 
-  onNewUser, 
-  onEditUser, 
-  onDeleteUser 
-}: { 
-  users: UserData[]; 
+function UsersView({
+  users,
+  loading,
+  query,
+  setQuery,
+  onNewUser,
+  onEditUser,
+  onDeleteUser,
+}: {
+  users: UserData[];
   loading: boolean;
   query: string;
   setQuery: (q: string) => void;
@@ -445,105 +479,116 @@ function UsersView({
   onEditUser: (u: UserData) => void;
   onDeleteUser: (id: string) => void;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [topHeight, setTopHeight] = useState(300);
+  const onDrag = useCallback((delta: number) => {
+    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
+  }, []);
+
+  const selectedUser = users.find((u) => u.id === selectedId);
+
   return (
-    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">User Management</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Create and manage admin and customer accounts</p>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={onNewUser} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-user">
+          <Plus className="h-[10px] w-[10px]" />New User
+        </button>
+        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <span className="text-[10px] text-[#666]">{users.length} users</span>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter users..."
+            className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]"
+            data-testid="input-search-users"
+          />
         </div>
-        <Button size="sm" onClick={onNewUser} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-user">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          New User
-        </Button>
       </div>
 
-      <Card className="border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <Input 
-              value={query} 
-              onChange={(e) => setQuery(e.target.value)} 
-              placeholder="Search users..." 
-              className="h-8 w-64 pl-8 text-xs border-slate-200" 
-              data-testid="input-search-users"
-            />
-          </div>
-          <div className="text-xs text-slate-500">{users.length} users</div>
-        </div>
+      {/* Table */}
+      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
         {loading ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <div className="flex items-center justify-center h-full text-[11px] text-[#666]">
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50 border-slate-100">
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">User</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Role</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Company</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Last Login</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id} className="border-slate-100 hover:bg-slate-50">
-                  <TableCell>
-                    <div>
-                      <div className="text-xs font-medium text-slate-900">{u.name}</div>
-                      <div className="text-[10px] text-slate-500">{u.username} · {u.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell><StatusBadge status={u.role} type="role" /></TableCell>
-                  <TableCell className="text-xs text-slate-600">{u.companyName || "—"}</TableCell>
-                  <TableCell><StatusBadge status={u.active ? "active" : "suspended"} type="status" /></TableCell>
-                  <TableCell className="text-xs text-slate-500">
-                    {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : "Never"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => onEditUser(u)} 
-                        className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
-                        data-testid={`button-edit-user-${u.id}`}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => onDeleteUser(u.id)} 
-                        className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                        data-testid={`button-delete-user-${u.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+          <table className="w-full border-collapse" data-testid="table-users">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#e8e8e8]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Name</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Username</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Email</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Role</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Company</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Last Login</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u, i) => (
+                <tr
+                  key={u.id}
+                  onClick={() => setSelectedId(u.id)}
+                  className={`cursor-pointer ${selectedId === u.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  data-testid={`row-user-${u.id}`}
+                >
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{u.name}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.role} /></td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.companyName || "—"}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.active ? "active" : "suspended"} /></td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : "Never"}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); onEditUser(u); }} className="text-[#0078d4] hover:underline text-[10px] mr-2" data-testid={`button-edit-user-${u.id}`}>Edit</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteUser(u.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-user-${u.id}`}>Del</button>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         )}
-      </Card>
-    </motion.div>
+      </div>
+
+      <DraggableDivider onDrag={onDrag} />
+
+      {/* Detail panel */}
+      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
+        {selectedUser ? (
+          <div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">User Details - {selectedUser.name}</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
+              <div><span className="text-[#666]">Username:</span> <span className="text-[#1e1e1e]">{selectedUser.username}</span></div>
+              <div><span className="text-[#666]">Email:</span> <span className="text-[#1e1e1e]">{selectedUser.email}</span></div>
+              <div><span className="text-[#666]">Role:</span> <span className="text-[#1e1e1e]">{selectedUser.role}</span></div>
+              <div><span className="text-[#666]">Company:</span> <span className="text-[#1e1e1e]">{selectedUser.companyName || "—"}</span></div>
+              <div><span className="text-[#666]">Status:</span> <span className="text-[#1e1e1e]">{selectedUser.active ? "Active" : "Suspended"}</span></div>
+              <div><span className="text-[#666]">Created:</span> <span className="text-[#1e1e1e]">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
+              <div><span className="text-[#666]">Last Login:</span> <span className="text-[#1e1e1e]">{selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : "Never"}</span></div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-[#666] italic">Select a user to view details</div>
+        )}
+      </div>
+    </div>
   );
 }
 
-function UserModal({ 
-  open, 
-  onOpenChange, 
-  editingUser, 
+function UserModal({
+  open,
+  onOpenChange,
+  editingUser,
   token,
-  onSuccess 
-}: { 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void; 
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   editingUser: UserData | null;
   token: string | null;
   onSuccess: () => void;
@@ -574,15 +619,7 @@ function UserModal({
           active: editingUser.active,
         });
       } else {
-        setFormData({
-          username: "",
-          password: "",
-          name: "",
-          email: "",
-          role: "customer",
-          companyName: "",
-          active: true,
-        });
+        setFormData({ username: "", password: "", name: "", email: "", role: "customer", companyName: "", active: true });
       }
     }
   }, [open, editingUser]);
@@ -590,27 +627,17 @@ function UserModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-
     try {
       const url = editingUser ? `/api/admin/users/${editingUser.id}` : "/api/admin/users";
       const method = editingUser ? "PUT" : "POST";
-      
       const body: any = { ...formData };
-      if (editingUser && !body.password) {
-        delete body.password;
-      }
-
+      if (editingUser && !body.password) delete body.password;
       const res = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         toast({ title: "Success", description: editingUser ? "User updated" : "User created" });
         onSuccess();
@@ -626,122 +653,64 @@ function UserModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">{editingUser ? "Edit User" : "New User"}</DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+      <DialogContent className="sm:max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingUser ? "Edit User" : "New User"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-[#666]">
             {editingUser ? "Update user details" : "Create a new admin or customer account"}
           </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-xs font-medium">Username</Label>
-              <Input
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="h-9 text-sm"
-                required
-                disabled={!!editingUser}
-                data-testid="input-new-username"
-              />
+        </div>
+        <form onSubmit={handleSubmit} className="p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Username</label>
+              <input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required disabled={!!editingUser} data-testid="input-new-username" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-medium">
-                Password {editingUser && <span className="text-slate-400">(leave blank to keep)</span>}
-              </Label>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Password {editingUser && <span className="text-[#999]">(blank=keep)</span>}</label>
               <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="h-9 text-sm pr-9"
-                  required={!editingUser}
-                  data-testid="input-new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full h-[22px] px-1 pr-5 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required={!editingUser} data-testid="input-new-password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[#999] hover:text-[#1e1e1e]">
+                  {showPassword ? <EyeOff className="h-[12px] w-[12px]" /> : <Eye className="h-[12px] w-[12px]" />}
                 </button>
               </div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-xs font-medium">Full Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="h-9 text-sm"
-                required
-                data-testid="input-new-name"
-              />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Full Name</label>
+              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required data-testid="input-new-name" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-medium">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="h-9 text-sm"
-                required
-                data-testid="input-new-email"
-              />
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Email</label>
+              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required data-testid="input-new-email" />
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="role" className="text-xs font-medium">Role</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Role</label>
               <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                <SelectTrigger className="h-9 text-sm" data-testid="select-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]" data-testid="select-role"><SelectValue /></SelectTrigger>
+                <SelectContent className="!rounded-none border-[#d0d0d0]">
+                  <SelectItem value="customer" className="text-[11px]">Customer</SelectItem>
+                  <SelectItem value="admin" className="text-[11px]">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="companyName" className="text-xs font-medium">Company Name</Label>
-              <Input
-                id="companyName"
-                value={formData.companyName}
-                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                className="h-9 text-sm"
-                placeholder="Optional"
-                data-testid="input-new-company"
-              />
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Company Name</label>
+              <input value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" placeholder="Optional" data-testid="input-new-company" />
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="active"
-              checked={formData.active}
-              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-            <Label htmlFor="active" className="text-xs font-medium">Account Active</Label>
+          <div className="flex items-center gap-1">
+            <input type="checkbox" id="active" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="h-3 w-3" />
+            <label htmlFor="active" className="text-[10px] text-[#666]">Account Active</label>
           </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 text-xs">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs" data-testid="button-save-user">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingUser ? "Update" : "Create")}
-            </Button>
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">
+              {loading ? "Saving..." : editingUser ? "Update" : "Create"}
+            </button>
           </div>
         </form>
       </DialogContent>
@@ -784,21 +753,20 @@ function CustomersView({ token }: { token: string | null }) {
   const [editingCompany, setEditingCompany] = useState<CompanyData | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [addToCustomerId, setAddToCustomerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadCompanies();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [topHeight, setTopHeight] = useState(300);
+  const onDrag = useCallback((delta: number) => {
+    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
   }, []);
+
+  useEffect(() => { loadCompanies(); }, []);
 
   async function loadCompanies() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/customers", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setCompanies(await res.json());
-      }
-    } catch (error) {
+      const res = await fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setCompanies(await res.json());
+    } catch {
       toast({ title: "Error", description: "Failed to load customers", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -808,9 +776,7 @@ function CustomersView({ token }: { token: string | null }) {
   async function loadCompanyUsers(customerId: string) {
     setLoadingUsers(true);
     try {
-      const res = await fetch(`/api/admin/customers/${customerId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/customers/${customerId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         setExpandedUsers(data.users || []);
@@ -822,11 +788,9 @@ function CustomersView({ token }: { token: string | null }) {
     }
   }
 
-  function toggleExpand(id: string) {
-    if (expandedId === id) {
-      setExpandedId(null);
-      setExpandedUsers([]);
-    } else {
+  function handleSelect(id: string) {
+    setSelectedId(id);
+    if (expandedId !== id) {
       setExpandedId(id);
       loadCompanyUsers(id);
     }
@@ -835,10 +799,7 @@ function CustomersView({ token }: { token: string | null }) {
   async function handleDeleteCompany(id: string) {
     if (!confirm("Delete this customer and unlink all associated users?")) return;
     try {
-      const res = await fetch(`/api/admin/customers/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/customers/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         toast({ title: "Customer deleted" });
         loadCompanies();
@@ -852,10 +813,7 @@ function CustomersView({ token }: { token: string | null }) {
   async function handleRemoveUser(customerId: string, userId: string) {
     if (!confirm("Remove this user from the customer?")) return;
     try {
-      const res = await fetch(`/api/admin/customers/${customerId}/users/${userId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/customers/${customerId}/users/${userId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         toast({ title: "User removed" });
         loadCompanyUsers(customerId);
@@ -880,130 +838,132 @@ function CustomersView({ token }: { token: string | null }) {
     }
   };
 
+  const selectedCompany = companies.find(c => c.id === selectedId);
+
   return (
-    <div className="space-y-4" data-testid="customers-view">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Customer Accounts</h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">{companies.length} total customers (companies)</p>
-        </div>
-        <Button size="sm" className="h-8 text-xs" onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} data-testid="button-add-customer">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />Add Customer
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input placeholder="Search customers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-8 text-xs" data-testid="input-customer-search" />
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="customers-view">
+      {/* Toolbar */}
+      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-add-customer">
+          <Plus className="h-[10px] w-[10px]" />Add Customer
+        </button>
+        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <span className="text-[10px] text-[#666]">{companies.length} customers</span>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <input placeholder="Filter..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" data-testid="input-customer-search" />
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-10 text-xs text-slate-500">Loading customers...</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-xs text-slate-500">
-          {searchQuery ? "No customers match your search." : "No customer accounts found. Click 'Add Customer' to create one."}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((company) => (
-            <div key={company.id} className="border border-slate-200 rounded-lg overflow-hidden" data-testid={`card-customer-${company.id}`}>
-              <div className="flex items-center px-4 py-3 bg-white hover:bg-slate-50/50 cursor-pointer" onClick={() => toggleExpand(company.id)}>
-                {expandedId === company.id ? <ChevronDown className="h-3.5 w-3.5 text-slate-400 mr-2 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400 mr-2 flex-shrink-0" />}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-900">{company.name}</span>
-                    {!company.active && <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-700">Inactive</span>}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {[company.contactName, company.email, company.phone].filter(Boolean).join(" · ") || "No contact info"}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditingCompany(company); setShowCompanyModal(true); }} data-testid={`button-edit-customer-${company.id}`}>
-                    <Pencil className="h-3 w-3 text-slate-500" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteCompany(company.id)} data-testid={`button-delete-customer-${company.id}`}>
-                    <Trash2 className="h-3 w-3 text-red-500" />
-                  </Button>
-                </div>
-              </div>
+      {/* Table */}
+      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-[11px] text-[#666]">Loading...</div>
+        ) : (
+          <table className="w-full border-collapse" data-testid="table-customers">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#e8e8e8]">
+                <th className="w-[16px] py-[2px] px-1 border border-[#d0d0d0]"></th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Company Name</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Contact</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Email</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Phone</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c, i) => (
+                <tr
+                  key={c.id}
+                  onClick={() => handleSelect(c.id)}
+                  className={`cursor-pointer ${selectedId === c.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  data-testid={`card-customer-${c.id}`}
+                >
+                  <td className="py-[2px] px-1 border border-[#d0d0d0] text-center">
+                    {expandedId === c.id ? <ChevronDown className="h-[10px] w-[10px] inline" /> : <ChevronRight className="h-[10px] w-[10px] inline" />}
+                  </td>
+                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#d0d0d0]">
+                    {c.name}
+                    {!c.active && <span className="ml-1 text-[9px] text-[#c42b1c]">[Inactive]</span>}
+                  </td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.contactName || "—"}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.email || "—"}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.phone || "—"}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={c.active ? "active" : "suspended"} /></td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingCompany(c); setShowCompanyModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-2" data-testid={`button-edit-customer-${c.id}`}>Edit</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCompany(c.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-customer-${c.id}`}>Del</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-              {expandedId === company.id && (
-                <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3">
-                  {company.address && (
-                    <div className="text-[10px] text-slate-500 mb-3">
-                      {[company.address, company.city, company.state, company.zip].filter(Boolean).join(", ")}
-                    </div>
-                  )}
-                  {company.notes && (
-                    <div className="text-[10px] text-slate-500 mb-3 italic">{company.notes}</div>
-                  )}
+      <DraggableDivider onDrag={onDrag} />
 
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Associated Users</span>
-                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => { setAddToCustomerId(company.id); setShowUserModal(true); }} data-testid={`button-add-user-${company.id}`}>
-                      <Plus className="mr-1 h-3 w-3" />Add User
-                    </Button>
-                  </div>
-
-                  {loadingUsers ? (
-                    <div className="text-center py-4 text-[10px] text-slate-400">Loading users...</div>
-                  ) : expandedUsers.length === 0 ? (
-                    <div className="text-center py-4 text-[10px] text-slate-400">No users associated with this customer.</div>
-                  ) : (
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-1.5 font-semibold text-slate-500">Name</th>
-                          <th className="text-left py-1.5 font-semibold text-slate-500">Username</th>
-                          <th className="text-left py-1.5 font-semibold text-slate-500">Email</th>
-                          <th className="text-left py-1.5 font-semibold text-slate-500">Role</th>
-                          <th className="text-right py-1.5 font-semibold text-slate-500"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {expandedUsers.map((u) => (
-                          <tr key={u.id} className="border-b border-slate-100" data-testid={`row-customer-user-${u.id}`}>
-                            <td className="py-1.5 text-slate-900 font-medium">{u.name}</td>
-                            <td className="py-1.5 text-slate-600">{u.username}</td>
-                            <td className="py-1.5 text-slate-600">{u.email}</td>
-                            <td className="py-1.5">
-                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-50 text-blue-700">{roleLabel(u.customerRole)}</span>
-                            </td>
-                            <td className="py-1.5 text-right">
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleRemoveUser(company.id, u.id)} data-testid={`button-remove-user-${u.id}`}>
-                                <X className="h-3 w-3 text-red-400" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
+      {/* Detail panel */}
+      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
+        {selectedCompany ? (
+          <div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">
+              Customer Details - {selectedCompany.name}
             </div>
-          ))}
-        </div>
-      )}
+            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
+              <div><span className="text-[#666]">Address:</span> <span className="text-[#1e1e1e]">{[selectedCompany.address, selectedCompany.city, selectedCompany.state, selectedCompany.zip].filter(Boolean).join(", ") || "—"}</span></div>
+              <div><span className="text-[#666]">Contact:</span> <span className="text-[#1e1e1e]">{selectedCompany.contactName || "—"}</span></div>
+              <div><span className="text-[#666]">Email:</span> <span className="text-[#1e1e1e]">{selectedCompany.email || "—"}</span></div>
+              <div><span className="text-[#666]">Phone:</span> <span className="text-[#1e1e1e]">{selectedCompany.phone || "—"}</span></div>
+              <div><span className="text-[#666]">Notes:</span> <span className="text-[#1e1e1e]">{selectedCompany.notes || "—"}</span></div>
+            </div>
 
-      <CompanyModal
-        open={showCompanyModal}
-        onOpenChange={setShowCompanyModal}
-        editing={editingCompany}
-        token={token}
-        onSuccess={() => { setShowCompanyModal(false); loadCompanies(); }}
-      />
+            <div className="flex items-center justify-between mb-1 border-b border-[#d0d0d0] pb-1">
+              <span className="text-[10px] font-semibold text-[#1e1e1e]">Associated Users</span>
+              <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="flex items-center gap-[2px] text-[10px] text-[#0078d4] hover:underline" data-testid={`button-add-user-${selectedCompany.id}`}>
+                <Plus className="h-[10px] w-[10px]" />Add User
+              </button>
+            </div>
+            {loadingUsers ? (
+              <div className="text-[10px] text-[#666]">Loading users...</div>
+            ) : expandedUsers.length === 0 ? (
+              <div className="text-[10px] text-[#666] italic">No users associated.</div>
+            ) : (
+              <table className="w-full border-collapse" data-testid="table-customer-users">
+                <thead>
+                  <tr className="bg-[#e8e8e8]">
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Name</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Username</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Email</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Role</th>
+                    <th className="text-center text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expandedUsers.map((u, i) => (
+                    <tr key={u.id} className={i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} data-testid={`row-customer-user-${u.id}`}>
+                      <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{u.name}</td>
+                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
+                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
+                      <td className="text-[11px] py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.customerRole || "technician"} /></td>
+                      <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                        <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-remove-user-${u.id}`}>Remove</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : (
+          <div className="text-[11px] text-[#666] italic">Select a customer to view details</div>
+        )}
+      </div>
 
-      <CustomerUserModal
-        open={showUserModal}
-        onOpenChange={setShowUserModal}
-        customerId={addToCustomerId}
-        token={token}
-        onSuccess={() => { setShowUserModal(false); if (addToCustomerId) loadCompanyUsers(addToCustomerId); }}
-      />
+      <CompanyModal open={showCompanyModal} onOpenChange={setShowCompanyModal} editing={editingCompany} token={token} onSuccess={() => { setShowCompanyModal(false); loadCompanies(); }} />
+      <CustomerUserModal open={showUserModal} onOpenChange={setShowUserModal} customerId={addToCustomerId} token={token} onSuccess={() => { setShowUserModal(false); if (addToCustomerId) loadCompanyUsers(addToCustomerId); }} />
     </div>
   );
 }
@@ -1021,17 +981,7 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
 
   useEffect(() => {
     if (editing) {
-      setForm({
-        name: editing.name,
-        address: editing.address || "",
-        city: editing.city || "",
-        state: editing.state || "",
-        zip: editing.zip || "",
-        phone: editing.phone || "",
-        email: editing.email || "",
-        contactName: editing.contactName || "",
-        notes: editing.notes || "",
-      });
+      setForm({ name: editing.name, address: editing.address || "", city: editing.city || "", state: editing.state || "", zip: editing.zip || "", phone: editing.phone || "", email: editing.email || "", contactName: editing.contactName || "", notes: editing.notes || "" });
     } else {
       setForm({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
     }
@@ -1043,11 +993,7 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
     setSaving(true);
     try {
       const url = editing ? `/api/admin/customers/${editing.id}` : "/api/admin/customers";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch(url, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(form) });
       if (res.ok) {
         toast({ title: editing ? "Customer updated" : "Customer created" });
         onSuccess();
@@ -1062,60 +1008,61 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
     }
   }
 
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-sm">{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
-          <DialogDescription className="text-[11px]">{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
+      <DialogContent className="max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-[#666]">{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
+        </div>
+        <form onSubmit={handleSubmit} className="p-3 space-y-2">
           <div>
-            <Label className="text-[11px]">Company Name *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-name" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Company Name *</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-company-name" />
           </div>
           <div>
-            <Label className="text-[11px]">Contact Name</Label>
-            <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-contact-name" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Contact Name</label>
+            <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={inputCls} data-testid="input-contact-name" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-[11px]">Email</Label>
-              <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-email" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">Email</label>
+              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-company-email" />
             </div>
             <div>
-              <Label className="text-[11px]">Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-phone" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">Phone</label>
+              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} data-testid="input-company-phone" />
             </div>
           </div>
           <div>
-            <Label className="text-[11px]">Address</Label>
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-address" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Address</label>
+            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputCls} data-testid="input-company-address" />
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-[11px]">City</Label>
-              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-city" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">City</label>
+              <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} data-testid="input-company-city" />
             </div>
             <div>
-              <Label className="text-[11px]">State</Label>
-              <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-state" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">State</label>
+              <input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls} data-testid="input-company-state" />
             </div>
             <div>
-              <Label className="text-[11px]">ZIP</Label>
-              <Input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-zip" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">ZIP</label>
+              <input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className={inputCls} data-testid="input-company-zip" />
             </div>
           </div>
           <div>
-            <Label className="text-[11px]">Notes</Label>
-            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-company-notes" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Notes</label>
+            <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} data-testid="input-company-notes" />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" size="sm" className="h-8 text-xs" disabled={saving} data-testid="button-save-customer">
-              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-              {editing ? "Update" : "Create"}
-            </Button>
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-customer">
+              {saving ? "Saving..." : editing ? "Update" : "Create"}
+            </button>
           </div>
         </form>
       </DialogContent>
@@ -1134,11 +1081,7 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
   const [form, setForm] = useState({ name: "", username: "", email: "", password: "", customerRole: "technician" });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      setForm({ name: "", username: "", email: "", password: "", customerRole: "technician" });
-    }
-  }, [open]);
+  useEffect(() => { if (open) setForm({ name: "", username: "", email: "", password: "", customerRole: "technician" }); }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1167,49 +1110,48 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
     }
   }
 
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-sm">Add User to Customer</DialogTitle>
-          <DialogDescription className="text-[11px]">Create a new user account linked to this company.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
+      <DialogContent className="max-w-sm !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">Add User to Customer</DialogTitle>
+          <DialogDescription className="text-[10px] text-[#666]">Create a new user account linked to this company.</DialogDescription>
+        </div>
+        <form onSubmit={handleSubmit} className="p-3 space-y-2">
           <div>
-            <Label className="text-[11px]">Full Name *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-name" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Full Name *</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-user-name" />
           </div>
           <div>
-            <Label className="text-[11px]">Username *</Label>
-            <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-username" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Username *</label>
+            <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={inputCls} data-testid="input-user-username" />
           </div>
           <div>
-            <Label className="text-[11px]">Email *</Label>
-            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-email" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Email *</label>
+            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-user-email" />
           </div>
           <div>
-            <Label className="text-[11px]">Password *</Label>
-            <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="h-8 text-xs mt-1" data-testid="input-user-password" />
+            <label className="text-[10px] text-[#666] block mb-[2px]">Password *</label>
+            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} data-testid="input-user-password" />
           </div>
           <div>
-            <Label className="text-[11px]">Role</Label>
+            <label className="text-[10px] text-[#666] block mb-[2px]">Role</label>
             <Select value={form.customerRole} onValueChange={(v) => setForm({ ...form, customerRole: v })}>
-              <SelectTrigger className="h-8 text-xs mt-1" data-testid="select-user-role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="account_admin">Account Admin</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="technician">Technician</SelectItem>
+              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]" data-testid="select-user-role"><SelectValue /></SelectTrigger>
+              <SelectContent className="!rounded-none border-[#d0d0d0]">
+                <SelectItem value="account_admin" className="text-[11px]">Account Admin</SelectItem>
+                <SelectItem value="manager" className="text-[11px]">Manager</SelectItem>
+                <SelectItem value="technician" className="text-[11px]">Technician</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" size="sm" className="h-8 text-xs" disabled={saving} data-testid="button-save-user">
-              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-              Add User
-            </Button>
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">
+              {saving ? "Saving..." : "Add User"}
+            </button>
           </div>
         </form>
       </DialogContent>
@@ -1227,6 +1169,18 @@ type ServiceData = {
   details: string | null;
   monthlyPrice: string;
   startDate: string;
+  grafanaUrl?: string | null;
+  grafanaDashboardUid?: string | null;
+  grafanaPanelId?: string | null;
+  grafanaOrgId?: string | null;
+  grafanaVar?: string | null;
+  snmpHost?: string | null;
+  snmpPort?: number | null;
+  snmpCommunity?: string | null;
+  snmpVersion?: string | null;
+  snmpOidStatus?: string | null;
+  snmpOidControl?: string | null;
+  pduPortNumber?: number | null;
 };
 
 type CustomerOption = {
@@ -1243,16 +1197,17 @@ function ServicesView({ token }: { token: string | null }) {
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<ServiceData | null>(null);
   const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [topHeight, setTopHeight] = useState(300);
+  const onDrag = useCallback((delta: number) => {
+    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
+  }, []);
 
   async function loadServices() {
     setLoading(true);
     try {
-      const res = await fetch("/api/services", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setServices(await res.json());
-      }
+      const res = await fetch("/api/services", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setServices(await res.json());
     } catch {
       toast({ title: "Error", description: "Failed to load services", variant: "destructive" });
     } finally {
@@ -1262,27 +1217,17 @@ function ServicesView({ token }: { token: string | null }) {
 
   async function loadCustomers() {
     try {
-      const res = await fetch("/api/admin/customer-users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setCustomers(await res.json());
-      }
+      const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setCustomers(await res.json());
     } catch {}
   }
 
-  useEffect(() => {
-    loadServices();
-    loadCustomers();
-  }, []);
+  useEffect(() => { loadServices(); loadCustomers(); }, []);
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this service?")) return;
     try {
-      const res = await fetch(`/api/admin/services/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/services/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         toast({ title: "Success", description: "Service deleted" });
         loadServices();
@@ -1298,72 +1243,117 @@ function ServicesView({ token }: { token: string | null }) {
     return services.filter((s) => [s.name, s.type, s.location].some((v) => v?.toLowerCase().includes(q)));
   }, [query, services]);
 
+  const selectedService = services.find(s => s.id === selectedId);
+
   return (
-    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">Services</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Manage customer services and allocations</p>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={() => { setEditingService(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-service">
+          <Plus className="h-[10px] w-[10px]" />New Service
+        </button>
+        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <span className="text-[10px] text-[#666]">{services.length} services</span>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" />
         </div>
-        <Button size="sm" onClick={() => { setEditingService(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-service">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          New Service
-        </Button>
       </div>
 
-      <Card className="border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search services..." className="h-8 w-64 pl-8 text-xs border-slate-200" />
-          </div>
-          <div className="text-xs text-slate-500">{services.length} services</div>
-        </div>
+      {/* Table */}
+      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
         {loading ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <div className="flex items-center justify-center h-full text-[11px] text-[#666]"><Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...</div>
+        ) : (
+          <table className="w-full border-collapse" data-testid="table-services">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#e8e8e8]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Service</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Type</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Location</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Monthly</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Monitoring</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredServices.map((s, i) => (
+                <tr
+                  key={s.id}
+                  onClick={() => setSelectedId(s.id)}
+                  className={`cursor-pointer ${selectedId === s.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  data-testid={`row-service-${s.id}`}
+                >
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">
+                    <div>{s.name}</div>
+                    {s.details && <div className="text-[9px] text-[#666]">{s.details}</div>}
+                  </td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{s.type}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{s.location}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={s.status} /></td>
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0] text-right font-medium">${Number(s.monthlyPrice).toFixed(2)}</td>
+                  <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">
+                    {s.grafanaUrl ? "Grafana" : s.snmpHost ? "SNMP/PDU" : "—"}
+                  </td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingService(s); setShowModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-2">Edit</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <DraggableDivider onDrag={onDrag} />
+
+      {/* Detail panel */}
+      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
+        {selectedService ? (
+          <div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">Service Details - {selectedService.name}</div>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
+              <div><span className="text-[#666]">Type:</span> <span className="text-[#1e1e1e]">{selectedService.type}</span></div>
+              <div><span className="text-[#666]">Location:</span> <span className="text-[#1e1e1e]">{selectedService.location}</span></div>
+              <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedService.status} /></div>
+              <div><span className="text-[#666]">Monthly:</span> <span className="text-[#1e1e1e]">${Number(selectedService.monthlyPrice).toFixed(2)}</span></div>
+              <div><span className="text-[#666]">Start Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedService.startDate).toLocaleDateString()}</span></div>
+              <div><span className="text-[#666]">Details:</span> <span className="text-[#1e1e1e]">{selectedService.details || "—"}</span></div>
+            </div>
+            {selectedService.grafanaUrl && (
+              <div className="mb-2">
+                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#d0d0d0] pb-1 mb-1">Grafana Configuration</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
+                  <div><span className="text-[#666]">URL:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaUrl}</span></div>
+                  <div><span className="text-[#666]">Dashboard UID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaDashboardUid || "—"}</span></div>
+                  <div><span className="text-[#666]">Panel ID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaPanelId || "—"}</span></div>
+                  <div><span className="text-[#666]">Org ID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaOrgId || "—"}</span></div>
+                  <div><span className="text-[#666]">Variable:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaVar || "—"}</span></div>
+                </div>
+              </div>
+            )}
+            {selectedService.snmpHost && (
+              <div>
+                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#d0d0d0] pb-1 mb-1">SNMP/PDU Configuration</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
+                  <div><span className="text-[#666]">Host:</span> <span className="text-[#1e1e1e]">{selectedService.snmpHost}</span></div>
+                  <div><span className="text-[#666]">Port:</span> <span className="text-[#1e1e1e]">{selectedService.snmpPort || 161}</span></div>
+                  <div><span className="text-[#666]">Community:</span> <span className="text-[#1e1e1e]">{selectedService.snmpCommunity || "—"}</span></div>
+                  <div><span className="text-[#666]">Version:</span> <span className="text-[#1e1e1e]">{selectedService.snmpVersion || "—"}</span></div>
+                  <div><span className="text-[#666]">Status OID:</span> <span className="text-[#1e1e1e]">{selectedService.snmpOidStatus || "—"}</span></div>
+                  <div><span className="text-[#666]">Control OID:</span> <span className="text-[#1e1e1e]">{selectedService.snmpOidControl || "—"}</span></div>
+                  <div><span className="text-[#666]">PDU Port #:</span> <span className="text-[#1e1e1e]">{selectedService.pduPortNumber ?? "—"}</span></div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50 border-slate-100">
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Service</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Type</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Location</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Monthly</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredServices.map((s) => (
-                <TableRow key={s.id} className="border-slate-100 hover:bg-slate-50">
-                  <TableCell>
-                    <div>
-                      <div className="text-xs font-medium text-slate-900">{s.name}</div>
-                      <div className="text-[10px] text-slate-500">{s.details}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-600">{s.type}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{s.location}</TableCell>
-                  <TableCell><StatusBadge status={s.status} type="status" /></TableCell>
-                  <TableCell className="text-xs font-medium text-slate-900">${Number(s.monthlyPrice).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => { setEditingService(s); setShowModal(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="text-[11px] text-[#666] italic">Select a service to view details</div>
         )}
-      </Card>
+      </div>
 
       <ServiceModal
         open={showModal}
@@ -1373,7 +1363,7 @@ function ServicesView({ token }: { token: string | null }) {
         token={token}
         onSuccess={() => { setShowModal(false); loadServices(); }}
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -1387,6 +1377,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
 }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "grafana" | "snmp">("general");
   const [formData, setFormData] = useState({
     userId: "",
     name: "",
@@ -1396,10 +1387,23 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
     details: "",
     monthlyPrice: "",
     startDate: new Date().toISOString().split("T")[0],
+    grafanaUrl: "",
+    grafanaDashboardUid: "",
+    grafanaPanelId: "",
+    grafanaOrgId: "",
+    grafanaVar: "",
+    snmpHost: "",
+    snmpPort: "161",
+    snmpCommunity: "",
+    snmpVersion: "v2c",
+    snmpOidStatus: "",
+    snmpOidControl: "",
+    pduPortNumber: "",
   });
 
   useEffect(() => {
     if (open) {
+      setActiveTab("general");
       if (editingService) {
         setFormData({
           userId: editingService.userId,
@@ -1410,6 +1414,18 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
           details: editingService.details || "",
           monthlyPrice: editingService.monthlyPrice,
           startDate: new Date(editingService.startDate).toISOString().split("T")[0],
+          grafanaUrl: editingService.grafanaUrl || "",
+          grafanaDashboardUid: editingService.grafanaDashboardUid || "",
+          grafanaPanelId: editingService.grafanaPanelId || "",
+          grafanaOrgId: editingService.grafanaOrgId || "",
+          grafanaVar: editingService.grafanaVar || "",
+          snmpHost: editingService.snmpHost || "",
+          snmpPort: String(editingService.snmpPort || 161),
+          snmpCommunity: editingService.snmpCommunity || "",
+          snmpVersion: editingService.snmpVersion || "v2c",
+          snmpOidStatus: editingService.snmpOidStatus || "",
+          snmpOidControl: editingService.snmpOidControl || "",
+          pduPortNumber: editingService.pduPortNumber != null ? String(editingService.pduPortNumber) : "",
         });
       } else {
         setFormData({
@@ -1421,6 +1437,18 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
           details: "",
           monthlyPrice: "",
           startDate: new Date().toISOString().split("T")[0],
+          grafanaUrl: "",
+          grafanaDashboardUid: "",
+          grafanaPanelId: "",
+          grafanaOrgId: "",
+          grafanaVar: "",
+          snmpHost: "",
+          snmpPort: "161",
+          snmpCommunity: "",
+          snmpVersion: "v2c",
+          snmpOidStatus: "",
+          snmpOidControl: "",
+          pduPortNumber: "",
         });
       }
     }
@@ -1432,10 +1460,26 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
     try {
       const url = editingService ? `/api/admin/services/${editingService.id}` : "/api/admin/services";
       const method = editingService ? "PUT" : "POST";
+      const body: any = {
+        ...formData,
+        startDate: new Date(formData.startDate),
+        snmpPort: formData.snmpPort ? parseInt(formData.snmpPort) : null,
+        pduPortNumber: formData.pduPortNumber ? parseInt(formData.pduPortNumber) : null,
+        grafanaUrl: formData.grafanaUrl || null,
+        grafanaDashboardUid: formData.grafanaDashboardUid || null,
+        grafanaPanelId: formData.grafanaPanelId || null,
+        grafanaOrgId: formData.grafanaOrgId || null,
+        grafanaVar: formData.grafanaVar || null,
+        snmpHost: formData.snmpHost || null,
+        snmpCommunity: formData.snmpCommunity || null,
+        snmpVersion: formData.snmpVersion || null,
+        snmpOidStatus: formData.snmpOidStatus || null,
+        snmpOidControl: formData.snmpOidControl || null,
+      };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...formData, startDate: new Date(formData.startDate) }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         toast({ title: "Success", description: editingService ? "Service updated" : "Service created" });
@@ -1452,97 +1496,188 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
   }
 
   const locations = [
-    "iM Critical Miami",
-    "Equinix Miami",
-    "Digital Realty Miami",
-    "365 Data Centers FLL",
-    "EdgeConneX Miami",
-    "QTS MIA1",
-    "CoreSite MI1",
-    "South Reach Networks",
+    "iM Critical Miami", "Equinix Miami", "Digital Realty Miami",
+    "365 Data Centers FLL", "EdgeConneX Miami", "QTS MIA1", "CoreSite MI1", "South Reach Networks",
   ];
-
   const serviceTypes = ["Colocation", "Internet", "Network", "Cross-Connect", "SmartHands", "DDoS Protection"];
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">{editingService ? "Edit Service" : "New Service"}</DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingService ? "Edit Service" : "New Service"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-[#666]">
             {editingService ? "Update service details" : "Create a new customer service"}
           </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Customer</Label>
-            <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Service Name</Label>
-              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-9 text-sm" required placeholder="e.g., Cabinet C12 (42U)" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Type</Label>
-              <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {serviceTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Location</Label>
-              <Select value={formData.location} onValueChange={(v) => setFormData({ ...formData, location: v })}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {locations.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Status</Label>
-              <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="provisioning">Provisioning</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Details</Label>
-            <Input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className="h-9 text-sm" placeholder="e.g., 2kW · 2x 20A circuits" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Monthly Price ($)</Label>
-              <Input type="number" step="0.01" value={formData.monthlyPrice} onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })} className="h-9 text-sm" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Start Date</Label>
-              <Input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className="h-9 text-sm" required />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 text-xs">Cancel</Button>
-            <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingService ? "Update" : "Create")}
-            </Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex bg-[#ececec] border-b border-[#d0d0d0]">
+          {(["general", "grafana", "snmp"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-[4px] text-[11px] border-r border-[#d0d0d0] ${
+                activeTab === tab ? "bg-[#ffffff] font-medium text-[#1e1e1e]" : "text-[#666] hover:bg-[#f3f3f3]"
+              }`}
+            >
+              {tab === "general" ? "General" : tab === "grafana" ? "Grafana" : "SNMP/PDU"}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+          {activeTab === "general" && (
+            <>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
+                <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
+                  <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Service Name</label>
+                  <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required placeholder="e.g., Cabinet C12 (42U)" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Type</label>
+                  <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                      {serviceTypes.map((t) => <SelectItem key={t} value={t} className="text-[11px]">{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Location</label>
+                  <Select value={formData.location} onValueChange={(v) => setFormData({ ...formData, location: v })}>
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                      {locations.map((l) => <SelectItem key={l} value={l} className="text-[11px]">{l}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
+                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                      <SelectItem value="active" className="text-[11px]">Active</SelectItem>
+                      <SelectItem value="provisioning" className="text-[11px]">Provisioning</SelectItem>
+                      <SelectItem value="suspended" className="text-[11px]">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Details</label>
+                <input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className={inputCls} placeholder="e.g., 2kW, 2x 20A circuits" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Monthly Price ($)</label>
+                  <input type="number" step="0.01" value={formData.monthlyPrice} onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })} className={inputCls} required />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Start Date</label>
+                  <input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className={inputCls} required />
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "grafana" && (
+            <>
+              <div className="text-[10px] text-[#666] bg-[#f3f3f3] border border-[#d0d0d0] p-2 mb-1">
+                Configure Grafana panel embedding for network traffic monitoring. The customer portal will display the specified panel as an iframe.
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Grafana URL</label>
+                <input value={formData.grafanaUrl} onChange={(e) => setFormData({ ...formData, grafanaUrl: e.target.value })} className={inputCls} placeholder="https://grafana.911dc.us" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Dashboard UID</label>
+                  <input value={formData.grafanaDashboardUid} onChange={(e) => setFormData({ ...formData, grafanaDashboardUid: e.target.value })} className={inputCls} placeholder="e.g., abc123xyz" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Panel ID</label>
+                  <input value={formData.grafanaPanelId} onChange={(e) => setFormData({ ...formData, grafanaPanelId: e.target.value })} className={inputCls} placeholder="e.g., 2" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Org ID</label>
+                  <input value={formData.grafanaOrgId} onChange={(e) => setFormData({ ...formData, grafanaOrgId: e.target.value })} className={inputCls} placeholder="Optional (e.g., 1)" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Host Variable</label>
+                  <input value={formData.grafanaVar} onChange={(e) => setFormData({ ...formData, grafanaVar: e.target.value })} className={inputCls} placeholder="e.g., hostname or host ID" />
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "snmp" && (
+            <>
+              <div className="text-[10px] text-[#666] bg-[#f3f3f3] border border-[#d0d0d0] p-2 mb-1">
+                Configure SNMP for PDU port management. Requires read/write community string for reboot capability.
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Host</label>
+                  <input value={formData.snmpHost} onChange={(e) => setFormData({ ...formData, snmpHost: e.target.value })} className={inputCls} placeholder="IP or hostname" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Port</label>
+                  <input type="number" value={formData.snmpPort} onChange={(e) => setFormData({ ...formData, snmpPort: e.target.value })} className={inputCls} placeholder="161" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Community String</label>
+                  <input value={formData.snmpCommunity} onChange={(e) => setFormData({ ...formData, snmpCommunity: e.target.value })} className={inputCls} placeholder="e.g., private" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Version</label>
+                  <Select value={formData.snmpVersion} onValueChange={(v) => setFormData({ ...formData, snmpVersion: v })}>
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                      <SelectItem value="v1" className="text-[11px]">v1</SelectItem>
+                      <SelectItem value="v2c" className="text-[11px]">v2c</SelectItem>
+                      <SelectItem value="v3" className="text-[11px]">v3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Status OID (read port state)</label>
+                <input value={formData.snmpOidStatus} onChange={(e) => setFormData({ ...formData, snmpOidStatus: e.target.value })} className={inputCls} placeholder="e.g., 1.3.6.1.4.1.318.1.1.12.3.3.1.1.4" />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Control OID (set port state)</label>
+                <input value={formData.snmpOidControl} onChange={(e) => setFormData({ ...formData, snmpOidControl: e.target.value })} className={inputCls} placeholder="e.g., 1.3.6.1.4.1.318.1.1.12.3.3.1.1.4" />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">PDU Port Number</label>
+                <input type="number" value={formData.pduPortNumber} onChange={(e) => setFormData({ ...formData, pduPortNumber: e.target.value })} className={inputCls} placeholder="Outlet number assigned to customer" />
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white">
+              {loading ? "Saving..." : editingService ? "Update" : "Create"}
+            </button>
           </div>
         </form>
       </DialogContent>
@@ -1571,15 +1706,17 @@ function InvoicesView({ token }: { token: string | null }) {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null);
   const [query, setQuery] = useState("");
   const [billingRunning, setBillingRunning] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [topHeight, setTopHeight] = useState(300);
+  const onDrag = useCallback((delta: number) => {
+    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
+  }, []);
 
   async function handleRunBilling() {
     if (!confirm("This will generate invoices for all customers with active services for this month. Continue?")) return;
     setBillingRunning(true);
     try {
-      const res = await fetch("/api/admin/billing/run", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch("/api/admin/billing/run", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (res.ok) {
         toast({
@@ -1599,9 +1736,7 @@ function InvoicesView({ token }: { token: string | null }) {
 
   async function handleDownloadPdf(invoiceId: string, invoiceNumber: string) {
     try {
-      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -1623,12 +1758,8 @@ function InvoicesView({ token }: { token: string | null }) {
   async function loadInvoices() {
     setLoading(true);
     try {
-      const res = await fetch("/api/invoices", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setInvoices(await res.json());
-      }
+      const res = await fetch("/api/invoices", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setInvoices(await res.json());
     } catch {
       toast({ title: "Error", description: "Failed to load invoices", variant: "destructive" });
     } finally {
@@ -1638,27 +1769,17 @@ function InvoicesView({ token }: { token: string | null }) {
 
   async function loadCustomers() {
     try {
-      const res = await fetch("/api/admin/customer-users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setCustomers(await res.json());
-      }
+      const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setCustomers(await res.json());
     } catch {}
   }
 
-  useEffect(() => {
-    loadInvoices();
-    loadCustomers();
-  }, []);
+  useEffect(() => { loadInvoices(); loadCustomers(); }, []);
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this invoice?")) return;
     try {
-      const res = await fetch(`/api/admin/invoices/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/invoices/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         toast({ title: "Success", description: "Invoice deleted" });
         loadInvoices();
@@ -1674,76 +1795,88 @@ function InvoicesView({ token }: { token: string | null }) {
     return invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q));
   }, [query, invoices]);
 
+  const selectedInvoice = invoices.find(inv => inv.id === selectedId);
+
   return (
-    <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">Invoices</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Manage customer invoices and billing</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleRunBilling} disabled={billingRunning} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" data-testid="button-run-billing">
-            {billingRunning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CreditCard className="mr-1.5 h-3.5 w-3.5" />}
-            Run Billing
-          </Button>
-          <Button size="sm" onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-invoice">
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New Invoice
-          </Button>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={handleRunBilling} disabled={billingRunning} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff] disabled:opacity-50" data-testid="button-run-billing">
+          {billingRunning ? <Loader2 className="h-[10px] w-[10px] animate-spin" /> : <CreditCard className="h-[10px] w-[10px]" />}Run Billing
+        </button>
+        <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-invoice">
+          <Plus className="h-[10px] w-[10px]" />New Invoice
+        </button>
+        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <span className="text-[10px] text-[#666]">{invoices.length} invoices</span>
+        <div className="flex-1" />
+        <div className="relative">
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" />
         </div>
       </div>
 
-      <Card className="border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search invoices..." className="h-8 w-64 pl-8 text-xs border-slate-200" />
-          </div>
-          <div className="text-xs text-slate-500">{invoices.length} invoices</div>
-        </div>
+      {/* Table */}
+      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
         {loading ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <div className="flex items-center justify-center h-full text-[11px] text-[#666]"><Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...</div>
+        ) : (
+          <table className="w-full border-collapse" data-testid="table-invoices">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#e8e8e8]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Invoice #</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Issue Date</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Due Date</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Total</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredInvoices.map((inv, i) => (
+                <tr
+                  key={inv.id}
+                  onClick={() => setSelectedId(inv.id)}
+                  className={`cursor-pointer ${selectedId === inv.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  data-testid={`invoice-${inv.id}`}
+                >
+                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#d0d0d0]">{inv.invoiceNumber}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{new Date(inv.issueDate).toLocaleDateString()}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={inv.status} /></td>
+                  <td className="text-[11px] text-[#1e1e1e] font-semibold py-[2px] px-2 border border-[#d0d0d0] text-right">${Number(inv.total).toFixed(2)}</td>
+                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(inv.id, inv.invoiceNumber); }} className="text-[#0078d4] hover:underline text-[10px] mr-1" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">PDF</button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setShowModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-1">Edit</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <DraggableDivider onDrag={onDrag} />
+
+      {/* Detail panel */}
+      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
+        {selectedInvoice ? (
+          <div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">Invoice Details - {selectedInvoice.invoiceNumber}</div>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px]">
+              <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedInvoice.status} /></div>
+              <div><span className="text-[#666]">Issue Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</span></div>
+              <div><span className="text-[#666]">Due Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</span></div>
+              <div><span className="text-[#666]">Subtotal:</span> <span className="text-[#1e1e1e]">${Number(selectedInvoice.subtotal).toFixed(2)}</span></div>
+              <div><span className="text-[#666]">Tax:</span> <span className="text-[#1e1e1e]">${Number(selectedInvoice.tax).toFixed(2)}</span></div>
+              <div><span className="text-[#666]">Total:</span> <span className="text-[#1e1e1e] font-semibold">${Number(selectedInvoice.total).toFixed(2)}</span></div>
+            </div>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50 border-slate-100">
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Invoice #</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Issue Date</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Due Date</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Total</TableHead>
-                <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInvoices.map((inv) => (
-                <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50">
-                  <TableCell className="text-xs font-medium text-slate-900">{inv.invoiceNumber}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{new Date(inv.issueDate).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-xs text-slate-600">{new Date(inv.dueDate).toLocaleDateString()}</TableCell>
-                  <TableCell><StatusBadge status={inv.status} type="status" /></TableCell>
-                  <TableCell className="text-xs font-semibold text-slate-900">${Number(inv.total).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf(inv.id, inv.invoiceNumber)} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">
-                        <Download className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => { setEditingInvoice(inv); setShowModal(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(inv.id)} className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="text-[11px] text-[#666] italic">Select an invoice to view details</div>
         )}
-      </Card>
+      </div>
 
       <InvoiceModal
         open={showModal}
@@ -1753,7 +1886,7 @@ function InvoicesView({ token }: { token: string | null }) {
         token={token}
         onSuccess={() => { setShowModal(false); loadInvoices(); }}
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -1822,11 +1955,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ...formData,
-          issueDate: new Date(formData.issueDate),
-          dueDate: new Date(formData.dueDate),
-        }),
+        body: JSON.stringify({ ...formData, issueDate: new Date(formData.issueDate), dueDate: new Date(formData.dueDate) }),
       });
       if (res.ok) {
         toast({ title: "Success", description: editingInvoice ? "Invoice updated" : "Invoice created" });
@@ -1842,76 +1971,74 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
     }
   }
 
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
+        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-[#666]">
             {editingInvoice ? "Update invoice details" : "Create a new customer invoice"}
           </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Customer</Label>
+        </div>
+        <form onSubmit={handleSubmit} className="p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
               <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
+                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <SelectContent className="!rounded-none border-[#d0d0d0]">
+                  {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Invoice Number</Label>
-              <Input value={formData.invoiceNumber} onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })} className="h-9 text-sm" required />
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Invoice Number</label>
+              <input value={formData.invoiceNumber} onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })} className={inputCls} required />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Issue Date</Label>
-              <Input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className="h-9 text-sm" required />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Issue Date</label>
+              <input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className={inputCls} required />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Due Date</Label>
-              <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className="h-9 text-sm" required />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Subtotal ($)</Label>
-              <Input type="number" step="0.01" value={formData.subtotal} onChange={(e) => setFormData({ ...formData, subtotal: e.target.value })} className="h-9 text-sm" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Tax ($)</Label>
-              <Input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="h-9 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Total ($)</Label>
-              <Input value={formData.total} className="h-9 text-sm bg-slate-50" readOnly />
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Due Date</label>
+              <input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className={inputCls} required />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Status</Label>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Subtotal ($)</label>
+              <input type="number" step="0.01" value={formData.subtotal} onChange={(e) => setFormData({ ...formData, subtotal: e.target.value })} className={inputCls} required />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Tax ($)</label>
+              <input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Total ($)</label>
+              <input value={formData.total} className={`${inputCls} bg-[#f3f3f3]`} readOnly />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
             <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="past_due">Past Due</SelectItem>
+              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
+              <SelectContent className="!rounded-none border-[#d0d0d0]">
+                <SelectItem value="pending" className="text-[11px]">Pending</SelectItem>
+                <SelectItem value="open" className="text-[11px]">Open</SelectItem>
+                <SelectItem value="paid" className="text-[11px]">Paid</SelectItem>
+                <SelectItem value="past_due" className="text-[11px]">Past Due</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 text-xs">Cancel</Button>
-            <Button type="submit" disabled={loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-xs">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingInvoice ? "Update" : "Create")}
-            </Button>
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white">
+              {loading ? "Saving..." : editingInvoice ? "Update" : "Create"}
+            </button>
           </div>
         </form>
       </DialogContent>

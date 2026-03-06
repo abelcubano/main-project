@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, decimal, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -80,6 +80,18 @@ export const services = pgTable("services", {
   monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
   startDate: timestamp("start_date").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  grafanaUrl: text("grafana_url"),
+  grafanaDashboardUid: text("grafana_dashboard_uid"),
+  grafanaPanelId: text("grafana_panel_id"),
+  grafanaOrgId: text("grafana_org_id"),
+  grafanaVar: text("grafana_var"),
+  snmpHost: text("snmp_host"),
+  snmpPort: integer("snmp_port"),
+  snmpCommunity: text("snmp_community"),
+  snmpVersion: text("snmp_version"),
+  snmpOidStatus: text("snmp_oid_status"),
+  snmpOidControl: text("snmp_oid_control"),
+  pduPortNumber: integer("pdu_port_number"),
 });
 
 export const invoices = pgTable("invoices", {
