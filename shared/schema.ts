@@ -119,6 +119,18 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 
+export const billingSettings = pgTable("billing_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoicePrefix: text("invoice_prefix").notNull().default("INV"),
+  nextInvoiceNumber: integer("next_invoice_number").notNull().default(1),
+  paymentTerms: text("payment_terms").notNull().default("Net 30"),
+  billingEmailSubject: text("billing_email_subject").notNull().default("Invoice {{invoiceNumber}} - 911-DC"),
+  billingEmailTemplate: text("billing_email_template").notNull().default("Dear {{customerName}},\n\nPlease find attached your invoice {{invoiceNumber}} for the amount of ${{totalAmount}}.\n\nIssue Date: {{issueDate}}\nDue Date: {{dueDate}}\nItems: {{itemCount}}\n\nFor questions, contact billing@911dc.us.\n\nThank you for your business.\n911-DC"),
+  invitationEmailSubject: text("invitation_email_subject").notNull().default("Welcome to 911-DC Customer Portal"),
+  invitationEmailTemplate: text("invitation_email_template").notNull().default("Dear {{userName}},\n\nYour account has been created on the 911-DC Customer Portal.\n\nUsername: {{userEmail}}\nCompany: {{companyName}}\n\nPlease log in at {{portalUrl}} to access your services, billing, and support.\n\nWelcome aboard!\n911-DC"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -127,6 +139,7 @@ export const services = pgTable("services", {
   status: text("status").notNull().default("active"),
   location: text("location").notNull(),
   details: text("details"),
+  serviceOrder: text("service_order"),
   monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
   startDate: timestamp("start_date").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -182,9 +195,16 @@ export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
   id: true,
 });
 
+export const insertBillingSettingsSchema = createInsertSchema(billingSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type BillingSettings = typeof billingSettings.$inferSelect;
+export type InsertBillingSettings = z.infer<typeof insertBillingSettingsSchema>;

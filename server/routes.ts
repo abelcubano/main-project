@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { sendDispatchEmail, verifyEmailConnection, type DispatchRequest } from "./email";
+import { sendDispatchEmail, sendInvoiceEmail, sendInvitationEmail, verifyEmailConnection, type DispatchRequest } from "./email";
 import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
@@ -384,7 +384,7 @@ export async function registerRoutes(
       }
       const invoicesList = user.role === "admin" 
         ? await storage.getAllInvoices()
-        : await storage.getInvoicesByUser(user.id);
+        : (await storage.getInvoicesByUser(user.id)).filter(inv => inv.status !== "draft");
       res.json(invoicesList);
     } catch (error: any) {
       console.error("[INVOICES] Get invoices error:", error);
@@ -474,6 +474,107 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[BILLING] Run billing error:", error);
       res.status(500).json({ error: "Failed to run billing cycle" });
+    }
+  });
+
+  // Billing settings
+  app.get("/api/admin/billing-settings", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      res.json(settings);
+    } catch (error: any) {
+      console.error("[ADMIN] Get billing settings error:", error);
+      res.status(500).json({ error: "Failed to fetch billing settings" });
+    }
+  });
+
+  app.put("/api/admin/billing-settings", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.updateBillingSettings(req.body);
+      res.json(settings);
+    } catch (error: any) {
+      console.error("[ADMIN] Update billing settings error:", error);
+      res.status(500).json({ error: "Failed to update billing settings" });
+    }
+  });
+
+  // Approve invoice (draft -> pending)
+  app.post("/api/admin/invoices/:id/approve", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const invoice = await storage.getInvoice(id);
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (invoice.status !== "draft") return res.status(400).json({ error: "Only draft invoices can be approved" });
+      const updated = await storage.updateInvoice(id, { status: "pending" });
+
+      try {
+        const customer = await storage.getCustomer(invoice.customerId);
+        if (customer) {
+          const billingSettings = await storage.getBillingSettings();
+          const allUsers = await storage.getUsers();
+          const customerUsers = allUsers.filter(u => u.customerId === customer.id && u.permBillingReceiveInvoices && u.email);
+          const items = await storage.getInvoiceItems(id);
+          for (const recipient of customerUsers) {
+            await sendInvoiceEmail(
+              {
+                customerName: customer.name,
+                contactName: recipient.name || customer.contactName || customer.name,
+                email: recipient.email,
+                invoiceNumber: invoice.invoiceNumber,
+                total: Number(invoice.total).toFixed(2),
+                dueDate: new Date(invoice.dueDate).toLocaleDateString("en-US"),
+                issueDate: new Date(invoice.issueDate).toLocaleDateString("en-US"),
+                itemCount: items.length,
+              },
+              {
+                subject: billingSettings.billingEmailSubject,
+                body: billingSettings.billingEmailTemplate,
+              }
+            );
+          }
+        }
+      } catch (emailErr: any) {
+        console.error("[ADMIN] Approve invoice email error:", emailErr.message);
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[ADMIN] Approve invoice error:", error);
+      res.status(500).json({ error: "Failed to approve invoice" });
+    }
+  });
+
+  // Send invitation email
+  app.post("/api/admin/users/:id/send-invitation", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const billingSettings = await storage.getBillingSettings();
+      const customer = user.customerId ? await storage.getCustomer(user.customerId) : null;
+
+      const result = await sendInvitationEmail(
+        {
+          userName: user.name,
+          userEmail: user.email,
+          companyName: customer?.name || user.companyName || "911-DC",
+          portalUrl: `${req.protocol}://${req.get("host")}/portal`,
+        },
+        {
+          subject: billingSettings.invitationEmailSubject,
+          body: billingSettings.invitationEmailTemplate,
+        }
+      );
+
+      if (result.success) {
+        res.json({ success: true, message: "Invitation email sent" });
+      } else {
+        res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+    } catch (error: any) {
+      console.error("[ADMIN] Send invitation error:", error);
+      res.status(500).json({ error: "Failed to send invitation" });
     }
   });
 

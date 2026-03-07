@@ -4,7 +4,8 @@ import {
   type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem,
   type Customer, type InsertCustomer,
-  users, sessions, services, invoices, invoiceItems, customers 
+  type BillingSettings, type InsertBillingSettings,
+  users, sessions, services, invoices, invoiceItems, customers, billingSettings 
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, desc } from "drizzle-orm";
@@ -49,6 +50,9 @@ export interface IStorage {
   getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
   createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
   deleteInvoiceItems(invoiceId: string): Promise<boolean>;
+
+  getBillingSettings(): Promise<BillingSettings>;
+  updateBillingSettings(updates: Partial<InsertBillingSettings>): Promise<BillingSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -218,6 +222,22 @@ export class DatabaseStorage implements IStorage {
   async deleteInvoiceItems(invoiceId: string): Promise<boolean> {
     await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
     return true;
+  }
+
+  async getBillingSettings(): Promise<BillingSettings> {
+    const rows = await db.select().from(billingSettings);
+    if (rows.length > 0) return rows[0];
+    const [created] = await db.insert(billingSettings).values({}).returning();
+    return created;
+  }
+
+  async updateBillingSettings(updates: Partial<InsertBillingSettings>): Promise<BillingSettings> {
+    const current = await this.getBillingSettings();
+    const [updated] = await db.update(billingSettings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(billingSettings.id, current.id))
+      .returning();
+    return updated;
   }
 }
 

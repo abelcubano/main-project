@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   Loader2,
   LogOut,
+  Mail,
   MapPin,
   Pencil,
   Plus,
@@ -25,6 +26,7 @@ import {
   Settings,
   Shield,
   Ticket,
+  Save,
   Trash2,
   Users,
   X,
@@ -176,7 +178,7 @@ type AdminTicket = {
   updatedAt: string;
 };
 
-type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers";
+type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings";
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -195,6 +197,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: "bg-[#fff4ce] text-[#9d6b00]",
     paid: "bg-[#dff6dd] text-[#1e7b34]",
     past_due: "bg-[#fde7e9] text-[#c42b1c]",
+    draft: "bg-[#dce3ed] text-[#888]",
     provisioning: "bg-[#cce4f7] text-[#2563eb]",
   };
   return (
@@ -327,6 +330,7 @@ export default function AdminPage() {
     services: "Services",
     invoices: "Invoices & Billing",
     customers: "Customer Accounts",
+    settings: "Settings",
   };
 
   const sidebarItems: { section: string; items: { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number }[] }[] = [
@@ -358,7 +362,7 @@ export default function AdminPage() {
       items: [
         { icon: Users, label: "Users", view: "users", badge: allUsers.length || undefined },
         { icon: Shield, label: "Permissions" },
-        { icon: Settings, label: "Settings" },
+        { icon: Settings, label: "Settings", view: "settings" },
       ],
     },
   ];
@@ -384,7 +388,7 @@ export default function AdminPage() {
 
       {/* Tab bar */}
       <div className="h-[26px] bg-[#243656] border-b border-[#1b2a4a] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
-        {(["dashboard", "customers", "services", "invoices", "users"] as AdminView[]).map((v) => (
+        {(["dashboard", "customers", "services", "invoices", "users", "settings"] as AdminView[]).map((v) => (
           <button
             key={v}
             onClick={() => setCurrentView(v)}
@@ -475,6 +479,7 @@ export default function AdminPage() {
           {currentView === "services" && <ServicesView token={token} />}
           {currentView === "invoices" && <InvoicesView token={token} />}
           {currentView === "customers" && <CustomersView token={token} />}
+          {currentView === "settings" && <SettingsView token={token} />}
         </div>
       </div>
 
@@ -702,6 +707,32 @@ function UsersView({
               <div><span className="text-[#666]">Created:</span> <span className="text-[#1e1e1e]">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
               <div><span className="text-[#666]">Last Login:</span> <span className="text-[#1e1e1e]">{selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : "Never"}</span></div>
             </div>
+            {selectedUser.role === "customer" && (
+              <div className="mt-2 pt-1 border-t border-[#b8c4d4]">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/admin/users/${selectedUser.id}/send-invitation`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        toast({ title: "Success", description: "Invitation email sent to " + selectedUser.email });
+                      } else {
+                        toast({ title: "Error", description: data.error || "Failed to send invitation", variant: "destructive" });
+                      }
+                    } catch {
+                      toast({ title: "Error", description: "Failed to send invitation email", variant: "destructive" });
+                    }
+                  }}
+                  className="flex items-center gap-[3px] text-[10px] text-[#2563eb] hover:underline"
+                  data-testid={`button-send-invitation-${selectedUser.id}`}
+                >
+                  <Mail className="h-[10px] w-[10px]" />Send Portal Invitation
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-[11px] text-[#666] italic">Select a user to view details</div>
@@ -1408,6 +1439,7 @@ type ServiceData = {
   status: string;
   location: string;
   details: string | null;
+  serviceOrder: string | null;
   monthlyPrice: string;
   startDate: string;
   grafanaUrl?: string | null;
@@ -1563,6 +1595,7 @@ function ServicesView({ token }: { token: string | null }) {
               <div><span className="text-[#666]">Monthly:</span> <span className="text-[#1e1e1e]">${Number(selectedService.monthlyPrice).toFixed(2)}</span></div>
               <div><span className="text-[#666]">Start Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedService.startDate).toLocaleDateString()}</span></div>
               <div><span className="text-[#666]">Details:</span> <span className="text-[#1e1e1e]">{selectedService.details || "—"}</span></div>
+              <div><span className="text-[#666]">Service Order:</span> <span className="text-[#1e1e1e]">{selectedService.serviceOrder || "—"}</span></div>
             </div>
             {selectedService.grafanaUrl && (
               <div className="mb-2">
@@ -1626,6 +1659,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
     status: "active",
     location: "iM Critical Miami",
     details: "",
+    serviceOrder: "",
     monthlyPrice: "",
     startDate: new Date().toISOString().split("T")[0],
     grafanaUrl: "",
@@ -1653,6 +1687,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
           status: editingService.status,
           location: editingService.location,
           details: editingService.details || "",
+          serviceOrder: editingService.serviceOrder || "",
           monthlyPrice: editingService.monthlyPrice,
           startDate: new Date(editingService.startDate).toISOString().split("T")[0],
           grafanaUrl: editingService.grafanaUrl || "",
@@ -1676,6 +1711,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
           status: "active",
           location: "iM Critical Miami",
           details: "",
+          serviceOrder: "",
           monthlyPrice: "",
           startDate: new Date().toISOString().split("T")[0],
           grafanaUrl: "",
@@ -1704,6 +1740,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
       const body: any = {
         ...formData,
         startDate: new Date(formData.startDate),
+        serviceOrder: formData.serviceOrder || null,
         snmpPort: formData.snmpPort ? parseInt(formData.snmpPort) : null,
         pduPortNumber: formData.pduPortNumber ? parseInt(formData.pduPortNumber) : null,
         grafanaUrl: formData.grafanaUrl || null,
@@ -1821,9 +1858,15 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                   </Select>
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Details</label>
-                <input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className={inputCls} placeholder="e.g., 2kW, 2x 20A circuits" />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Details</label>
+                  <input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className={inputCls} placeholder="e.g., 2kW, 2x 20A circuits" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Service Order #</label>
+                  <input value={formData.serviceOrder} onChange={(e) => setFormData({ ...formData, serviceOrder: e.target.value })} className={inputCls} placeholder="e.g., SO-2024-001" data-testid="input-service-order" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -2033,6 +2076,24 @@ function InvoicesView({ token }: { token: string | null }) {
     }
   }
 
+  async function handleApprove(inv: InvoiceData) {
+    try {
+      const res = await fetch(`/api/admin/invoices/${inv.id}/approve`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Invoice approved and set to pending" });
+        loadInvoices();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error || "Failed to approve invoice", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to approve invoice", variant: "destructive" });
+    }
+  }
+
   const filteredInvoices = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return invoices;
@@ -2090,6 +2151,9 @@ function InvoicesView({ token }: { token: string | null }) {
                   <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={inv.status} /></td>
                   <td className="text-[11px] text-[#1e1e1e] font-semibold py-[2px] px-2 border border-[#b8c4d4] text-right">${Number(inv.total).toFixed(2)}</td>
                   <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
+                    {inv.status === "draft" && (
+                      <button onClick={(e) => { e.stopPropagation(); handleApprove(inv); }} className="text-[#1e7b34] hover:underline text-[10px] mr-1 font-medium" data-testid={`button-approve-invoice-${inv.id}`}>Approve</button>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(inv.id, inv.invoiceNumber); }} className="text-[#2563eb] hover:underline text-[10px] mr-1" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">PDF</button>
                     <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setShowModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-1">Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
@@ -2134,6 +2198,309 @@ function InvoicesView({ token }: { token: string | null }) {
   );
 }
 
+type BillingSettingsData = {
+  id?: string;
+  invoicePrefix: string;
+  nextInvoiceNumber: number;
+  paymentTerms: string;
+  billingEmailSubject: string;
+  billingEmailTemplate: string;
+  invitationEmailSubject: string;
+  invitationEmailTemplate: string;
+};
+
+const BILLING_PLACEHOLDERS = [
+  { var: "{{customerName}}", desc: "Customer company name" },
+  { var: "{{invoiceNumber}}", desc: "Invoice number" },
+  { var: "{{totalAmount}}", desc: "Invoice total" },
+  { var: "{{dueDate}}", desc: "Payment due date" },
+  { var: "{{issueDate}}", desc: "Invoice issue date" },
+  { var: "{{itemCount}}", desc: "Number of line items" },
+];
+
+const INVITATION_PLACEHOLDERS = [
+  { var: "{{userName}}", desc: "User full name" },
+  { var: "{{userEmail}}", desc: "User email address" },
+  { var: "{{companyName}}", desc: "Company name" },
+  { var: "{{portalUrl}}", desc: "Portal login URL" },
+];
+
+function SettingsView({ token }: { token: string | null }) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"billing" | "email">("billing");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<BillingSettingsData>({
+    invoicePrefix: "INV",
+    nextInvoiceNumber: 1,
+    paymentTerms: "Net 30",
+    billingEmailSubject: "",
+    billingEmailTemplate: "",
+    invitationEmailSubject: "",
+    invitationEmailTemplate: "",
+  });
+  const [previewType, setPreviewType] = useState<"billing" | "invitation" | null>(null);
+
+  async function loadSettings() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/billing-settings", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to load settings", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadSettings(); }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/billing-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          invoicePrefix: settings.invoicePrefix,
+          nextInvoiceNumber: settings.nextInvoiceNumber,
+          paymentTerms: settings.paymentTerms,
+          billingEmailSubject: settings.billingEmailSubject,
+          billingEmailTemplate: settings.billingEmailTemplate,
+          invitationEmailSubject: settings.invitationEmailSubject,
+          invitationEmailTemplate: settings.invitationEmailTemplate,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSettings(updated);
+        toast({ title: "Settings saved" });
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to save settings", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function renderPreview(template: string, type: "billing" | "invitation") {
+    let result = template;
+    if (type === "billing") {
+      result = result.replace(/\{\{customerName\}\}/g, "Acme Corp")
+        .replace(/\{\{invoiceNumber\}\}/g, `${settings.invoicePrefix}-001`)
+        .replace(/\{\{totalAmount\}\}/g, "1,250.00")
+        .replace(/\{\{dueDate\}\}/g, "01/15/2025")
+        .replace(/\{\{issueDate\}\}/g, "12/15/2024")
+        .replace(/\{\{itemCount\}\}/g, "3");
+    } else {
+      result = result.replace(/\{\{userName\}\}/g, "John Smith")
+        .replace(/\{\{userEmail\}\}/g, "john@acme.com")
+        .replace(/\{\{companyName\}\}/g, "Acme Corp")
+        .replace(/\{\{portalUrl\}\}/g, "https://portal.911dc.us");
+    }
+    return result;
+  }
+
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[11px] text-[#666]" data-testid="settings-view">
+        <Loader2 className="h-4 w-4 animate-spin mr-1" />Loading settings...
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="settings-view">
+      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
+        <button
+          onClick={() => setActiveTab("billing")}
+          className={`px-2 h-[18px] text-[10px] border border-b-0 ${activeTab === "billing" ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4]" : "bg-[#dce3ed] text-[#666] border-[#b8c4d4] hover:bg-[#c8d3e3]"}`}
+          data-testid="tab-billing-settings"
+        >
+          Billing
+        </button>
+        <button
+          onClick={() => setActiveTab("email")}
+          className={`px-2 h-[18px] text-[10px] border border-b-0 ${activeTab === "email" ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4]" : "bg-[#dce3ed] text-[#666] border-[#b8c4d4] hover:bg-[#c8d3e3]"}`}
+          data-testid="tab-email-templates"
+        >
+          Email Templates
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-[3px] text-[10px] text-white bg-[#2563eb] hover:bg-[#1d4ed8] px-2 py-[1px] border border-[#2563eb] disabled:opacity-50"
+          data-testid="button-save-settings"
+        >
+          {saving ? <Loader2 className="h-[10px] w-[10px] animate-spin" /> : <Save className="h-[10px] w-[10px]" />}
+          Save Settings
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-auto bg-[#ffffff] p-3">
+        {activeTab === "billing" && (
+          <div className="max-w-lg space-y-3" data-testid="billing-settings-panel">
+            <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1">Invoice Configuration</div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Invoice Prefix</label>
+                <input
+                  value={settings.invoicePrefix}
+                  onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })}
+                  className={inputCls}
+                  data-testid="input-invoice-prefix"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Next Invoice Number</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={settings.nextInvoiceNumber}
+                  onChange={(e) => setSettings({ ...settings, nextInvoiceNumber: parseInt(e.target.value) || 1 })}
+                  className={inputCls}
+                  data-testid="input-next-invoice-number"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#666] block mb-[2px]">Payment Terms</label>
+                <input
+                  value={settings.paymentTerms}
+                  onChange={(e) => setSettings({ ...settings, paymentTerms: e.target.value })}
+                  className={inputCls}
+                  data-testid="input-payment-terms"
+                />
+              </div>
+            </div>
+            <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2 text-[10px] text-[#666]">
+              <span className="font-semibold text-[#1e1e1e]">Preview:</span> Next invoice will be numbered <span className="font-mono font-semibold text-[#1e1e1e]">{settings.invoicePrefix}-{String(settings.nextInvoiceNumber).padStart(3, "0")}</span>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "email" && (
+          <div className="space-y-4" data-testid="email-templates-panel">
+            <div>
+              <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-2 flex items-center justify-between">
+                <span>Billing Email Template</span>
+                <button
+                  onClick={() => setPreviewType(previewType === "billing" ? null : "billing")}
+                  className="text-[10px] text-[#2563eb] hover:underline flex items-center gap-1"
+                  data-testid="button-preview-billing-email"
+                >
+                  <Eye className="h-[10px] w-[10px]" />
+                  {previewType === "billing" ? "Hide Preview" : "Preview"}
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
+                  <input
+                    value={settings.billingEmailSubject}
+                    onChange={(e) => setSettings({ ...settings, billingEmailSubject: e.target.value })}
+                    className={inputCls}
+                    data-testid="input-billing-email-subject"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Body Template</label>
+                  <textarea
+                    value={settings.billingEmailTemplate}
+                    onChange={(e) => setSettings({ ...settings, billingEmailTemplate: e.target.value })}
+                    rows={8}
+                    className="w-full px-1 py-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb] font-mono resize-y"
+                    data-testid="textarea-billing-email-template"
+                  />
+                </div>
+                <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2">
+                  <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-[2px]">
+                    {BILLING_PLACEHOLDERS.map((p) => (
+                      <span key={p.var} className="text-[10px]">
+                        <code className="font-mono text-[#2563eb] bg-[#e8f0fe] px-[3px]">{p.var}</code>
+                        <span className="text-[#666] ml-1">{p.desc}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {previewType === "billing" && (
+                  <div className="border border-[#b8c4d4] bg-[#fafafa] p-2" data-testid="preview-billing-email">
+                    <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Preview (sample data)</div>
+                    <div className="text-[10px] text-[#1e1e1e] font-medium mb-1">Subject: {renderPreview(settings.billingEmailSubject, "billing")}</div>
+                    <pre className="text-[10px] text-[#1e1e1e] whitespace-pre-wrap font-sans">{renderPreview(settings.billingEmailTemplate, "billing")}</pre>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-2 flex items-center justify-between">
+                <span>Invitation Email Template</span>
+                <button
+                  onClick={() => setPreviewType(previewType === "invitation" ? null : "invitation")}
+                  className="text-[10px] text-[#2563eb] hover:underline flex items-center gap-1"
+                  data-testid="button-preview-invitation-email"
+                >
+                  <Eye className="h-[10px] w-[10px]" />
+                  {previewType === "invitation" ? "Hide Preview" : "Preview"}
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
+                  <input
+                    value={settings.invitationEmailSubject}
+                    onChange={(e) => setSettings({ ...settings, invitationEmailSubject: e.target.value })}
+                    className={inputCls}
+                    data-testid="input-invitation-email-subject"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#666] block mb-[2px]">Body Template</label>
+                  <textarea
+                    value={settings.invitationEmailTemplate}
+                    onChange={(e) => setSettings({ ...settings, invitationEmailTemplate: e.target.value })}
+                    rows={8}
+                    className="w-full px-1 py-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb] font-mono resize-y"
+                    data-testid="textarea-invitation-email-template"
+                  />
+                </div>
+                <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2">
+                  <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-[2px]">
+                    {INVITATION_PLACEHOLDERS.map((p) => (
+                      <span key={p.var} className="text-[10px]">
+                        <code className="font-mono text-[#2563eb] bg-[#e8f0fe] px-[3px]">{p.var}</code>
+                        <span className="text-[#666] ml-1">{p.desc}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {previewType === "invitation" && (
+                  <div className="border border-[#b8c4d4] bg-[#fafafa] p-2" data-testid="preview-invitation-email">
+                    <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Preview (sample data)</div>
+                    <div className="text-[10px] text-[#1e1e1e] font-medium mb-1">Subject: {renderPreview(settings.invitationEmailSubject, "invitation")}</div>
+                    <pre className="text-[10px] text-[#1e1e1e] whitespace-pre-wrap font-sans">{renderPreview(settings.invitationEmailTemplate, "invitation")}</pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, onSuccess }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -2147,7 +2514,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
   const [formData, setFormData] = useState({
     userId: "",
     invoiceNumber: "",
-    status: "pending",
+    status: "draft",
     issueDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     subtotal: "",
@@ -2173,7 +2540,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
         setFormData({
           userId: customers[0]?.id || "",
           invoiceNumber: nextNum,
-          status: "pending",
+          status: "draft",
           issueDate: new Date().toISOString().split("T")[0],
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
           subtotal: "",
@@ -2271,6 +2638,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
             <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
               <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
               <SelectContent className="!rounded-none border-[#b8c4d4]">
+                <SelectItem value="draft" className="text-[11px]">Draft</SelectItem>
                 <SelectItem value="pending" className="text-[11px]">Pending</SelectItem>
                 <SelectItem value="open" className="text-[11px]">Open</SelectItem>
                 <SelectItem value="paid" className="text-[11px]">Paid</SelectItem>

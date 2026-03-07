@@ -100,14 +100,37 @@ The database schema is shared between frontend and backend through the `shared/`
 - **Template**: Professional invoice PDF with 911-DC branding, company details, customer info, line items table, totals, and payment terms
 - **Endpoint**: GET /api/invoices/:id/pdf (accessible by admins and invoice owner)
 
+### Billing Settings & Configuration
+- **Table**: billing_settings — configurable invoice prefix, sequential numbering, payment terms, email templates
+- **Admin UI**: Settings view with "Billing" and "Email Templates" tabs
+- **Invoice Number Format**: Configurable prefix (default "INV") + YYYYMM + sequential number (e.g., INV-202603-0001)
+- **Email Templates**: Billing and invitation templates with placeholder variables ({{customerName}}, {{invoiceNumber}}, {{totalAmount}}, {{dueDate}}, {{issueDate}}, {{itemCount}}, {{userName}}, {{userEmail}}, {{companyName}}, {{portalUrl}})
+- **Endpoints**: GET/PUT /api/admin/billing-settings
+
+### Invoice Draft/Approval Workflow
+- **Draft Status**: New invoices (manual and automated) start as "draft" — not visible to customers
+- **Approval**: Admin clicks "Approve" to change draft → pending (visible to customers)
+- **Customer Portal**: Filters out draft invoices server-side
+- **Endpoint**: POST /api/admin/invoices/:id/approve
+
+### Service Order References
+- **Field**: serviceOrder on services table — optional service order number (e.g., SO-2024-001)
+- **Invoice Line Items**: Service order reference automatically included in invoice line item descriptions when present
+
 ### Automated Billing
 - **Service**: server/billing.ts - scans active services grouped by customer company
 - **Trigger**: POST /api/admin/billing/run (admin only, manual trigger from Invoices view)
 - **Features**:
-  - Generates monthly invoices with each active service as a line item
-  - Prevents duplicate invoices for the same billing period via invoice number pattern matching (INV-YYYYMM-XXXX)
-  - Sends email notifications to customer contacts when invoices are generated
+  - Generates monthly invoices as "draft" status with configurable invoice number prefix and sequential numbering
+  - Prevents duplicate invoices for the same billing period via invoice number pattern matching
+  - Sends email notifications using configurable billing email template
   - Groups services by customer company for consolidated invoicing
+  - Includes service order references in line item descriptions
+
+### Invitation Emails
+- **Endpoint**: POST /api/admin/users/:id/send-invitation (admin only)
+- **Template**: Configurable via billing settings, supports placeholder variables
+- **UI**: "Send Portal Invitation" button in admin user detail panel for customer users
 
 ### SNMP/PDU Management
 - **Library**: net-snmp (Node.js SNMP client)
