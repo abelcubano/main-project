@@ -1982,6 +1982,8 @@ type InvoiceData = {
   subtotal: string;
   tax: string;
   total: string;
+  customerName?: string;
+  customerId?: string | null;
 };
 
 function InvoicesView({ token }: { token: string | null }) {
@@ -2097,7 +2099,7 @@ function InvoicesView({ token }: { token: string | null }) {
   const filteredInvoices = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return invoices;
-    return invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q));
+    return invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q) || (inv.customerName || "").toLowerCase().includes(q));
   }, [query, invoices]);
 
   const selectedInvoice = invoices.find(inv => inv.id === selectedId);
@@ -2130,6 +2132,7 @@ function InvoicesView({ token }: { token: string | null }) {
             <thead className="sticky top-0 z-10">
               <tr className="bg-[#dce3ed]">
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Invoice #</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Customer</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Issue Date</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Due Date</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
@@ -2146,6 +2149,7 @@ function InvoicesView({ token }: { token: string | null }) {
                   data-testid={`invoice-${inv.id}`}
                 >
                   <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#b8c4d4]">{inv.invoiceNumber}</td>
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{inv.customerName || "—"}</td>
                   <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.issueDate).toLocaleDateString()}</td>
                   <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.dueDate).toLocaleDateString()}</td>
                   <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={inv.status} /></td>
@@ -2173,6 +2177,7 @@ function InvoicesView({ token }: { token: string | null }) {
           <div>
             <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">Invoice Details - {selectedInvoice.invoiceNumber}</div>
             <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px]">
+              <div><span className="text-[#666]">Customer:</span> <span className="text-[#1e1e1e] font-medium">{selectedInvoice.customerName || "—"}</span></div>
               <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedInvoice.status} /></div>
               <div><span className="text-[#666]">Issue Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</span></div>
               <div><span className="text-[#666]">Due Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</span></div>

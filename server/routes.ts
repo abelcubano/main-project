@@ -385,6 +385,17 @@ export async function registerRoutes(
       const invoicesList = user.role === "admin" 
         ? await storage.getAllInvoices()
         : (await storage.getInvoicesByUser(user.id)).filter(inv => inv.status !== "draft");
+      
+      if (user.role === "admin") {
+        const allUsers = await storage.getAllUsers();
+        const allCustomers = await storage.getAllCustomers();
+        const enriched = invoicesList.map(inv => {
+          const invUser = allUsers.find(u => u.id === inv.userId);
+          const customer = invUser?.customerId ? allCustomers.find(c => c.id === invUser.customerId) : null;
+          return { ...inv, customerName: customer?.name || invUser?.name || "Unknown", customerId: customer?.id || null };
+        });
+        return res.json(enriched);
+      }
       res.json(invoicesList);
     } catch (error: any) {
       console.error("[INVOICES] Get invoices error:", error);
@@ -508,14 +519,15 @@ export async function registerRoutes(
       const updated = await storage.updateInvoice(id, { status: "pending" });
 
       try {
-        const customer = await storage.getCustomer(invoice.customerId);
+        const invoiceUser = await storage.getUser(invoice.userId);
+        const customer = invoiceUser?.customerId ? await storage.getCustomer(invoiceUser.customerId) : null;
         if (customer) {
           const billingSettings = await storage.getBillingSettings();
-          const allUsers = await storage.getUsers();
+          const allUsers = await storage.getAllUsers();
           const customerUsers = allUsers.filter(u => u.customerId === customer.id && u.permBillingReceiveInvoices && u.email);
           const items = await storage.getInvoiceItems(id);
           for (const recipient of customerUsers) {
-            await sendInvoiceEmail(
+            const emailResult = await sendInvoiceEmail(
               {
                 customerName: customer.name,
                 contactName: recipient.name || customer.contactName || customer.name,
@@ -531,7 +543,13 @@ export async function registerRoutes(
                 body: billingSettings.billingEmailTemplate,
               }
             );
+            console.log(`[ADMIN] Approve email to ${recipient.email}: ${emailResult.success ? "sent" : emailResult.error}`);
           }
+          if (customerUsers.length === 0) {
+            console.log(`[ADMIN] No users with billing_receive_invoices permission for ${customer.name}`);
+          }
+        } else {
+          console.log(`[ADMIN] No customer found for invoice ${invoice.invoiceNumber} (userId: ${invoice.userId})`);
         }
       } catch (emailErr: any) {
         console.error("[ADMIN] Approve invoice email error:", emailErr.message);

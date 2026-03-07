@@ -200,7 +200,7 @@ export async function sendInvoiceEmail(
   data: InvoiceEmailData,
   templateOverride?: { subject?: string; body?: string }
 ): Promise<{ success: boolean; error?: string }> {
-  const fromAddress = process.env.MAIL_FROM || "abel.monzon@911dc.us";
+  const fromAddress = process.env.MAIL_BILLING_FROM || "billing@911dc.us";
 
   const vars: Record<string, string> = {
     customerName: data.customerName,
