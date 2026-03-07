@@ -212,6 +212,7 @@ export async function registerRoutes(
       if (req.body.name) updates.name = req.body.name;
       if (req.body.email) updates.email = req.body.email;
       if (req.body.companyName !== undefined) updates.companyName = req.body.companyName;
+      if (req.body.customerId !== undefined) updates.customerId = req.body.customerId || null;
       if (req.body.role) updates.role = req.body.role;
       if (typeof req.body.active === "boolean") updates.active = req.body.active;
       
@@ -568,7 +569,7 @@ export async function registerRoutes(
   app.get("/api/admin/customer-users", requireAuth, requireAdmin, async (req, res) => {
     try {
       const allCustomers = await storage.getAllCustomers();
-      const result: Array<{ id: string; name: string; companyName: string | null; email: string | null }> = [];
+      const result: Array<{ id: string; name: string; companyName: string | null; email: string | null; customerId: string }> = [];
       for (const customer of allCustomers) {
         const users = await storage.getUsersByCustomer(customer.id);
         if (users.length > 0) {
@@ -577,6 +578,15 @@ export async function registerRoutes(
             name: customer.name,
             companyName: customer.name,
             email: customer.email,
+            customerId: customer.id,
+          });
+        } else {
+          result.push({
+            id: "",
+            name: customer.name,
+            companyName: customer.name,
+            email: customer.email,
+            customerId: customer.id,
           });
         }
       }

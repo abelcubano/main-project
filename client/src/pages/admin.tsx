@@ -160,6 +160,7 @@ type UserData = {
   email: string;
   role: string;
   companyName?: string;
+  customerId?: string | null;
   active: boolean;
   createdAt: string;
   lastLogin?: string;
@@ -727,16 +728,26 @@ function UserModal({
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [roleTemplate, setRoleTemplate] = useState("custom");
+  const [customerList, setCustomerList] = useState<Array<{ id: string; name: string }>>([]);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
     name: "",
     email: "",
     role: "customer",
-    companyName: "",
+    customerId: "",
     active: true,
   });
   const [perms, setPerms] = useState<PermissionKeys>({ ...DEFAULT_PERMS });
+
+  useEffect(() => {
+    if (open && token) {
+      fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : [])
+        .then(data => setCustomerList(data))
+        .catch(() => {});
+    }
+  }, [open, token]);
 
   useEffect(() => {
     if (open) {
@@ -747,7 +758,7 @@ function UserModal({
           name: editingUser.name,
           email: editingUser.email,
           role: editingUser.role,
-          companyName: editingUser.companyName || "",
+          customerId: editingUser.customerId || "",
           active: editingUser.active,
         });
         setPerms({
@@ -769,7 +780,7 @@ function UserModal({
         });
         setRoleTemplate("custom");
       } else {
-        setFormData({ username: "", password: "", name: "", email: "", role: "customer", companyName: "", active: true });
+        setFormData({ username: "", password: "", name: "", email: "", role: "customer", customerId: "", active: true });
         setPerms({ ...DEFAULT_PERMS });
         setRoleTemplate("custom");
       }
@@ -790,6 +801,13 @@ function UserModal({
       const method = editingUser ? "PUT" : "POST";
       const body: any = { ...formData };
       if (editingUser && !body.password) delete body.password;
+      const selectedCustomer = customerList.find(c => c.id === formData.customerId);
+      if (selectedCustomer) {
+        body.companyName = selectedCustomer.name;
+      } else {
+        body.customerId = null;
+        body.companyName = null;
+      }
       if (formData.role === "customer") {
         Object.assign(body, perms);
       }
@@ -859,8 +877,14 @@ function UserModal({
               </Select>
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Company Name</label>
-              <input value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" placeholder="Optional" data-testid="input-new-company" />
+              <label className="text-[10px] text-[#666] block mb-[2px]">Company</label>
+              <Select value={formData.customerId || "none"} onValueChange={(v) => setFormData({ ...formData, customerId: v === "none" ? "" : v })}>
+                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]" data-testid="select-company"><SelectValue placeholder="Select company" /></SelectTrigger>
+                <SelectContent className="!rounded-none border-[#b8c4d4]">
+                  <SelectItem value="none" className="text-[11px]">— None —</SelectItem>
+                  {customerList.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -1753,9 +1777,12 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                 <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
                   <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
                   <SelectContent className="!rounded-none border-[#b8c4d4]">
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
+                    {customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {customers.length > 0 && customers.filter(c => c.id).length === 0 && (
+                  <p className="text-[9px] text-[#c42b1c] mt-[2px]">No companies have users yet. Create a user for a company first.</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -2206,7 +2233,7 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
               <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
                 <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent className="!rounded-none border-[#b8c4d4]">
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
+                  {customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
