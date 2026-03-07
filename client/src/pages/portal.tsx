@@ -9,6 +9,7 @@ import {
   Cable,
   ChevronDown,
   CreditCard,
+  Download,
   FileText,
   Globe,
   HardHat,
@@ -585,18 +586,45 @@ export default function PortalPage() {
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Date</TableHead>
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Status</TableHead>
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-right">Total</TableHead>
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-8 text-xs text-slate-500">No invoices found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs text-slate-500">No invoices found</TableCell></TableRow>
                     ) : (
                       invoices.map((inv) => (
-                        <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`invoice-${inv.id}`}>
+                        <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50" data-testid={`invoice-${inv.id}`}>
                           <TableCell className="text-xs font-medium text-slate-900">{inv.number}</TableCell>
                           <TableCell className="text-xs text-slate-600">{inv.date}</TableCell>
                           <TableCell><StatusBadge status={inv.status} /></TableCell>
                           <TableCell className="text-xs font-semibold text-slate-900 text-right">{inv.total}</TableCell>
+                          <TableCell className="text-center">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/invoices/${inv.id}/pdf`, {
+                                    headers: { Authorization: `Bearer ${token}` },
+                                  });
+                                  if (!res.ok) return;
+                                  const blob = await res.blob();
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `${inv.number}.pdf`;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
+                                } catch {}
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                              data-testid={`button-download-invoice-${inv.id}`}
+                            >
+                              <Download className="h-3 w-3" />
+                              PDF
+                            </button>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
