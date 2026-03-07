@@ -135,7 +135,7 @@ function PermissionCheckboxGrid({ perms, onChange }: { perms: PermissionKeys; on
           <div className="text-[9px] font-semibold text-[#999] uppercase tracking-wider mb-[2px]">{group.label}</div>
           <div className="grid grid-cols-2 gap-x-2 gap-y-[1px]">
             {group.keys.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-[4px] text-[10px] text-[#1e1e1e] cursor-pointer hover:bg-[#f3f3f3] px-1 py-[1px]">
+              <label key={key} className="flex items-center gap-[4px] text-[10px] text-[#1e1e1e] cursor-pointer hover:bg-[#eef1f6] px-1 py-[1px]">
                 <input
                   type="checkbox"
                   checked={perms[key]}
@@ -181,23 +181,23 @@ function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     active: "bg-[#dff6dd] text-[#1e7b34]",
     suspended: "bg-[#fff4ce] text-[#9d6b00]",
-    new: "bg-[#cce4f7] text-[#0078d4]",
-    open: "bg-[#cce4f7] text-[#0078d4]",
+    new: "bg-[#cce4f7] text-[#2563eb]",
+    open: "bg-[#cce4f7] text-[#2563eb]",
     waiting: "bg-[#fff4ce] text-[#9d6b00]",
-    resolved: "bg-[#e8e8e8] text-[#666]",
-    low: "bg-[#e8e8e8] text-[#666]",
-    normal: "bg-[#e8e8e8] text-[#666]",
+    resolved: "bg-[#dce3ed] text-[#666]",
+    low: "bg-[#dce3ed] text-[#666]",
+    normal: "bg-[#dce3ed] text-[#666]",
     high: "bg-[#fff4ce] text-[#9d6b00]",
     urgent: "bg-[#fde7e9] text-[#c42b1c]",
     admin: "bg-[#e8daef] text-[#6c3483]",
-    customer: "bg-[#cce4f7] text-[#0078d4]",
+    customer: "bg-[#cce4f7] text-[#2563eb]",
     pending: "bg-[#fff4ce] text-[#9d6b00]",
     paid: "bg-[#dff6dd] text-[#1e7b34]",
     past_due: "bg-[#fde7e9] text-[#c42b1c]",
-    provisioning: "bg-[#cce4f7] text-[#0078d4]",
+    provisioning: "bg-[#cce4f7] text-[#2563eb]",
   };
   return (
-    <span className={`inline-block px-[4px] py-[1px] text-[10px] font-medium ${colors[status] || "bg-[#e8e8e8] text-[#666]"}`} style={{ lineHeight: "14px" }}>
+    <span className={`inline-block px-[4px] py-[1px] text-[10px] font-medium ${colors[status] || "bg-[#dce3ed] text-[#666]"}`} style={{ lineHeight: "14px" }}>
       {status.replace("_", " ")}
     </span>
   );
@@ -234,7 +234,7 @@ function DraggableDivider({ onDrag }: { onDrag: (deltaY: number) => void }) {
   return (
     <div
       onMouseDown={handleMouseDown}
-      className="h-[4px] cursor-row-resize bg-[#e8e8e8] border-t border-b border-[#d0d0d0] hover:bg-[#0078d4] active:bg-[#0078d4] flex-shrink-0"
+      className="h-[4px] cursor-row-resize bg-[#dce3ed] border-t border-b border-[#b8c4d4] hover:bg-[#2563eb] active:bg-[#2563eb] flex-shrink-0"
       style={{ minHeight: 4 }}
       data-testid="draggable-divider"
     />
@@ -363,34 +363,34 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="h-dvh flex flex-col bg-[#f3f3f3] overflow-hidden" data-testid="page-admin" style={{ fontSize: "11px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+    <div className="h-dvh flex flex-col bg-[#eef1f6] overflow-hidden" data-testid="page-admin" style={{ fontSize: "11px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
       {/* Menu bar */}
-      <div className="h-[22px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0" data-testid="menu-bar">
-        <span className="font-semibold text-[11px] text-[#1e1e1e] mr-4">911-DC Admin</span>
-        <div className="flex items-center gap-3 text-[11px] text-[#666]">
-          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">File</button>
-          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Edit</button>
-          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">View</button>
-          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Tools</button>
-          <button className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1">Help</button>
+      <div className="h-[22px] bg-[#1b2a4a] border-b border-[#152240] flex items-center px-2 flex-shrink-0" data-testid="menu-bar">
+        <span className="font-semibold text-[11px] text-white mr-4">911-DC Admin</span>
+        <div className="flex items-center gap-3 text-[11px] text-[#8ea4c8]">
+          <button className="hover:text-white hover:bg-[#243656] px-1">File</button>
+          <button className="hover:text-white hover:bg-[#243656] px-1">Edit</button>
+          <button className="hover:text-white hover:bg-[#243656] px-1">View</button>
+          <button className="hover:text-white hover:bg-[#243656] px-1">Tools</button>
+          <button className="hover:text-white hover:bg-[#243656] px-1">Help</button>
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-2 text-[10px] text-[#666]">
+        <div className="flex items-center gap-2 text-[10px] text-[#8ea4c8]">
           <span>{user?.name || "Admin"}</span>
-          <button onClick={handleLogout} className="hover:text-[#1e1e1e] hover:bg-[#e8e8e8] px-1" data-testid="button-logout">Sign Out</button>
+          <button onClick={handleLogout} className="hover:text-white hover:bg-[#243656] px-1" data-testid="button-logout">Sign Out</button>
         </div>
       </div>
 
       {/* Tab bar */}
-      <div className="h-[26px] bg-[#ececec] border-b border-[#d0d0d0] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
+      <div className="h-[26px] bg-[#243656] border-b border-[#1b2a4a] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
         {(["dashboard", "customers", "services", "invoices", "users"] as AdminView[]).map((v) => (
           <button
             key={v}
             onClick={() => setCurrentView(v)}
-            className={`px-3 h-[24px] text-[11px] border border-b-0 border-[#d0d0d0] mr-[1px] flex items-center ${
+            className={`px-3 h-[24px] text-[11px] border border-b-0 mr-[1px] flex items-center ${
               currentView === v
-                ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-b-[#ffffff] -mb-[1px] z-10"
-                : "bg-[#e8e8e8] text-[#666] hover:bg-[#f3f3f3]"
+                ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4] border-b-[#ffffff] -mb-[1px] z-10"
+                : "bg-[#1e3050] text-[#8ea4c8] border-[#1b2a4a] hover:bg-[#2c4060] hover:text-white"
             }`}
             data-testid={`tab-${v}`}
           >
@@ -400,7 +400,7 @@ export default function AdminPage() {
       </div>
 
       {/* Breadcrumb bar */}
-      <div className="h-[18px] bg-[#ffffff] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 text-[10px] text-[#666]" data-testid="breadcrumb-bar">
+      <div className="h-[18px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 text-[10px] text-[#5a6a82]" data-testid="breadcrumb-bar">
         <span>911-DC</span>
         <ChevronRight className="h-[10px] w-[10px] mx-1" />
         <span>Admin</span>
@@ -408,12 +408,12 @@ export default function AdminPage() {
         <span className="text-[#1e1e1e] font-medium">{viewLabels[currentView]}</span>
         <div className="flex-1" />
         <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
+          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#8a96a8]" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
-            className="h-[16px] w-[140px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]"
+            className="h-[16px] w-[140px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]"
             data-testid="input-global-search"
           />
         </div>
@@ -422,25 +422,25 @@ export default function AdminPage() {
       {/* Main body */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-[140px] bg-[#ffffff] border-r border-[#d0d0d0] flex flex-col overflow-y-auto flex-shrink-0" data-testid="sidebar">
+        <div className="w-[140px] bg-[#2c3e5a] border-r border-[#1b2a4a] flex flex-col overflow-y-auto flex-shrink-0" data-testid="sidebar">
           {sidebarItems.map((group) => (
             <div key={group.section}>
-              <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#999] uppercase tracking-wider">{group.section}</div>
+              <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#6b8ab5] uppercase tracking-wider">{group.section}</div>
               {group.items.map((item) => (
                 <button
                   key={item.label}
                   onClick={() => item.view && setCurrentView(item.view)}
                   className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
                     item.view && currentView === item.view
-                      ? "bg-[#cce4f7] text-[#1e1e1e] font-medium"
-                      : "text-[#1e1e1e] hover:bg-[#e8e8e8]"
+                      ? "bg-[#3b82f6] text-white font-medium"
+                      : "text-[#c8d6e5] hover:bg-[#374f6f] hover:text-white"
                   }`}
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                 >
                   <item.icon className="h-[12px] w-[12px] flex-shrink-0" />
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge !== undefined && (
-                    <span className="text-[9px] text-[#666] bg-[#e8e8e8] px-[3px]">{item.badge}</span>
+                    <span className="text-[9px] text-[#c8d6e5] bg-[#1b2a4a] px-[3px] rounded-sm">{item.badge}</span>
                   )}
                 </button>
               ))}
@@ -449,7 +449,7 @@ export default function AdminPage() {
           <div className="flex-1" />
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-[4px] px-2 py-[3px] text-[11px] text-[#666] hover:bg-[#e8e8e8] border-t border-[#d0d0d0]"
+            className="w-full flex items-center gap-[4px] px-2 py-[3px] text-[11px] text-[#8ea4c8] hover:bg-[#374f6f] hover:text-white border-t border-[#1b2a4a]"
             data-testid="button-sidebar-logout"
           >
             <LogOut className="h-[12px] w-[12px]" />
@@ -478,7 +478,7 @@ export default function AdminPage() {
       </div>
 
       {/* Status bar */}
-      <div className="h-[18px] bg-[#0078d4] flex items-center px-2 flex-shrink-0 text-[10px] text-white" data-testid="status-bar">
+      <div className="h-[18px] bg-[#1b2a4a] flex items-center px-2 flex-shrink-0 text-[10px] text-[#8ea4c8]" data-testid="status-bar">
         <span>Ready</span>
         <div className="flex-1" />
         <span className="mr-3">{allUsers.length} users</span>
@@ -508,7 +508,7 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
       <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
         <div className="p-2">
           <div className="text-[12px] font-semibold text-[#1e1e1e] mb-2">Operations Overview</div>
-          <div className="grid grid-cols-4 gap-[1px] bg-[#d0d0d0] border border-[#d0d0d0] mb-2">
+          <div className="grid grid-cols-4 gap-[1px] bg-[#b8c4d4] border border-[#b8c4d4] mb-2">
             {[
               { label: "Open Tickets", value: "3", sub: "1 urgent", color: "#c42b1c" },
               { label: "SmartHands Queue", value: "2", sub: "1 high priority", color: "#9d6b00" },
@@ -524,24 +524,24 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
           </div>
           <table className="w-full border-collapse" data-testid="table-tickets">
             <thead>
-              <tr className="bg-[#e8e8e8]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Subject</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Category</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Priority</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Assignee</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Updated</th>
+              <tr className="bg-[#dce3ed]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Subject</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Category</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Priority</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Assignee</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Updated</th>
               </tr>
             </thead>
             <tbody>
               {tickets.map((t, i) => (
-                <tr key={t.id} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{t.subject}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0] capitalize">{t.category.replace("_", " ")}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={t.priority} /></td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={t.status} /></td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{t.assignee}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0] text-right">{t.updatedAt}</td>
+                <tr key={t.id} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{t.subject}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] capitalize">{t.category.replace("_", " ")}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.priority} /></td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.status} /></td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assignee}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{t.updatedAt}</td>
                 </tr>
               ))}
             </tbody>
@@ -555,7 +555,7 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
       <div className="flex-1 overflow-auto bg-[#ffffff] border-t-0">
         <div className="p-2">
           <div className="text-[11px] font-semibold text-[#1e1e1e] mb-2">Quick Actions</div>
-          <div className="grid grid-cols-6 gap-[1px] bg-[#d0d0d0] border border-[#d0d0d0]">
+          <div className="grid grid-cols-6 gap-[1px] bg-[#b8c4d4] border border-[#b8c4d4]">
             {[
               { icon: Building2, label: "Customers" },
               { icon: Server, label: "Services" },
@@ -567,10 +567,10 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
               <button
                 key={action.label}
                 onClick={action.onClick}
-                className="bg-[#ffffff] hover:bg-[#cce4f7] p-2 flex flex-col items-center gap-1"
+                className="bg-[#ffffff] hover:bg-[#d4e4f7] p-2 flex flex-col items-center gap-1"
                 data-testid={`button-quick-${action.label.toLowerCase()}`}
               >
-                <action.icon className="h-[14px] w-[14px] text-[#0078d4]" />
+                <action.icon className="h-[14px] w-[14px] text-[#2563eb]" />
                 <span className="text-[10px] text-[#1e1e1e]">{action.label}</span>
               </button>
             ))}
@@ -609,11 +609,11 @@ function UsersView({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={onNewUser} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-user">
+      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={onNewUser} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-user">
           <Plus className="h-[10px] w-[10px]" />New User
         </button>
-        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
         <span className="text-[10px] text-[#666]">{users.length} users</span>
         <div className="flex-1" />
         <div className="relative">
@@ -622,7 +622,7 @@ function UsersView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter users..."
-            className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]"
+            className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]"
             data-testid="input-search-users"
           />
         </div>
@@ -637,15 +637,15 @@ function UsersView({
         ) : (
           <table className="w-full border-collapse" data-testid="table-users">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-[#e8e8e8]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Name</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Username</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Email</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Role</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Permissions</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Company</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              <tr className="bg-[#dce3ed]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Name</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Username</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Email</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Role</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Permissions</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Company</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -653,14 +653,14 @@ function UsersView({
                 <tr
                   key={u.id}
                   onClick={() => setSelectedId(u.id)}
-                  className={`cursor-pointer ${selectedId === u.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  className={`cursor-pointer ${selectedId === u.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
                   data-testid={`row-user-${u.id}`}
                 >
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{u.name}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.role} /></td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]">
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{u.name}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.username}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.email}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={u.role} /></td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]">
                     {u.role === "customer" ? (
                       <div className="flex flex-wrap gap-[2px]" data-testid={`perms-summary-${u.id}`}>
                         {getPermSummaryBadges(u).map((b) => (
@@ -672,10 +672,10 @@ function UsersView({
                       <span className="text-[9px] text-[#999]">all</span>
                     )}
                   </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.companyName || "—"}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={u.active ? "active" : "suspended"} /></td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); onEditUser(u); }} className="text-[#0078d4] hover:underline text-[10px] mr-2" data-testid={`button-edit-user-${u.id}`}>Edit</button>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.companyName || "—"}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={u.active ? "active" : "suspended"} /></td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); onEditUser(u); }} className="text-[#2563eb] hover:underline text-[10px] mr-2" data-testid={`button-edit-user-${u.id}`}>Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); onDeleteUser(u.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-user-${u.id}`}>Del</button>
                   </td>
                 </tr>
@@ -691,7 +691,7 @@ function UsersView({
       <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
         {selectedUser ? (
           <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">User Details - {selectedUser.name}</div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">User Details - {selectedUser.name}</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
               <div><span className="text-[#666]">Username:</span> <span className="text-[#1e1e1e]">{selectedUser.username}</span></div>
               <div><span className="text-[#666]">Email:</span> <span className="text-[#1e1e1e]">{selectedUser.email}</span></div>
@@ -814,8 +814,8 @@ function UserModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
-        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingUser ? "Edit User" : "New User"}</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">
             {editingUser ? "Update user details and permissions" : "Create a new admin or customer account"}
@@ -825,12 +825,12 @@ function UserModal({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Username</label>
-              <input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required disabled={!!editingUser} data-testid="input-new-username" />
+              <input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required disabled={!!editingUser} data-testid="input-new-username" />
             </div>
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Password {editingUser && <span className="text-[#999]">(blank=keep)</span>}</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full h-[22px] px-1 pr-5 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required={!editingUser} data-testid="input-new-password" />
+                <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full h-[22px] px-1 pr-5 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required={!editingUser} data-testid="input-new-password" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[#999] hover:text-[#1e1e1e]">
                   {showPassword ? <EyeOff className="h-[12px] w-[12px]" /> : <Eye className="h-[12px] w-[12px]" />}
                 </button>
@@ -840,19 +840,19 @@ function UserModal({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Full Name</label>
-              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required data-testid="input-new-name" />
+              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required data-testid="input-new-name" />
             </div>
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Email</label>
-              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" required data-testid="input-new-email" />
+              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required data-testid="input-new-email" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">System Role</label>
               <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]" data-testid="select-role"><SelectValue /></SelectTrigger>
-                <SelectContent className="!rounded-none border-[#d0d0d0]">
+                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]" data-testid="select-role"><SelectValue /></SelectTrigger>
+                <SelectContent className="!rounded-none border-[#b8c4d4]">
                   <SelectItem value="customer" className="text-[11px]">Customer</SelectItem>
                   <SelectItem value="admin" className="text-[11px]">Admin</SelectItem>
                 </SelectContent>
@@ -860,7 +860,7 @@ function UserModal({
             </div>
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Company Name</label>
-              <input value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]" placeholder="Optional" data-testid="input-new-company" />
+              <input value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" placeholder="Optional" data-testid="input-new-company" />
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -869,14 +869,14 @@ function UserModal({
           </div>
 
           {formData.role === "customer" && (
-            <div className="border border-[#d0d0d0] bg-[#fafafa]">
-              <div className="bg-[#e8e8e8] px-2 py-[3px] flex items-center justify-between border-b border-[#d0d0d0]">
+            <div className="border border-[#b8c4d4] bg-[#fafafa]">
+              <div className="bg-[#dce3ed] px-2 py-[3px] flex items-center justify-between border-b border-[#b8c4d4]">
                 <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
                 <div className="flex items-center gap-1">
                   <span className="text-[9px] text-[#666]">Template:</span>
                   <Select value={roleTemplate} onValueChange={handleTemplateChange}>
-                    <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#d0d0d0] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#b8c4d4] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#b8c4d4]">
                       {ROLE_TEMPLATES.map((t) => (
                         <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
                       ))}
@@ -887,15 +887,15 @@ function UserModal({
               <div className="p-2">
                 <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
               </div>
-              <div className="bg-[#f3f3f3] border-t border-[#d0d0d0] px-2 py-[2px] text-[9px] text-[#666]">
+              <div className="bg-[#eef1f6] border-t border-[#b8c4d4] px-2 py-[2px] text-[9px] text-[#666]">
                 {getActivePermCount(perms)} of 15 permissions enabled
               </div>
             </div>
           )}
 
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-user">
               {loading ? "Saving..." : editingUser ? "Update" : "Create"}
             </button>
           </div>
@@ -1021,16 +1021,16 @@ function CustomersView({ token }: { token: string | null }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden" data-testid="customers-view">
       {/* Toolbar */}
-      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-add-customer">
+      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-add-customer">
           <Plus className="h-[10px] w-[10px]" />Add Customer
         </button>
-        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
         <span className="text-[10px] text-[#666]">{companies.length} customers</span>
         <div className="flex-1" />
         <div className="relative">
           <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input placeholder="Filter..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" data-testid="input-customer-search" />
+          <input placeholder="Filter..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" data-testid="input-customer-search" />
         </div>
       </div>
 
@@ -1041,14 +1041,14 @@ function CustomersView({ token }: { token: string | null }) {
         ) : (
           <table className="w-full border-collapse" data-testid="table-customers">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-[#e8e8e8]">
-                <th className="w-[16px] py-[2px] px-1 border border-[#d0d0d0]"></th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Company Name</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Contact</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Email</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Phone</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              <tr className="bg-[#dce3ed]">
+                <th className="w-[16px] py-[2px] px-1 border border-[#b8c4d4]"></th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Company Name</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Contact</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Email</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Phone</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1056,22 +1056,22 @@ function CustomersView({ token }: { token: string | null }) {
                 <tr
                   key={c.id}
                   onClick={() => handleSelect(c.id)}
-                  className={`cursor-pointer ${selectedId === c.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  className={`cursor-pointer ${selectedId === c.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
                   data-testid={`card-customer-${c.id}`}
                 >
-                  <td className="py-[2px] px-1 border border-[#d0d0d0] text-center">
+                  <td className="py-[2px] px-1 border border-[#b8c4d4] text-center">
                     {expandedId === c.id ? <ChevronDown className="h-[10px] w-[10px] inline" /> : <ChevronRight className="h-[10px] w-[10px] inline" />}
                   </td>
-                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#d0d0d0]">
+                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#b8c4d4]">
                     {c.name}
                     {!c.active && <span className="ml-1 text-[9px] text-[#c42b1c]">[Inactive]</span>}
                   </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.contactName || "—"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.email || "—"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{c.phone || "—"}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={c.active ? "active" : "suspended"} /></td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingCompany(c); setShowCompanyModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-2" data-testid={`button-edit-customer-${c.id}`}>Edit</button>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.contactName || "—"}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.email || "—"}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.phone || "—"}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={c.active ? "active" : "suspended"} /></td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingCompany(c); setShowCompanyModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-2" data-testid={`button-edit-customer-${c.id}`}>Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); handleDeleteCompany(c.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-customer-${c.id}`}>Del</button>
                   </td>
                 </tr>
@@ -1087,7 +1087,7 @@ function CustomersView({ token }: { token: string | null }) {
       <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
         {selectedCompany ? (
           <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">
               Customer Details - {selectedCompany.name}
             </div>
             <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
@@ -1098,9 +1098,9 @@ function CustomersView({ token }: { token: string | null }) {
               <div><span className="text-[#666]">Notes:</span> <span className="text-[#1e1e1e]">{selectedCompany.notes || "—"}</span></div>
             </div>
 
-            <div className="flex items-center justify-between mb-1 border-b border-[#d0d0d0] pb-1">
+            <div className="flex items-center justify-between mb-1 border-b border-[#b8c4d4] pb-1">
               <span className="text-[10px] font-semibold text-[#1e1e1e]">Associated Users</span>
-              <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="flex items-center gap-[2px] text-[10px] text-[#0078d4] hover:underline" data-testid={`button-add-user-${selectedCompany.id}`}>
+              <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="flex items-center gap-[2px] text-[10px] text-[#2563eb] hover:underline" data-testid={`button-add-user-${selectedCompany.id}`}>
                 <Plus className="h-[10px] w-[10px]" />Add User
               </button>
             </div>
@@ -1111,21 +1111,21 @@ function CustomersView({ token }: { token: string | null }) {
             ) : (
               <table className="w-full border-collapse" data-testid="table-customer-users">
                 <thead>
-                  <tr className="bg-[#e8e8e8]">
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Name</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Username</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Email</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]">Permissions</th>
-                    <th className="text-center text-[10px] font-semibold py-[2px] px-2 border border-[#d0d0d0]"></th>
+                  <tr className="bg-[#dce3ed]">
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Name</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Username</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Email</th>
+                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Permissions</th>
+                    <th className="text-center text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {expandedUsers.map((u, i) => (
-                    <tr key={u.id} className={i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} data-testid={`row-customer-user-${u.id}`}>
-                      <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">{u.name}</td>
-                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.username}</td>
-                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{u.email}</td>
-                      <td className="py-[2px] px-2 border border-[#d0d0d0]">
+                    <tr key={u.id} className={i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} data-testid={`row-customer-user-${u.id}`}>
+                      <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{u.name}</td>
+                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.username}</td>
+                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.email}</td>
+                      <td className="py-[2px] px-2 border border-[#b8c4d4]">
                         <div className="flex flex-wrap gap-[2px]">
                           {getPermSummaryBadges(u).map((b) => (
                             <span key={b} className="inline-block px-[3px] py-0 text-[8px] font-medium bg-[#e8daef] text-[#6c3483]" style={{ lineHeight: "12px" }}>{b}</span>
@@ -1133,7 +1133,7 @@ function CustomersView({ token }: { token: string | null }) {
                           {getPermSummaryBadges(u).length === 0 && <span className="text-[9px] text-[#999]">none</span>}
                         </div>
                       </td>
-                      <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
+                      <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
                         <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-remove-user-${u.id}`}>Remove</button>
                       </td>
                     </tr>
@@ -1193,12 +1193,12 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
     }
   }
 
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
-        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+      <DialogContent className="max-w-md !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
+        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
         </div>
@@ -1243,9 +1243,9 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
             <label className="text-[10px] text-[#666] block mb-[2px]">Notes</label>
             <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} data-testid="input-company-notes" />
           </div>
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-customer">
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-customer">
               {saving ? "Saving..." : editing ? "Update" : "Create"}
             </button>
           </div>
@@ -1310,12 +1310,12 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
     }
   }
 
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
-        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+      <DialogContent className="max-w-md !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
+        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">Add User to Customer</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">Create a new user account linked to this company.</DialogDescription>
         </div>
@@ -1341,14 +1341,14 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
             </div>
           </div>
 
-          <div className="border border-[#d0d0d0] bg-[#fafafa]">
-            <div className="bg-[#e8e8e8] px-2 py-[3px] flex items-center justify-between border-b border-[#d0d0d0]">
+          <div className="border border-[#b8c4d4] bg-[#fafafa]">
+            <div className="bg-[#dce3ed] px-2 py-[3px] flex items-center justify-between border-b border-[#b8c4d4]">
               <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
               <div className="flex items-center gap-1">
                 <span className="text-[9px] text-[#666]">Template:</span>
                 <Select value={roleTemplate} onValueChange={handleTemplateChange}>
-                  <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#d0d0d0] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
-                  <SelectContent className="!rounded-none border-[#d0d0d0]">
+                  <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#b8c4d4] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                  <SelectContent className="!rounded-none border-[#b8c4d4]">
                     {ROLE_TEMPLATES.map((t) => (
                       <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
                     ))}
@@ -1359,14 +1359,14 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
             <div className="p-2">
               <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
             </div>
-            <div className="bg-[#f3f3f3] border-t border-[#d0d0d0] px-2 py-[2px] text-[9px] text-[#666]">
+            <div className="bg-[#eef1f6] border-t border-[#b8c4d4] px-2 py-[2px] text-[9px] text-[#666]">
               {getActivePermCount(perms)} of 15 permissions enabled
             </div>
           </div>
 
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white" data-testid="button-save-user">
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-user">
               {saving ? "Saving..." : "Add User"}
             </button>
           </div>
@@ -1465,16 +1465,16 @@ function ServicesView({ token }: { token: string | null }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={() => { setEditingService(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-service">
+      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={() => { setEditingService(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-service">
           <Plus className="h-[10px] w-[10px]" />New Service
         </button>
-        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
         <span className="text-[10px] text-[#666]">{services.length} services</span>
         <div className="flex-1" />
         <div className="relative">
           <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" />
         </div>
       </div>
 
@@ -1485,14 +1485,14 @@ function ServicesView({ token }: { token: string | null }) {
         ) : (
           <table className="w-full border-collapse" data-testid="table-services">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-[#e8e8e8]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Service</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Type</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Location</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Monthly</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Monitoring</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              <tr className="bg-[#dce3ed]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Service</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Type</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Location</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Monthly</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Monitoring</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1500,22 +1500,22 @@ function ServicesView({ token }: { token: string | null }) {
                 <tr
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
-                  className={`cursor-pointer ${selectedId === s.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  className={`cursor-pointer ${selectedId === s.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
                   data-testid={`row-service-${s.id}`}
                 >
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">
                     <div>{s.name}</div>
                     {s.details && <div className="text-[9px] text-[#666]">{s.details}</div>}
                   </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{s.type}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{s.location}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={s.status} /></td>
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0] text-right font-medium">${Number(s.monthlyPrice).toFixed(2)}</td>
-                  <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{s.type}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{s.location}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={s.status} /></td>
+                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] text-right font-medium">${Number(s.monthlyPrice).toFixed(2)}</td>
+                  <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">
                     {s.grafanaUrl ? "Grafana" : s.snmpHost ? "SNMP/PDU" : "—"}
                   </td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingService(s); setShowModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-2">Edit</button>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingService(s); setShowModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-2">Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
                   </td>
                 </tr>
@@ -1531,7 +1531,7 @@ function ServicesView({ token }: { token: string | null }) {
       <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
         {selectedService ? (
           <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">Service Details - {selectedService.name}</div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">Service Details - {selectedService.name}</div>
             <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
               <div><span className="text-[#666]">Type:</span> <span className="text-[#1e1e1e]">{selectedService.type}</span></div>
               <div><span className="text-[#666]">Location:</span> <span className="text-[#1e1e1e]">{selectedService.location}</span></div>
@@ -1542,7 +1542,7 @@ function ServicesView({ token }: { token: string | null }) {
             </div>
             {selectedService.grafanaUrl && (
               <div className="mb-2">
-                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#d0d0d0] pb-1 mb-1">Grafana Configuration</div>
+                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-1">Grafana Configuration</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
                   <div><span className="text-[#666]">URL:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaUrl}</span></div>
                   <div><span className="text-[#666]">Dashboard UID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaDashboardUid || "—"}</span></div>
@@ -1554,7 +1554,7 @@ function ServicesView({ token }: { token: string | null }) {
             )}
             {selectedService.snmpHost && (
               <div>
-                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#d0d0d0] pb-1 mb-1">SNMP/PDU Configuration</div>
+                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-1">SNMP/PDU Configuration</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
                   <div><span className="text-[#666]">Host:</span> <span className="text-[#1e1e1e]">{selectedService.snmpHost}</span></div>
                   <div><span className="text-[#666]">Port:</span> <span className="text-[#1e1e1e]">{selectedService.snmpPort || 161}</span></div>
@@ -1717,12 +1717,12 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
     "365 Data Centers FLL", "EdgeConneX Miami", "QTS MIA1", "CoreSite MI1", "South Reach Networks",
   ];
   const serviceTypes = ["Colocation", "Internet", "Network", "Cross-Connect", "SmartHands", "DDoS Protection"];
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
-        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
+        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingService ? "Edit Service" : "New Service"}</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">
             {editingService ? "Update service details" : "Create a new customer service"}
@@ -1730,14 +1730,14 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-[#ececec] border-b border-[#d0d0d0]">
+        <div className="flex bg-[#ececec] border-b border-[#b8c4d4]">
           {(["general", "grafana", "snmp"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-[4px] text-[11px] border-r border-[#d0d0d0] ${
-                activeTab === tab ? "bg-[#ffffff] font-medium text-[#1e1e1e]" : "text-[#666] hover:bg-[#f3f3f3]"
+              className={`px-3 py-[4px] text-[11px] border-r border-[#b8c4d4] ${
+                activeTab === tab ? "bg-[#ffffff] font-medium text-[#1e1e1e]" : "text-[#666] hover:bg-[#eef1f6]"
               }`}
             >
               {tab === "general" ? "General" : tab === "grafana" ? "Grafana" : "SNMP/PDU"}
@@ -1751,8 +1751,8 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
               <div>
                 <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
                 <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                  <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent className="!rounded-none border-[#d0d0d0]">
+                  <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent className="!rounded-none border-[#b8c4d4]">
                     {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -1765,8 +1765,8 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                 <div>
                   <label className="text-[10px] text-[#666] block mb-[2px]">Type</label>
                   <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#b8c4d4]">
                       {serviceTypes.map((t) => <SelectItem key={t} value={t} className="text-[11px]">{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -1776,8 +1776,8 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                 <div>
                   <label className="text-[10px] text-[#666] block mb-[2px]">Location</label>
                   <Select value={formData.location} onValueChange={(v) => setFormData({ ...formData, location: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#b8c4d4]">
                       {locations.map((l) => <SelectItem key={l} value={l} className="text-[11px]">{l}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -1785,8 +1785,8 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                 <div>
                   <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
                   <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#b8c4d4]">
                       <SelectItem value="active" className="text-[11px]">Active</SelectItem>
                       <SelectItem value="provisioning" className="text-[11px]">Provisioning</SelectItem>
                       <SelectItem value="suspended" className="text-[11px]">Suspended</SelectItem>
@@ -1813,7 +1813,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
 
           {activeTab === "grafana" && (
             <>
-              <div className="text-[10px] text-[#666] bg-[#f3f3f3] border border-[#d0d0d0] p-2 mb-1">
+              <div className="text-[10px] text-[#666] bg-[#eef1f6] border border-[#b8c4d4] p-2 mb-1">
                 Configure Grafana panel embedding for network traffic monitoring. The customer portal will display the specified panel as an iframe.
               </div>
               <div>
@@ -1845,7 +1845,7 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
 
           {activeTab === "snmp" && (
             <>
-              <div className="text-[10px] text-[#666] bg-[#f3f3f3] border border-[#d0d0d0] p-2 mb-1">
+              <div className="text-[10px] text-[#666] bg-[#eef1f6] border border-[#b8c4d4] p-2 mb-1">
                 Configure SNMP for PDU port management. Requires read/write community string for reboot capability.
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -1866,8 +1866,8 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
                 <div>
                   <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Version</label>
                   <Select value={formData.snmpVersion} onValueChange={(v) => setFormData({ ...formData, snmpVersion: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#d0d0d0]">
+                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="!rounded-none border-[#b8c4d4]">
                       <SelectItem value="v1" className="text-[11px]">v1</SelectItem>
                       <SelectItem value="v2c" className="text-[11px]">v2c</SelectItem>
                       <SelectItem value="v3" className="text-[11px]">v3</SelectItem>
@@ -1890,9 +1890,9 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
             </>
           )}
 
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white">
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
               {loading ? "Saving..." : editingService ? "Update" : "Create"}
             </button>
           </div>
@@ -2017,19 +2017,19 @@ function InvoicesView({ token }: { token: string | null }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="h-[24px] bg-[#f3f3f3] border-b border-[#d0d0d0] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={handleRunBilling} disabled={billingRunning} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff] disabled:opacity-50" data-testid="button-run-billing">
+      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
+        <button onClick={handleRunBilling} disabled={billingRunning} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff] disabled:opacity-50" data-testid="button-run-billing">
           {billingRunning ? <Loader2 className="h-[10px] w-[10px] animate-spin" /> : <CreditCard className="h-[10px] w-[10px]" />}Run Billing
         </button>
-        <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#e8e8e8] px-1 py-[1px] border border-[#d0d0d0] bg-[#ffffff]" data-testid="button-new-invoice">
+        <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-invoice">
           <Plus className="h-[10px] w-[10px]" />New Invoice
         </button>
-        <div className="h-[14px] w-[1px] bg-[#d0d0d0]" />
+        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
         <span className="text-[10px] text-[#666]">{invoices.length} invoices</span>
         <div className="flex-1" />
         <div className="relative">
           <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#d0d0d0] outline-none focus:border-[#0078d4]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" />
         </div>
       </div>
 
@@ -2040,13 +2040,13 @@ function InvoicesView({ token }: { token: string | null }) {
         ) : (
           <table className="w-full border-collapse" data-testid="table-invoices">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-[#e8e8e8]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Invoice #</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Issue Date</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Due Date</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Status</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Total</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#d0d0d0]">Actions</th>
+              <tr className="bg-[#dce3ed]">
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Invoice #</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Issue Date</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Due Date</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
+                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Total</th>
+                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2054,17 +2054,17 @@ function InvoicesView({ token }: { token: string | null }) {
                 <tr
                   key={inv.id}
                   onClick={() => setSelectedId(inv.id)}
-                  className={`cursor-pointer ${selectedId === inv.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f7f7f7]"} hover:bg-[#cce4f7]`}
+                  className={`cursor-pointer ${selectedId === inv.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
                   data-testid={`invoice-${inv.id}`}
                 >
-                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#d0d0d0]">{inv.invoiceNumber}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{new Date(inv.issueDate).toLocaleDateString()}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#d0d0d0]">{new Date(inv.dueDate).toLocaleDateString()}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0]"><StatusBadge status={inv.status} /></td>
-                  <td className="text-[11px] text-[#1e1e1e] font-semibold py-[2px] px-2 border border-[#d0d0d0] text-right">${Number(inv.total).toFixed(2)}</td>
-                  <td className="py-[2px] px-2 border border-[#d0d0d0] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(inv.id, inv.invoiceNumber); }} className="text-[#0078d4] hover:underline text-[10px] mr-1" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">PDF</button>
-                    <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setShowModal(true); }} className="text-[#0078d4] hover:underline text-[10px] mr-1">Edit</button>
+                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#b8c4d4]">{inv.invoiceNumber}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.issueDate).toLocaleDateString()}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={inv.status} /></td>
+                  <td className="text-[11px] text-[#1e1e1e] font-semibold py-[2px] px-2 border border-[#b8c4d4] text-right">${Number(inv.total).toFixed(2)}</td>
+                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
+                    <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(inv.id, inv.invoiceNumber); }} className="text-[#2563eb] hover:underline text-[10px] mr-1" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">PDF</button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setShowModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-1">Edit</button>
                     <button onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
                   </td>
                 </tr>
@@ -2080,7 +2080,7 @@ function InvoicesView({ token }: { token: string | null }) {
       <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
         {selectedInvoice ? (
           <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#d0d0d0] pb-1">Invoice Details - {selectedInvoice.invoiceNumber}</div>
+            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">Invoice Details - {selectedInvoice.invoiceNumber}</div>
             <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px]">
               <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedInvoice.status} /></div>
               <div><span className="text-[#666]">Issue Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</span></div>
@@ -2188,12 +2188,12 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
     }
   }
 
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#d0d0d0] bg-[#ffffff] outline-none focus:border-[#0078d4]";
+  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#d0d0d0] !shadow-none !p-0">
-        <div className="bg-[#f3f3f3] border-b border-[#d0d0d0] px-3 py-[6px]">
+      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
+        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
           <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
           <DialogDescription className="text-[10px] text-[#666]">
             {editingInvoice ? "Update invoice details" : "Create a new customer invoice"}
@@ -2204,8 +2204,8 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
               <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent className="!rounded-none border-[#d0d0d0]">
+                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <SelectContent className="!rounded-none border-[#b8c4d4]">
                   {customers.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -2236,14 +2236,14 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
             </div>
             <div>
               <label className="text-[10px] text-[#666] block mb-[2px]">Total ($)</label>
-              <input value={formData.total} className={`${inputCls} bg-[#f3f3f3]`} readOnly />
+              <input value={formData.total} className={`${inputCls} bg-[#eef1f6]`} readOnly />
             </div>
           </div>
           <div>
             <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
             <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#d0d0d0]"><SelectValue /></SelectTrigger>
-              <SelectContent className="!rounded-none border-[#d0d0d0]">
+              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
+              <SelectContent className="!rounded-none border-[#b8c4d4]">
                 <SelectItem value="pending" className="text-[11px]">Pending</SelectItem>
                 <SelectItem value="open" className="text-[11px]">Open</SelectItem>
                 <SelectItem value="paid" className="text-[11px]">Paid</SelectItem>
@@ -2251,9 +2251,9 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#d0d0d0]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#d0d0d0] bg-[#e8e8e8] hover:bg-[#d0d0d0] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#0078d4] bg-[#0078d4] hover:bg-[#106ebe] text-white">
+          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
+            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
+            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
               {loading ? "Saving..." : editingInvoice ? "Update" : "Create"}
             </button>
           </div>

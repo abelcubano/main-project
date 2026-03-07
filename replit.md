@@ -124,9 +124,9 @@ The database schema is shared between frontend and backend through the `shared/`
 - **Customer portal**: Time range selector (6h, 24h, 7d, 30d), auto-constructs iframe src from config
 
 ### Admin Portal UI Style
-- **Design**: Native desktop application aesthetic (pgAdmin/SSMS/VS Code light theme)
+- **Design**: Native desktop application aesthetic (pgAdmin/SSMS/Ubersmith-inspired dark navy)
 - **Layout**: Menu bar (22px), tab bar (26px), breadcrumb (18px), tree sidebar (140px), draggable split panels, status bar (18px)
-- **Colors**: bg #f3f3f3, panels #ffffff, table headers #e8e8e8, borders #d0d0d0, text #1e1e1e, accent #0078d4, selected #cce4f7
+- **Colors**: Menu bar #1b2a4a, tab bar #243656, sidebar #2c3e5a, sidebar text #c8d6e5, active nav #3b82f6, breadcrumb #f0f2f5, content bg #eef1f6, panels #ffffff, table headers #dce3ed, borders #b8c4d4, text #1e1e1e, accent #2563eb, hover rows #d4e4f7, alt rows #f0f2f7, status bar #1b2a4a
 - **Density**: 10-12px fonts, 18-22px table rows, 1px borders, no rounded corners/shadows, alternating row colors
 
 ### Planned Integrations (Future)
