@@ -212,7 +212,8 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
 
 export async function sendInvoiceEmail(
   data: InvoiceEmailData,
-  templateOverride?: { subject?: string; body?: string }
+  templateOverride?: { subject?: string; body?: string },
+  pdfBuffer?: Buffer
 ): Promise<{ success: boolean; error?: string }> {
   const fromAddress = process.env.MAIL_BILLING_FROM || "abel.monzon@911dc.us";
 
@@ -264,14 +265,22 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
   const textBody = bodyText || `Invoice ${data.invoiceNumber} - $${data.total}\nDue: ${data.dueDate}\n${data.itemCount} service(s)\n\n911-DC`;
 
   try {
-    await transporter.sendMail({
+    const mailOptions: any = {
       from: `"911-DC Billing" <${fromAddress}>`,
       to: data.email,
       subject,
       text: textBody,
       html: htmlBody,
-    });
-    emailLog(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}`);
+    };
+    if (pdfBuffer) {
+      mailOptions.attachments = [{
+        filename: `${data.invoiceNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      }];
+    }
+    await transporter.sendMail(mailOptions);
+    emailLog(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}${pdfBuffer ? " (with PDF)" : ""}`);
     return { success: true };
   } catch (error: any) {
     emailLog(`[EMAIL ERROR] Failed to send invoice email: ${error.message}`);

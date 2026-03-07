@@ -526,6 +526,21 @@ export async function registerRoutes(
           const allUsers = await storage.getAllUsers();
           const customerUsers = allUsers.filter(u => u.customerId === customer.id && u.permBillingReceiveInvoices && u.email);
           const items = await storage.getInvoiceItems(id);
+
+          let pdfBuffer: Buffer | undefined;
+          try {
+            const pdfDoc = generateInvoicePdf({ invoice, items, customer, userName: invoiceUser?.name || "Customer" });
+            const chunks: Buffer[] = [];
+            pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+            pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+              pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+              pdfDoc.on("error", reject);
+              pdfDoc.end();
+            });
+          } catch (pdfErr: any) {
+            console.error("[ADMIN] PDF generation error for approve email:", pdfErr.message);
+          }
+
           for (const recipient of customerUsers) {
             const emailResult = await sendInvoiceEmail(
               {
@@ -541,7 +556,8 @@ export async function registerRoutes(
               {
                 subject: billingSettings.billingEmailSubject,
                 body: billingSettings.billingEmailTemplate,
-              }
+              },
+              pdfBuffer
             );
             console.log(`[ADMIN] Approve email to ${recipient.email}: ${emailResult.success ? "sent" : emailResult.error}`);
           }
