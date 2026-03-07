@@ -342,7 +342,7 @@ export default function PortalPage() {
   }
 
   const { data: servicesData = [] } = useQuery<DbService[]>({
-    queryKey: ["services"],
+    queryKey: ["services", user?.id],
     queryFn: async () => {
       const res = await fetch("/api/services", {
         headers: { Authorization: `Bearer ${token}` },
@@ -354,7 +354,7 @@ export default function PortalPage() {
   });
 
   const { data: invoicesData = [] } = useQuery<DbInvoice[]>({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", user?.id],
     queryFn: async () => {
       const res = await fetch("/api/invoices", {
         headers: { Authorization: `Bearer ${token}` },
