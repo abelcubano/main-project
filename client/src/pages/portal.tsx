@@ -116,7 +116,7 @@ function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: typeof L
   );
 }
 
-type PortalView = "dashboard" | "services" | "invoices" | "tickets" | "settings";
+type PortalView = "dashboard" | "services" | "network" | "invoices" | "tickets" | "settings";
 
 function GrafanaPanel({ service }: { service: Service }) {
   const [timeRange, setTimeRange] = useState("24h");
@@ -440,7 +440,7 @@ export default function PortalPage() {
               <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Services</div>
               <NavItem icon={Server} label="My Services" badge={services.length || undefined} active={activeView === "services"} onClick={() => setActiveView("services")} />
               <NavItem icon={MapPin} label="Locations" />
-              {canSeeTechnical && <NavItem icon={Network} label="Network" />}
+              {canSeeTechnical && <NavItem icon={Network} label="Network" active={activeView === "network"} onClick={() => setActiveView("network")} />}
             </>
           )}
 
@@ -532,13 +532,42 @@ export default function PortalPage() {
                           <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">{s.type}</span>
                         </div>
 
-                        {canSeeTechnical && <GrafanaPanel service={s} />}
-                        {canSeeTechnical && <PduControls service={s} token={token} canManage={canManageTechnical} />}
                       </div>
                     ))
                   )}
                 </div>
               </Card>
+            </motion.div>
+          )}
+
+          {activeView === "network" && canSeeTechnical && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div>
+                <h1 className="text-lg font-semibold text-slate-900">Network</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Traffic monitoring and power management</p>
+              </div>
+              {services.filter(s => s.grafanaUrl || s.snmpHost).length === 0 ? (
+                <Card className="border-slate-200 bg-white p-8 text-center">
+                  <div className="text-xs text-slate-500">No network monitoring configured for your services</div>
+                </Card>
+              ) : (
+                services.filter(s => s.grafanaUrl || s.snmpHost).map((s) => (
+                  <Card key={s.id} className="border-slate-200 bg-white overflow-hidden" data-testid={`network-service-${s.id}`}>
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Server className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-sm font-semibold text-slate-900">{s.name}</span>
+                        <StatusBadge status={s.status} />
+                      </div>
+                      <span className="text-[10px] text-slate-500">{s.location}</span>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <GrafanaPanel service={s} />
+                      <PduControls service={s} token={token} canManage={canManageTechnical} />
+                    </div>
+                  </Card>
+                ))
+              )}
             </motion.div>
           )}
 
