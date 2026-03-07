@@ -1,4 +1,18 @@
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
+
+const LOG_FILE = path.join(process.cwd(), "logs", "email.log");
+
+function emailLog(message: string) {
+  const timestamp = new Date().toISOString();
+  const line = `[${timestamp}] ${message}\n`;
+  console.log(message);
+  try {
+    fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
+    fs.appendFileSync(LOG_FILE, line);
+  } catch {}
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST || "smtp.titan.email",
@@ -155,10 +169,10 @@ Submitted: ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" }
       html: htmlBody,
     });
 
-    console.log(`[EMAIL] Dispatch request sent successfully for ${request.company} - ${request.facility}`);
+    emailLog(`[EMAIL] Dispatch request sent successfully for ${request.company} - ${request.facility}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`[EMAIL ERROR] Failed to send dispatch email:`, error.message);
+    emailLog(`[EMAIL ERROR] Failed to send dispatch email: ${error.message}`);
     return { success: false, error: error.message };
   }
 }
@@ -257,10 +271,10 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
       text: textBody,
       html: htmlBody,
     });
-    console.log(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}`);
+    emailLog(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`[EMAIL ERROR] Failed to send invoice email:`, error.message);
+    emailLog(`[EMAIL ERROR] Failed to send invoice email: ${error.message}`);
     return { success: false, error: error.message };
   }
 }
@@ -303,10 +317,10 @@ export async function sendInvitationEmail(
       text: bodyText,
       html: htmlBody,
     });
-    console.log(`[EMAIL] Invitation sent to ${data.userEmail}`);
+    emailLog(`[EMAIL] Invitation sent to ${data.userEmail}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`[EMAIL ERROR] Failed to send invitation email:`, error.message);
+    emailLog(`[EMAIL ERROR] Failed to send invitation email: ${error.message}`);
     return { success: false, error: error.message };
   }
 }
@@ -314,10 +328,10 @@ export async function sendInvitationEmail(
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
     await transporter.verify();
-    console.log("[EMAIL] SMTP connection verified successfully");
+    emailLog("[EMAIL] SMTP connection verified successfully");
     return true;
   } catch (error: any) {
-    console.error("[EMAIL ERROR] SMTP connection failed:", error.message);
+    emailLog(`[EMAIL ERROR] SMTP connection failed: ${error.message}`);
     return false;
   }
 }
