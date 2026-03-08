@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
-import type { Service as DbService, Invoice as DbInvoice } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Service as DbService, Invoice as DbInvoice, Ticket as DbTicket } from "@shared/schema";
 import {
   ArrowRight,
+  ArrowLeft,
   Bell,
   Cable,
   ChevronDown,
@@ -16,10 +17,12 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  MessageSquare,
   Network,
   Phone,
   Plus,
   Search,
+  Send,
   Server,
   Settings,
   Shield,
@@ -37,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 type Invoice = {
@@ -47,13 +51,22 @@ type Invoice = {
   total: string;
 };
 
-type Ticket = {
+type TicketReply = {
   id: string;
-  subject: string;
-  category: "technical" | "billing" | "smart_hands";
-  priority: "low" | "normal" | "high" | "urgent";
-  status: "new" | "open" | "waiting" | "resolved";
-  updatedAt: string;
+  ticketId: string;
+  userId: string;
+  body: string;
+  isInternal: boolean;
+  createdAt: string;
+  authorName: string;
+  authorRole: string;
+};
+
+type TicketDetail = DbTicket & {
+  creatorName: string;
+  customerName: string;
+  assigneeName: string | null;
+  replies: TicketReply[];
 };
 
 type Service = {
@@ -91,8 +104,15 @@ function StatusBadge({ status }: { status: string }) {
     pending: "bg-amber-50 text-amber-700 border-amber-200",
     past_due: "bg-rose-50 text-rose-700 border-rose-200",
     new: "bg-blue-50 text-blue-700 border-blue-200",
+    in_progress: "bg-indigo-50 text-indigo-700 border-indigo-200",
     waiting: "bg-amber-50 text-amber-700 border-amber-200",
     resolved: "bg-slate-50 text-slate-600 border-slate-200",
+    closed: "bg-slate-50 text-slate-500 border-slate-200",
+    high: "bg-orange-50 text-orange-700 border-orange-200",
+    urgent: "bg-rose-50 text-rose-700 border-rose-200",
+    low: "bg-slate-50 text-slate-600 border-slate-200",
+    normal: "bg-blue-50 text-blue-600 border-blue-200",
+    general: "bg-slate-50 text-slate-600 border-slate-200",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${colors[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
@@ -314,6 +334,15 @@ export default function PortalPage() {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
   const [activeView, setActiveView] = useState<PortalView>("dashboard");
+  const [showNewTicket, setShowNewTicket] = useState(false);
+  const [newTicketSubject, setNewTicketSubject] = useState("");
+  const [newTicketBody, setNewTicketBody] = useState("");
+  const [newTicketCategory, setNewTicketCategory] = useState("general");
+  const [newTicketPriority, setNewTicketPriority] = useState("normal");
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isAdmin = user?.role === "admin";
   const hasPortalAccess = isAdmin || user?.permPortalAccess !== false;
@@ -398,11 +427,81 @@ export default function PortalPage() {
     };
   });
 
-  const tickets: Ticket[] = [
-    { id: "t-001", subject: "SmartHands: install replacement SSD", category: "smart_hands", priority: "normal", status: "open", updatedAt: "2h ago" },
-    { id: "t-002", subject: "Billing: credit applied to INV-10310", category: "billing", priority: "low", status: "waiting", updatedAt: "yesterday" },
-    { id: "t-003", subject: "Network: packet loss on cross-connect", category: "technical", priority: "urgent", status: "new", updatedAt: "10m ago" },
-  ];
+  const { data: ticketsData = [], isLoading: ticketsLoading } = useQuery<DbTicket[]>({
+    queryKey: ["tickets", user?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/tickets", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!token && canSeeTickets,
+  });
+
+  const { data: ticketDetail, isLoading: ticketDetailLoading } = useQuery<TicketDetail>({
+    queryKey: ["ticket-detail", selectedTicketId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tickets/${selectedTicketId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load ticket");
+      return res.json();
+    },
+    enabled: !!token && !!selectedTicketId,
+  });
+
+  const createTicketMutation = useMutation({
+    mutationFn: async (data: { subject: string; body: string; category: string; priority: string }) => {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create ticket");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      setShowNewTicket(false);
+      setNewTicketSubject("");
+      setNewTicketBody("");
+      setNewTicketCategory("general");
+      setNewTicketPriority("normal");
+      toast({ title: "Ticket Created", description: "Your support ticket has been submitted." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const createReplyMutation = useMutation({
+    mutationFn: async (data: { ticketId: string; body: string }) => {
+      const res = await fetch(`/api/tickets/${data.ticketId}/replies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ body: data.body }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to send reply");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail", selectedTicketId] });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      setReplyText("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const tickets = ticketsData;
 
   const activeServices = services.filter((s) => s.status === "active").length;
   const provisioningServices = services.filter((s) => s.status === "provisioning").length;
@@ -456,7 +555,7 @@ export default function PortalPage() {
           {canSeeTickets && (
             <>
               <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-5 pb-2">Support</div>
-              <NavItem icon={Ticket} label="My Tickets" badge={3} active={activeView === "tickets"} onClick={() => setActiveView("tickets")} />
+              <NavItem icon={Ticket} label="My Tickets" badge={tickets.filter(t => !["resolved", "closed"].includes(t.status)).length || undefined} active={activeView === "tickets"} onClick={() => { setActiveView("tickets"); setSelectedTicketId(null); }} />
               {canSeeSmarthands && <NavItem icon={Cable} label="SmartHands" />}
             </>
           )}
@@ -479,7 +578,7 @@ export default function PortalPage() {
             <span className="px-2.5 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700">{user?.companyName || "Customer Account"}</span>
           </div>
           <div className="flex items-center gap-3">
-            <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs">
+            <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" onClick={() => { if (canCreateTickets) { setShowNewTicket(true); } }} data-testid="button-new-request">
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Request
             </Button>
@@ -634,17 +733,19 @@ export default function PortalPage() {
             </motion.div>
           )}
 
-          {activeView === "tickets" && canSeeTickets && (
+          {activeView === "tickets" && canSeeTickets && !selectedTicketId && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-lg font-semibold text-slate-900">My Tickets</h1>
                   <p className="text-xs text-slate-500 mt-0.5">Support requests and updates</p>
                 </div>
-                <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-ticket">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  New Ticket
-                </Button>
+                {canCreateTickets && (
+                  <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid="button-new-ticket" onClick={() => setShowNewTicket(true)}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    New Ticket
+                  </Button>
+                )}
               </div>
               <Card className="border-slate-200 bg-white overflow-hidden">
                 <Table>
@@ -658,20 +759,212 @@ export default function PortalPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tickets.map((t) => (
-                      <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`ticket-${t.id}`}>
-                        <TableCell className="text-xs font-medium text-slate-900">{t.subject}</TableCell>
-                        <TableCell className="text-xs text-slate-600 capitalize">{t.category.replace("_", " ")}</TableCell>
-                        <TableCell><StatusBadge status={t.priority} /></TableCell>
-                        <TableCell><StatusBadge status={t.status} /></TableCell>
-                        <TableCell className="text-xs text-slate-500 text-right">{t.updatedAt}</TableCell>
-                      </TableRow>
-                    ))}
+                    {ticketsLoading ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="h-4 w-4 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
+                    ) : tickets.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs text-slate-500">No tickets found</TableCell></TableRow>
+                    ) : (
+                      tickets.map((t) => (
+                        <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`ticket-${t.id}`} onClick={() => setSelectedTicketId(t.id)}>
+                          <TableCell className="text-xs font-medium text-slate-900">{t.subject}</TableCell>
+                          <TableCell className="text-xs text-slate-600 capitalize">{t.category.replace("_", " ")}</TableCell>
+                          <TableCell><StatusBadge status={t.priority} /></TableCell>
+                          <TableCell><StatusBadge status={t.status} /></TableCell>
+                          <TableCell className="text-xs text-slate-500 text-right">{new Date(t.updatedAt).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </Card>
             </motion.div>
           )}
+
+          {activeView === "tickets" && canSeeTickets && selectedTicketId && (
+            <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-600" onClick={() => setSelectedTicketId(null)} data-testid="button-back-tickets">
+                  <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                  Back
+                </Button>
+              </div>
+
+              {ticketDetailLoading ? (
+                <Card className="border-slate-200 bg-white p-8 text-center">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-slate-400" />
+                </Card>
+              ) : ticketDetail ? (
+                <>
+                  <Card className="border-slate-200 bg-white overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-sm font-semibold text-slate-900" data-testid="text-ticket-subject">{ticketDetail.subject}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={ticketDetail.priority} />
+                        <StatusBadge status={ticketDetail.status} />
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px]">
+                        <div>
+                          <span className="text-slate-500 font-medium uppercase tracking-wide">Category</span>
+                          <div className="mt-0.5 text-xs text-slate-900 capitalize">{ticketDetail.category.replace("_", " ")}</div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 font-medium uppercase tracking-wide">Created</span>
+                          <div className="mt-0.5 text-xs text-slate-900">{new Date(ticketDetail.createdAt).toLocaleDateString()}</div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 font-medium uppercase tracking-wide">Updated</span>
+                          <div className="mt-0.5 text-xs text-slate-900">{new Date(ticketDetail.updatedAt).toLocaleDateString()}</div>
+                        </div>
+                        {ticketDetail.assigneeName && (
+                          <div>
+                            <span className="text-slate-500 font-medium uppercase tracking-wide">Assigned To</span>
+                            <div className="mt-0.5 text-xs text-slate-900">{ticketDetail.assigneeName}</div>
+                          </div>
+                        )}
+                      </div>
+                      <Separator className="bg-slate-100" />
+                      <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed" data-testid="text-ticket-body">{ticketDetail.body}</div>
+                    </div>
+                  </Card>
+
+                  <Card className="border-slate-200 bg-white overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100">
+                      <span className="text-sm font-semibold text-slate-900">Replies ({ticketDetail.replies.length})</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {ticketDetail.replies.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-500">No replies yet</div>
+                      ) : (
+                        ticketDetail.replies.map((reply) => (
+                          <div key={reply.id} className="p-4" data-testid={`reply-${reply.id}`}>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <div className={`h-6 w-6 rounded-md flex items-center justify-center text-[9px] font-bold ${reply.authorRole === "admin" ? "bg-slate-900 text-white" : "bg-blue-600 text-white"}`}>
+                                  {reply.authorName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                                </div>
+                                <span className="text-xs font-medium text-slate-900">{reply.authorName}</span>
+                                {reply.authorRole === "admin" && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-slate-100 text-slate-600 rounded">Staff</span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-500">{new Date(reply.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed ml-8">{reply.body}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {!["resolved", "closed"].includes(ticketDetail.status) && (
+                      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                        <Textarea
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Type your reply..."
+                          className="min-h-[80px] text-xs border-slate-200 bg-white mb-2"
+                          data-testid="input-ticket-reply"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                            disabled={!replyText.trim() || createReplyMutation.isPending}
+                            onClick={() => createReplyMutation.mutate({ ticketId: selectedTicketId!, body: replyText.trim() })}
+                            data-testid="button-send-reply"
+                          >
+                            {createReplyMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
+                            Send Reply
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </>
+              ) : (
+                <Card className="border-slate-200 bg-white p-8 text-center">
+                  <div className="text-xs text-slate-500">Ticket not found</div>
+                </Card>
+              )}
+            </motion.div>
+          )}
+
+          <Dialog open={showNewTicket} onOpenChange={setShowNewTicket}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-sm font-semibold">New Support Ticket</DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">Describe your issue and we'll get back to you as soon as possible.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 mt-2">
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Subject</label>
+                  <Input
+                    value={newTicketSubject}
+                    onChange={(e) => setNewTicketSubject(e.target.value)}
+                    placeholder="Brief description of your issue"
+                    className="mt-1 h-8 text-xs border-slate-200"
+                    data-testid="input-ticket-subject"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Category</label>
+                    <select
+                      value={newTicketCategory}
+                      onChange={(e) => setNewTicketCategory(e.target.value)}
+                      className="mt-1 w-full h-8 text-xs border border-slate-200 rounded-md px-2 bg-white"
+                      data-testid="select-ticket-category"
+                    >
+                      <option value="general">General</option>
+                      <option value="technical">Technical</option>
+                      <option value="billing">Billing</option>
+                      <option value="smart_hands">Smart Hands</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Priority</label>
+                    <select
+                      value={newTicketPriority}
+                      onChange={(e) => setNewTicketPriority(e.target.value)}
+                      className="mt-1 w-full h-8 text-xs border border-slate-200 rounded-md px-2 bg-white"
+                      data-testid="select-ticket-priority"
+                    >
+                      <option value="low">Low</option>
+                      <option value="normal">Normal</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Description</label>
+                  <Textarea
+                    value={newTicketBody}
+                    onChange={(e) => setNewTicketBody(e.target.value)}
+                    placeholder="Provide details about your issue..."
+                    className="mt-1 min-h-[100px] text-xs border-slate-200"
+                    data-testid="input-ticket-body"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <Button variant="outline" size="sm" onClick={() => setShowNewTicket(false)} className="h-8 text-xs" data-testid="button-cancel-ticket">Cancel</Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                    disabled={!newTicketSubject.trim() || !newTicketBody.trim() || createTicketMutation.isPending}
+                    onClick={() => createTicketMutation.mutate({ subject: newTicketSubject.trim(), body: newTicketBody.trim(), category: newTicketCategory, priority: newTicketPriority })}
+                    data-testid="button-submit-ticket"
+                  >
+                    {createTicketMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
+                    Create Ticket
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {activeView === "settings" && (
             <motion.div variants={fade} initial="hidden" animate="show" className="space-y-5">
@@ -743,8 +1036,8 @@ export default function PortalPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Active Tickets</div>
-                    <div className="mt-1 text-2xl font-bold text-slate-900">3</div>
-                    <div className="mt-0.5 text-[10px] text-rose-600">1 urgent</div>
+                    <div className="mt-1 text-2xl font-bold text-slate-900">{tickets.filter(t => !["resolved", "closed"].includes(t.status)).length}</div>
+                    <div className="mt-0.5 text-[10px] text-rose-600">{tickets.filter(t => t.priority === "urgent").length > 0 ? `${tickets.filter(t => t.priority === "urgent").length} urgent` : "None urgent"}</div>
                   </div>
                   <div className="h-9 w-9 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
                     <Ticket className="h-4 w-4" />

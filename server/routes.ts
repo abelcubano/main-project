@@ -6,7 +6,7 @@ import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, PERMISSION_FIELDS } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
 
@@ -872,6 +872,171 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[ADMIN] Remove customer user error:", error);
       res.status(500).json({ error: "Failed to remove user from customer" });
+    }
+  });
+
+  // Ticket endpoints
+  app.get("/api/tickets", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role === "admin") {
+        const allTickets = await storage.getAllTickets();
+        const allUsers = await storage.getAllUsers();
+        const allCustomers = await storage.getAllCustomers();
+        const enriched = allTickets.map((t: any) => {
+          const creator = allUsers.find(u => u.id === t.userId);
+          const customer = t.customerId ? allCustomers.find(c => c.id === t.customerId) : null;
+          const assignee = t.assignedTo ? allUsers.find(u => u.id === t.assignedTo) : null;
+          return {
+            ...t,
+            creatorName: creator?.name || "Unknown",
+            customerName: customer?.name || creator?.companyName || "Unknown",
+            assigneeName: assignee?.name || null,
+          };
+        });
+        return res.json(enriched);
+      }
+      if (!canViewSupport(user)) {
+        return res.status(403).json({ error: "You do not have permission to view tickets" });
+      }
+      if (!user.customerId) {
+        return res.json([]);
+      }
+      const customerTickets = await storage.getTicketsByCustomer(user.customerId);
+      res.json(customerTickets);
+    } catch (error: any) {
+      console.error("[TICKETS] Get tickets error:", error);
+      res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  app.get("/api/tickets/:id", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const ticketId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      if (user.role !== "admin") {
+        if (!canViewSupport(user)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        if (ticket.customerId !== user.customerId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      let replies = await storage.getTicketReplies(ticketId);
+      if (user.role !== "admin") {
+        replies = replies.filter(r => !r.isInternal);
+      }
+      const allUsers = await storage.getAllUsers();
+      const enrichedReplies = replies.map(r => {
+        const author = allUsers.find(u => u.id === r.userId);
+        return { ...r, authorName: author?.name || "Unknown", authorRole: author?.role || "customer" };
+      });
+      const creator = allUsers.find(u => u.id === ticket.userId);
+      const customer = ticket.customerId ? await storage.getCustomer(ticket.customerId) : null;
+      const assignee = ticket.assignedTo ? allUsers.find(u => u.id === ticket.assignedTo) : null;
+      res.json({
+        ...ticket,
+        creatorName: creator?.name || "Unknown",
+        customerName: customer?.name || creator?.companyName || "Unknown",
+        assigneeName: assignee?.name || null,
+        replies: enrichedReplies,
+      });
+    } catch (error: any) {
+      console.error("[TICKETS] Get ticket error:", error);
+      res.status(500).json({ error: "Failed to fetch ticket" });
+    }
+  });
+
+  app.post("/api/tickets", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "admin" && !canCreateSupport(user)) {
+        return res.status(403).json({ error: "You do not have permission to create tickets" });
+      }
+      const body: any = {
+        ...req.body,
+        userId: user.role === "admin" ? (req.body.userId || user.id) : user.id,
+        customerId: user.role === "admin" ? (req.body.customerId || null) : (user.customerId || null),
+      };
+      const validation = insertTicketSchema.safeParse(body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      }
+      const ticket = await storage.createTicket(validation.data);
+      res.json(ticket);
+    } catch (error: any) {
+      console.error("[TICKETS] Create ticket error:", error);
+      res.status(500).json({ error: "Failed to create ticket" });
+    }
+  });
+
+  app.put("/api/tickets/:id", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const ticketId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      if (user.role !== "admin") {
+        if (ticket.customerId !== user.customerId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      const updates: any = {};
+      if (user.role === "admin") {
+        if (req.body.status) updates.status = req.body.status;
+        if (req.body.priority) updates.priority = req.body.priority;
+        if (req.body.assignedTo !== undefined) updates.assignedTo = req.body.assignedTo || null;
+        if (req.body.category) updates.category = req.body.category;
+        if (req.body.status === "closed" || req.body.status === "resolved") {
+          updates.closedAt = new Date();
+        }
+      }
+      const updated = await storage.updateTicket(ticketId, updates);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[TICKETS] Update ticket error:", error);
+      res.status(500).json({ error: "Failed to update ticket" });
+    }
+  });
+
+  app.post("/api/tickets/:id/replies", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const ticketId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = req.user;
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      if (user.role !== "admin") {
+        if (!canViewSupport(user)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        if (ticket.customerId !== user.customerId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      const replyData: any = {
+        ticketId,
+        userId: user.id,
+        body: req.body.body,
+        isInternal: user.role === "admin" ? (req.body.isInternal || false) : false,
+      };
+      const validation = insertTicketReplySchema.safeParse(replyData);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      }
+      const reply = await storage.createTicketReply(validation.data);
+      await storage.updateTicket(ticketId, {});
+      res.json(reply);
+    } catch (error: any) {
+      console.error("[TICKETS] Create reply error:", error);
+      res.status(500).json({ error: "Failed to create reply" });
     }
   });
 

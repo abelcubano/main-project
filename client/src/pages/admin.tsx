@@ -19,9 +19,11 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageSquare,
   Pencil,
   Plus,
   Search,
+  Send,
   Server,
   Settings,
   Shield,
@@ -168,17 +170,9 @@ type UserData = {
   lastLogin?: string;
 } & Partial<PermissionKeys>;
 
-type AdminTicket = {
-  id: string;
-  subject: string;
-  category: "technical" | "billing" | "smart_hands";
-  priority: "low" | "normal" | "high" | "urgent";
-  status: "new" | "open" | "waiting" | "resolved";
-  assignee: string;
-  updatedAt: string;
-};
+type AdminSection = "home" | "clients" | "support" | "devices" | "orders" | "sales" | "settings";
 
-type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings";
+type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings" | "tickets";
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -187,7 +181,9 @@ function StatusBadge({ status }: { status: string }) {
     new: "bg-[#cce4f7] text-[#2563eb]",
     open: "bg-[#cce4f7] text-[#2563eb]",
     waiting: "bg-[#fff4ce] text-[#9d6b00]",
-    resolved: "bg-[#dce3ed] text-[#666]",
+    in_progress: "bg-[#e8daef] text-[#6c3483]",
+    resolved: "bg-[#dff6dd] text-[#1e7b34]",
+    closed: "bg-[#dce3ed] text-[#666]",
     low: "bg-[#dce3ed] text-[#666]",
     normal: "bg-[#dce3ed] text-[#666]",
     high: "bg-[#fff4ce] text-[#9d6b00]",
@@ -249,18 +245,40 @@ export default function AdminPage() {
   const { user, token, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [currentSection, setCurrentSection] = useState<AdminSection>("home");
   const [currentView, setCurrentView] = useState<AdminView>("dashboard");
   const [query, setQuery] = useState("");
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
+  const [ticketQueueFilter, setTicketQueueFilter] = useState("all");
+  const [allTickets, setAllTickets] = useState<any[]>([]);
 
-  const tickets: AdminTicket[] = [
-    { id: "t-01", subject: "SmartHands: fiber light levels check", category: "smart_hands", priority: "high", status: "open", assignee: "J. Patel", updatedAt: "25m ago" },
-    { id: "t-02", subject: "Billing: refund request for overage", category: "billing", priority: "normal", status: "waiting", assignee: "Billing", updatedAt: "today" },
-    { id: "t-03", subject: "Network: cross-connect LOA verification", category: "technical", priority: "urgent", status: "new", assignee: "Unassigned", updatedAt: "8m ago" },
-  ];
+  function navigateToSection(section: AdminSection) {
+    setCurrentSection(section);
+    const defaultViews: Record<AdminSection, AdminView> = {
+      home: "dashboard",
+      clients: "customers",
+      support: "tickets",
+      devices: "dashboard",
+      orders: "services",
+      sales: "invoices",
+      settings: "settings",
+    };
+    setCurrentView(defaultViews[section]);
+  }
+
+  async function loadTickets() {
+    try {
+      const res = await fetch("/api/tickets", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setAllTickets(await res.json());
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (currentView === "tickets") loadTickets();
+  }, [currentView]);
 
   async function loadUsers() {
     setLoadingUsers(true);
@@ -331,53 +349,112 @@ export default function AdminPage() {
     invoices: "Invoices & Billing",
     customers: "Customer Accounts",
     settings: "Settings",
+    tickets: "Support Tickets",
   };
 
-  const sidebarItems: { section: string; items: { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number }[] }[] = [
-    {
-      section: "Overview",
-      items: [
+  const sectionLabels: Record<AdminSection, string> = {
+    home: "Home",
+    clients: "Clients",
+    support: "Support",
+    devices: "Devices",
+    orders: "Orders",
+    sales: "Sales",
+    settings: "Settings",
+  };
+
+  const sectionTabs: Record<AdminSection, { label: string; view: AdminView }[]> = {
+    home: [{ label: "Dashboard", view: "dashboard" }],
+    clients: [
+      { label: "Customers", view: "customers" },
+      { label: "Users", view: "users" },
+    ],
+    support: [{ label: "Tickets", view: "tickets" }],
+    devices: [],
+    orders: [{ label: "Services", view: "services" }],
+    sales: [{ label: "Invoices", view: "invoices" }],
+    settings: [{ label: "Settings", view: "settings" }],
+  };
+
+  const openTicketCount = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status)).length;
+
+  type SidebarItem = { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number; filter?: string };
+  type SidebarGroup = { section: string; items: SidebarItem[] };
+
+  const sidebarItemsBySection: Record<AdminSection, SidebarGroup[]> = {
+    home: [
+      { section: "Navigation", items: [
         { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
         { icon: Activity, label: "Live Activity" },
-      ],
-    },
-    {
-      section: "Operations",
-      items: [
-        { icon: HardHat, label: "SmartHands", badge: 2 },
-        { icon: Ticket, label: "Tickets", badge: 3 },
-        { icon: MapPin, label: "Dispatch" },
-      ],
-    },
-    {
-      section: "Business",
-      items: [
-        { icon: Building2, label: "Customers", view: "customers" },
-        { icon: Server, label: "Services", view: "services" },
-        { icon: CreditCard, label: "Billing", view: "invoices" },
-      ],
-    },
-    {
-      section: "System",
-      items: [
-        { icon: Users, label: "Users", view: "users", badge: allUsers.length || undefined },
-        { icon: Shield, label: "Permissions" },
-        { icon: Settings, label: "Settings", view: "settings" },
-      ],
-    },
-  ];
+      ]},
+    ],
+    clients: [
+      { section: "Accounts", items: [
+        { icon: Building2, label: "All Customers", view: "customers" },
+        { icon: Users, label: "All Users", view: "users", badge: allUsers.length || undefined },
+      ]},
+    ],
+    support: [
+      { section: "Queue", items: [
+        { icon: Ticket, label: "All Tickets", filter: "all", badge: allTickets.length || undefined },
+        { icon: Bell, label: "New", filter: "new", badge: allTickets.filter(t => t.status === "new").length || undefined },
+        { icon: Activity, label: "Open", filter: "open", badge: allTickets.filter(t => t.status === "open").length || undefined },
+        { icon: Loader2, label: "In Progress", filter: "in_progress", badge: allTickets.filter(t => t.status === "in_progress").length || undefined },
+        { icon: Bell, label: "Waiting", filter: "waiting", badge: allTickets.filter(t => t.status === "waiting").length || undefined },
+        { icon: Shield, label: "Resolved", filter: "resolved" },
+      ]},
+      { section: "Assignment", items: [
+        { icon: Users, label: "My Tickets", filter: "mine" },
+        { icon: HardHat, label: "Unassigned", filter: "unassigned", badge: allTickets.filter(t => !t.assignedTo).length || undefined },
+      ]},
+    ],
+    devices: [
+      { section: "Devices", items: [
+        { icon: Server, label: "Coming Soon" },
+      ]},
+    ],
+    orders: [
+      { section: "Service Orders", items: [
+        { icon: Server, label: "All Services", view: "services" },
+      ]},
+    ],
+    sales: [
+      { section: "Billing", items: [
+        { icon: CreditCard, label: "All Invoices", view: "invoices" },
+      ]},
+    ],
+    settings: [
+      { section: "Configuration", items: [
+        { icon: Settings, label: "Billing Config", view: "settings" },
+      ]},
+    ],
+  };
+
+  const currentSidebarItems = sidebarItemsBySection[currentSection] || [];
 
   return (
     <div className="h-dvh flex flex-col bg-[#eef1f6] overflow-hidden" data-testid="page-admin" style={{ fontSize: "11px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
-      {/* Menu bar */}
+      {/* Menu bar - Ubersmith-style section buttons */}
       <div className="h-[22px] bg-[#1b2a4a] border-b border-[#152240] flex items-center px-2 flex-shrink-0" data-testid="menu-bar">
-        <span className="font-semibold text-[11px] text-white mr-4">911-DC Admin</span>
-        <div className="flex items-center gap-3 text-[11px] text-[#8ea4c8]">
-          <button className="hover:text-white hover:bg-[#243656] px-1">File</button>
-          <button className="hover:text-white hover:bg-[#243656] px-1">Edit</button>
-          <button className="hover:text-white hover:bg-[#243656] px-1">View</button>
-          <button className="hover:text-white hover:bg-[#243656] px-1">Tools</button>
-          <button className="hover:text-white hover:bg-[#243656] px-1">Help</button>
+        <button onClick={() => navigateToSection("home")} className="font-semibold text-[11px] text-white mr-3 hover:text-[#60a5fa] px-1" data-testid="button-home">911-DC</button>
+        <div className="h-[14px] w-[1px] bg-[#2c4060] mr-1" />
+        <div className="flex items-center text-[11px]">
+          {(["clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).map((sec) => (
+            <button
+              key={sec}
+              onClick={() => navigateToSection(sec)}
+              className={`px-2 py-[1px] ${
+                currentSection === sec
+                  ? "text-white bg-[#2563eb] font-medium"
+                  : "text-[#8ea4c8] hover:text-white hover:bg-[#243656]"
+              }`}
+              data-testid={`section-${sec}`}
+            >
+              {sectionLabels[sec]}
+              {sec === "support" && openTicketCount > 0 && (
+                <span className="ml-1 text-[9px] bg-[#c42b1c] text-white px-[3px] rounded-sm">{openTicketCount}</span>
+              )}
+            </button>
+          ))}
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2 text-[10px] text-[#8ea4c8]">
@@ -386,20 +463,20 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
+      {/* Tab bar - contextual per section */}
       <div className="h-[26px] bg-[#243656] border-b border-[#1b2a4a] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
-        {(["dashboard", "customers", "services", "invoices", "users", "settings"] as AdminView[]).map((v) => (
+        {sectionTabs[currentSection].map((tab) => (
           <button
-            key={v}
-            onClick={() => setCurrentView(v)}
+            key={tab.view}
+            onClick={() => setCurrentView(tab.view)}
             className={`px-3 h-[24px] text-[11px] border border-b-0 mr-[1px] flex items-center ${
-              currentView === v
+              currentView === tab.view
                 ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4] border-b-[#ffffff] -mb-[1px] z-10"
                 : "bg-[#1e3050] text-[#8ea4c8] border-[#1b2a4a] hover:bg-[#2c4060] hover:text-white"
             }`}
-            data-testid={`tab-${v}`}
+            data-testid={`tab-${tab.view}`}
           >
-            {viewLabels[v]}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -408,7 +485,7 @@ export default function AdminPage() {
       <div className="h-[18px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 text-[10px] text-[#5a6a82]" data-testid="breadcrumb-bar">
         <span>911-DC</span>
         <ChevronRight className="h-[10px] w-[10px] mx-1" />
-        <span>Admin</span>
+        <span>{sectionLabels[currentSection]}</span>
         <ChevronRight className="h-[10px] w-[10px] mx-1" />
         <span className="text-[#1e1e1e] font-medium">{viewLabels[currentView]}</span>
         <div className="flex-1" />
@@ -426,29 +503,35 @@ export default function AdminPage() {
 
       {/* Main body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar - contextual per section */}
         <div className="w-[140px] bg-[#2c3e5a] border-r border-[#1b2a4a] flex flex-col overflow-y-auto flex-shrink-0" data-testid="sidebar">
-          {sidebarItems.map((group) => (
+          {currentSidebarItems.map((group) => (
             <div key={group.section}>
               <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#6b8ab5] uppercase tracking-wider">{group.section}</div>
-              {group.items.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => item.view && setCurrentView(item.view)}
-                  className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
-                    item.view && currentView === item.view
-                      ? "bg-[#3b82f6] text-white font-medium"
-                      : "text-[#c8d6e5] hover:bg-[#374f6f] hover:text-white"
-                  }`}
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                >
-                  <item.icon className="h-[12px] w-[12px] flex-shrink-0" />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className="text-[9px] text-[#c8d6e5] bg-[#1b2a4a] px-[3px] rounded-sm">{item.badge}</span>
-                  )}
-                </button>
-              ))}
+              {group.items.map((item) => {
+                const isActive = item.view ? currentView === item.view : (item.filter ? ticketQueueFilter === item.filter : false);
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      if (item.view) setCurrentView(item.view);
+                      if (item.filter) { setTicketQueueFilter(item.filter); setCurrentView("tickets"); }
+                    }}
+                    className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
+                      isActive
+                        ? "bg-[#3b82f6] text-white font-medium"
+                        : "text-[#c8d6e5] hover:bg-[#374f6f] hover:text-white"
+                    }`}
+                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    <item.icon className="h-[12px] w-[12px] flex-shrink-0" />
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="text-[9px] text-[#c8d6e5] bg-[#1b2a4a] px-[3px] rounded-sm">{item.badge}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
           <div className="flex-1" />
@@ -464,7 +547,7 @@ export default function AdminPage() {
 
         {/* Content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {currentView === "dashboard" && <DashboardView tickets={tickets} onManageUsers={() => setCurrentView("users")} />}
+          {currentView === "dashboard" && <DashboardView tickets={allTickets} onManageUsers={() => { setCurrentSection("clients"); setCurrentView("users"); }} onViewTickets={() => navigateToSection("support")} />}
           {currentView === "users" && (
             <UsersView
               users={filteredUsers}
@@ -480,6 +563,7 @@ export default function AdminPage() {
           {currentView === "invoices" && <InvoicesView token={token} />}
           {currentView === "customers" && <CustomersView token={token} />}
           {currentView === "settings" && <SettingsView token={token} />}
+          {currentView === "tickets" && <TicketsView token={token} tickets={allTickets} filter={ticketQueueFilter} userId={user?.id || ""} onRefresh={loadTickets} />}
         </div>
       </div>
 
@@ -502,7 +586,7 @@ export default function AdminPage() {
   );
 }
 
-function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onManageUsers: () => void }) {
+function DashboardView({ tickets, onManageUsers, onViewTickets }: { tickets: any[]; onManageUsers: () => void; onViewTickets: () => void }) {
   const [topHeight, setTopHeight] = useState(260);
   const onDrag = useCallback((delta: number) => {
     setTopHeight((h) => Math.max(100, Math.min(500, h + delta)));
@@ -516,10 +600,10 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
           <div className="text-[12px] font-semibold text-[#1e1e1e] mb-2">Operations Overview</div>
           <div className="grid grid-cols-4 gap-[1px] bg-[#b8c4d4] border border-[#b8c4d4] mb-2">
             {[
-              { label: "Open Tickets", value: "3", sub: "1 urgent", color: "#c42b1c" },
-              { label: "SmartHands Queue", value: "2", sub: "1 high priority", color: "#9d6b00" },
-              { label: "Monthly Revenue", value: "$3,280", sub: "+2 services", color: "#1e7b34" },
-              { label: "Active Customers", value: "12", sub: "2 pending", color: "#666" },
+              { label: "Open Tickets", value: String(tickets.filter(t => ["new","open","in_progress","waiting"].includes(t.status)).length), sub: `${tickets.filter(t => t.priority === "urgent").length} urgent`, color: "#c42b1c" },
+              { label: "New Tickets", value: String(tickets.filter(t => t.status === "new").length), sub: "awaiting response", color: "#2563eb" },
+              { label: "Unassigned", value: String(tickets.filter(t => !t.assignedTo).length), sub: "needs assignment", color: "#9d6b00" },
+              { label: "Total Tickets", value: String(tickets.length), sub: `${tickets.filter(t => t.status === "resolved" || t.status === "closed").length} resolved`, color: "#1e7b34" },
             ].map((stat) => (
               <div key={stat.label} className="bg-[#ffffff] p-2">
                 <div className="text-[9px] text-[#666] uppercase tracking-wide">{stat.label}</div>
@@ -528,30 +612,34 @@ function DashboardView({ tickets, onManageUsers }: { tickets: AdminTicket[]; onM
               </div>
             ))}
           </div>
+          {tickets.length > 0 ? (
           <table className="w-full border-collapse" data-testid="table-tickets">
             <thead>
               <tr className="bg-[#dce3ed]">
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Subject</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Category</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Customer</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Priority</th>
                 <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Assignee</th>
+                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Assigned To</th>
                 <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {tickets.map((t, i) => (
-                <tr key={t.id} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
+              {tickets.filter(t => ["new","open","in_progress","waiting"].includes(t.status)).slice(0, 5).map((t, i) => (
+                <tr key={t.id} onClick={onViewTickets} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
                   <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{t.subject}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] capitalize">{t.category.replace("_", " ")}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.customerName || "—"}</td>
                   <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.priority} /></td>
                   <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.status} /></td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assignee}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{t.updatedAt}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assigneeName || "Unassigned"}</td>
+                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{new Date(t.updatedAt).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          ) : (
+            <div className="text-[11px] text-[#666] italic p-2">No tickets yet</div>
+          )}
         </div>
       </div>
 
@@ -2229,6 +2317,338 @@ const INVITATION_PLACEHOLDERS = [
   { var: "{{companyName}}", desc: "Company name" },
   { var: "{{portalUrl}}", desc: "Portal login URL" },
 ];
+
+function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: string | null; tickets: any[]; filter: string; userId: string; onRefresh: () => void }) {
+  const { toast } = useToast();
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [ticketDetail, setTicketDetail] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyInternal, setReplyInternal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newTicket, setNewTicket] = useState({ subject: "", body: "", category: "general", priority: "normal", customerId: "" });
+  const [creating, setCreating] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [updatingField, setUpdatingField] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setTicketDetail(null);
+    setSelectedTicket(null);
+  }, [filter]);
+
+  const filteredTickets = useMemo(() => {
+    if (filter === "all") return tickets;
+    if (filter === "mine") return tickets.filter(t => String(t.assignedTo) === String(userId));
+    if (filter === "unassigned") return tickets.filter(t => !t.assignedTo);
+    return tickets.filter(t => t.status === filter);
+  }, [tickets, filter, userId]);
+
+  async function loadTicketDetail(id: number) {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/tickets/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const data = await res.json(); setTicketDetail(data); setSelectedTicket(data); }
+    } catch {} finally { setLoadingDetail(false); }
+  }
+
+  async function handleReply() {
+    if (!replyBody.trim() || !ticketDetail) return;
+    setSending(true);
+    try {
+      const res = await fetch(`/api/tickets/${ticketDetail.id}/replies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ body: replyBody, isInternal: replyInternal }),
+      });
+      if (res.ok) {
+        setReplyBody(""); setReplyInternal(false);
+        loadTicketDetail(ticketDetail.id); onRefresh();
+        toast({ title: replyInternal ? "Internal note added" : "Reply sent" });
+      }
+    } catch {} finally { setSending(false); }
+  }
+
+  async function handleUpdateTicket(field: string, value: string) {
+    if (!ticketDetail) return;
+    setUpdatingField(true);
+    try {
+      const body: any = {};
+      body[field] = field === "assignedTo" ? (value === "unassigned" ? null : parseInt(value)) : value;
+      const res = await fetch(`/api/tickets/${ticketDetail.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) { loadTicketDetail(ticketDetail.id); onRefresh(); toast({ title: `Ticket ${field} updated` }); }
+    } catch {} finally { setUpdatingField(false); }
+  }
+
+  async function handleCreateTicket() {
+    if (!newTicket.subject.trim() || !newTicket.customerId) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newTicket),
+      });
+      if (res.ok) {
+        setShowNewModal(false); setNewTicket({ subject: "", body: "", category: "general", priority: "normal", customerId: "" });
+        onRefresh(); toast({ title: "Ticket created" });
+      }
+    } catch {} finally { setCreating(false); }
+  }
+
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : []).then(users => setAdminUsers(users.filter((u: any) => u.role === "admin"))).catch(() => {});
+  }, []);
+
+  if (ticketDetail) {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="h-[28px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0">
+          <button onClick={() => { setTicketDetail(null); setSelectedTicket(null); }} className="text-[10px] text-[#2563eb] hover:underline mr-2" data-testid="button-back-tickets">&larr; Back to Queue</button>
+          <span className="text-[11px] font-semibold text-[#1e1e1e]">Ticket #{ticketDetail.id}: {ticketDetail.subject}</span>
+          <div className="flex-1" />
+          <StatusBadge status={ticketDetail.priority} />
+          <span className="mx-1" />
+          <StatusBadge status={ticketDetail.status} />
+        </div>
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-auto p-2">
+              <div className="bg-[#ffffff] border border-[#b8c4d4] p-3 mb-2">
+                <div className="text-[10px] text-[#666] mb-1">
+                  Opened by {ticketDetail.creatorName || "Unknown"} ({ticketDetail.customerName || "Unknown"}) &middot; {new Date(ticketDetail.createdAt).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#1e1e1e] whitespace-pre-wrap">{ticketDetail.body}</div>
+              </div>
+              {ticketDetail.replies?.map((reply: any) => (
+                <div key={reply.id} className={`border p-3 mb-1 ${reply.isInternal ? "bg-[#fff9e6] border-[#e8c840]" : "bg-[#ffffff] border-[#b8c4d4]"}`}>
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-[10px] font-semibold text-[#1e1e1e]">{reply.authorName || "Unknown"}</span>
+                    {reply.isInternal && <span className="text-[9px] bg-[#e8c840] text-[#5a4600] px-[3px] font-medium">INTERNAL NOTE</span>}
+                    {reply.authorRole === "admin" && <span className="text-[9px] bg-[#2563eb] text-white px-[3px]">Staff</span>}
+                    <span className="text-[9px] text-[#888]">{new Date(reply.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="text-[11px] text-[#1e1e1e] whitespace-pre-wrap">{reply.body}</div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-[#b8c4d4] p-2 bg-[#f0f2f5] flex-shrink-0">
+              <textarea
+                value={replyBody}
+                onChange={(e) => setReplyBody(e.target.value)}
+                placeholder={replyInternal ? "Add internal note (not visible to customer)..." : "Type your reply..."}
+                className={`w-full h-[60px] text-[11px] p-2 border outline-none resize-none ${replyInternal ? "bg-[#fff9e6] border-[#e8c840]" : "bg-[#ffffff] border-[#b8c4d4]"} focus:border-[#2563eb]`}
+                data-testid="input-ticket-reply"
+              />
+              <div className="flex items-center gap-2 mt-1">
+                <label className="flex items-center gap-1 text-[10px] text-[#666] cursor-pointer">
+                  <input type="checkbox" checked={replyInternal} onChange={(e) => setReplyInternal(e.target.checked)} className="accent-[#e8c840]" />
+                  Internal Note
+                </label>
+                <div className="flex-1" />
+                <button
+                  onClick={handleReply}
+                  disabled={!replyBody.trim() || sending}
+                  className="flex items-center gap-1 px-3 py-[3px] bg-[#2563eb] text-white text-[10px] font-medium hover:bg-[#1d4ed8] disabled:opacity-50"
+                  data-testid="button-send-reply"
+                >
+                  <Send className="h-[10px] w-[10px]" />
+                  {sending ? "Sending..." : replyInternal ? "Add Note" : "Send Reply"}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="w-[180px] bg-[#f0f2f5] border-l border-[#b8c4d4] p-2 overflow-auto flex-shrink-0">
+            <div className="text-[10px] font-semibold text-[#1e1e1e] mb-2">Ticket Properties</div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Status</div>
+              <select
+                value={ticketDetail.status}
+                onChange={(e) => handleUpdateTicket("status", e.target.value)}
+                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
+                data-testid="select-ticket-status"
+              >
+                {["new", "open", "in_progress", "waiting", "resolved", "closed"].map(s => (
+                  <option key={s} value={s}>{s.replace("_", " ")}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Priority</div>
+              <select
+                value={ticketDetail.priority}
+                onChange={(e) => handleUpdateTicket("priority", e.target.value)}
+                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
+                data-testid="select-ticket-priority"
+              >
+                {["low", "normal", "high", "urgent"].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Assigned To</div>
+              <select
+                value={ticketDetail.assignedTo || "unassigned"}
+                onChange={(e) => handleUpdateTicket("assignedTo", e.target.value)}
+                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
+                data-testid="select-ticket-assignee"
+              >
+                <option value="unassigned">Unassigned</option>
+                {adminUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name || u.username}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Category</div>
+              <div className="text-[10px] text-[#1e1e1e] capitalize">{ticketDetail.category?.replace("_", " ") || "—"}</div>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Customer</div>
+              <div className="text-[10px] text-[#1e1e1e]">{ticketDetail.customerName || "—"}</div>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Created</div>
+              <div className="text-[10px] text-[#666]">{new Date(ticketDetail.createdAt).toLocaleString()}</div>
+            </div>
+            <div className="mb-2">
+              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Updated</div>
+              <div className="text-[10px] text-[#666]">{new Date(ticketDetail.updatedAt).toLocaleString()}</div>
+            </div>
+            {ticketDetail.closedAt && (
+              <div className="mb-2">
+                <div className="text-[9px] text-[#666] uppercase mb-[2px]">Closed</div>
+                <div className="text-[10px] text-[#666]">{new Date(ticketDetail.closedAt).toLocaleString()}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="h-[28px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0">
+        <span className="text-[11px] font-semibold text-[#1e1e1e]">{filter === "all" ? "All Tickets" : filter === "mine" ? "My Tickets" : filter === "unassigned" ? "Unassigned" : `${filter.replace("_", " ")} Tickets`} ({filteredTickets.length})</span>
+        <div className="flex-1" />
+        <button onClick={() => setShowNewModal(true)} className="flex items-center gap-1 px-2 py-[2px] bg-[#2563eb] text-white text-[10px] font-medium hover:bg-[#1d4ed8]" data-testid="button-new-ticket">
+          <Plus className="h-[10px] w-[10px]" />
+          New Ticket
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <table className="w-full border-collapse" data-testid="table-admin-tickets">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-[#dce3ed]">
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[40px]">#</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Subject</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[120px]">Customer</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[70px]">Category</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[60px]">Priority</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[70px]">Status</th>
+              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[90px]">Assigned To</th>
+              <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[80px]">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTickets.length === 0 && (
+              <tr><td colSpan={8} className="text-center text-[11px] text-[#666] py-4 italic">No tickets match this filter</td></tr>
+            )}
+            {filteredTickets.map((t, i) => (
+              <tr
+                key={t.id}
+                onClick={() => loadTicketDetail(t.id)}
+                className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`}
+                data-testid={`row-admin-ticket-${t.id}`}
+              >
+                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.id}</td>
+                <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] font-medium">{t.subject}</td>
+                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.customerName || "—"}</td>
+                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] capitalize">{t.category?.replace("_", " ") || "—"}</td>
+                <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.priority} /></td>
+                <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.status} /></td>
+                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assigneeName || "Unassigned"}</td>
+                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{new Date(t.updatedAt).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={showNewModal} onOpenChange={setShowNewModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[13px]">New Support Ticket</DialogTitle>
+            <DialogDescription className="text-[10px]">Create a ticket on behalf of a customer</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
+              <select value={newTicket.customerId} onChange={(e) => setNewTicket(p => ({ ...p, customerId: e.target.value }))}
+                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-customer">
+                <option value="">Select customer...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
+              <input value={newTicket.subject} onChange={(e) => setNewTicket(p => ({ ...p, subject: e.target.value }))}
+                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="input-new-ticket-subject" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#666] block mb-[2px]">Description</label>
+              <textarea value={newTicket.body} onChange={(e) => setNewTicket(p => ({ ...p, body: e.target.value }))}
+                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none h-[80px] resize-none" data-testid="input-new-ticket-body" />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] text-[#666] block mb-[2px]">Category</label>
+                <select value={newTicket.category} onChange={(e) => setNewTicket(p => ({ ...p, category: e.target.value }))}
+                  className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-category">
+                  <option value="general">General</option>
+                  <option value="technical">Technical</option>
+                  <option value="billing">Billing</option>
+                  <option value="smart_hands">Smart Hands</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-[#666] block mb-[2px]">Priority</label>
+                <select value={newTicket.priority} onChange={(e) => setNewTicket(p => ({ ...p, priority: e.target.value }))}
+                  className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-priority">
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={handleCreateTicket}
+              disabled={!newTicket.subject.trim() || !newTicket.customerId || creating}
+              className="w-full py-1 bg-[#2563eb] text-white text-[11px] font-medium hover:bg-[#1d4ed8] disabled:opacity-50"
+              data-testid="button-create-ticket"
+            >
+              {creating ? "Creating..." : "Create Ticket"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 function SettingsView({ token }: { token: string | null }) {
   const { toast } = useToast();

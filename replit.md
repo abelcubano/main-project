@@ -62,6 +62,8 @@ The database schema is shared between frontend and backend through the `shared/`
 - **invoices** - Customer invoices with line items, totals, and status tracking
 - **invoice_items** - Individual line items for each invoice
 - **dispatch_requests** - SmartHands dispatch requests for datacenter operations
+- **tickets** - Support tickets (id UUID, customerId, userId, subject, body, category, priority, status, assignedTo, createdAt, updatedAt, closedAt)
+- **ticket_replies** - Ticket reply thread (id UUID, ticketId, userId, body, isInternal boolean for admin-only notes, createdAt)
 
 ### Build System
 - **Client Build**: Vite bundles React app to `dist/public/`
@@ -148,9 +150,24 @@ The database schema is shared between frontend and backend through the `shared/`
 
 ### Admin Portal UI Style
 - **Design**: Native desktop application aesthetic (pgAdmin/SSMS/Ubersmith-inspired dark navy)
+- **Navigation**: Ubersmith-style section buttons in menu bar: Clients, Support, Devices, Orders, Sales, Settings — each section activates contextual tab bar and sidebar
+  - **Clients**: Customers list, Users list
+  - **Support**: Ticket queue with filters (All, New, Open, In Progress, Waiting, Resolved, My Tickets, Unassigned), ticket detail with reply thread and internal notes
+  - **Devices**: Placeholder for future device management
+  - **Orders**: Services list
+  - **Sales**: Invoices list
+  - **Settings**: Billing config, email templates
 - **Layout**: Menu bar (22px), tab bar (26px), breadcrumb (18px), tree sidebar (140px), draggable split panels, status bar (18px)
 - **Colors**: Menu bar #1b2a4a, tab bar #243656, sidebar #2c3e5a, sidebar text #c8d6e5, active nav #3b82f6, breadcrumb #f0f2f5, content bg #eef1f6, panels #ffffff, table headers #dce3ed, borders #b8c4d4, text #1e1e1e, accent #2563eb, hover rows #d4e4f7, alt rows #f0f2f7, status bar #1b2a4a
 - **Density**: 10-12px fonts, 18-22px table rows, 1px borders, no rounded corners/shadows, alternating row colors
+
+### Ticketing System
+- **Tables**: tickets + ticket_replies (UUID primary keys)
+- **Ticket Fields**: customerId, userId (creator), subject, body, category (general/technical/billing/smart_hands), priority (low/normal/high/urgent), status (new/open/in_progress/waiting/resolved/closed), assignedTo (nullable, admin user), timestamps
+- **Internal Notes**: ticket_replies.isInternal — admin-only notes hidden from customer API responses (filtered server-side)
+- **Admin Features**: Full CRUD, status/priority/assignee management via property panel, queue filtering by status/assignment, new ticket creation on behalf of customers
+- **Customer Portal**: Create tickets, view own tickets, reply to tickets (isInternal hidden), permission-gated via permSupportView/permSupportCreate
+- **Endpoints**: GET/POST /api/tickets, GET/PUT /api/tickets/:id, POST /api/tickets/:id/replies
 
 ### Planned Integrations (Future)
 - Payment gateway integration (Stripe dependency already included)
