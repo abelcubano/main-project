@@ -253,6 +253,7 @@ export default function AdminPage() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [ticketQueueFilter, setTicketQueueFilter] = useState("all");
+  const [ticketDeptFilter, setTicketDeptFilter] = useState("all");
   const [allTickets, setAllTickets] = useState<any[]>([]);
 
   function navigateToSection(section: AdminSection) {
@@ -377,7 +378,24 @@ export default function AdminPage() {
 
   const openTicketCount = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status)).length;
 
-  type SidebarItem = { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number; filter?: string };
+  const ticketDepts = [
+    { key: "all", label: "All Queues", icon: Ticket },
+    { key: "support", label: "Support", icon: HardHat },
+    { key: "sales", label: "Sales", icon: CreditCard },
+    { key: "billing", label: "Billing", icon: FileText },
+    { key: "provisioning", label: "Provisioning", icon: Server },
+    { key: "smart_hands", label: "SmartHands", icon: HardHat },
+    { key: "abuse", label: "Abuse", icon: Shield },
+    { key: "general", label: "General", icon: MessageSquare },
+  ];
+
+  function deptCount(dept: string) {
+    const active = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status));
+    if (dept === "all") return active.length;
+    return active.filter(t => t.category === dept).length;
+  }
+
+  type SidebarItem = { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number; filter?: string; dept?: string };
   type SidebarGroup = { section: string; items: SidebarItem[] };
 
   const sidebarItemsBySection: Record<AdminSection, SidebarGroup[]> = {
@@ -394,8 +412,10 @@ export default function AdminPage() {
       ]},
     ],
     support: [
-      { section: "Queue", items: [
-        { icon: Ticket, label: "All Tickets", filter: "all", badge: allTickets.length || undefined },
+      { section: "Queues", items: ticketDepts.map(d => ({
+        icon: d.icon, label: d.label, dept: d.key, badge: deptCount(d.key) || undefined,
+      }))},
+      { section: "Status", items: [
         { icon: Bell, label: "New", filter: "new", badge: allTickets.filter(t => t.status === "new").length || undefined },
         { icon: Activity, label: "Open", filter: "open", badge: allTickets.filter(t => t.status === "open").length || undefined },
         { icon: Loader2, label: "In Progress", filter: "in_progress", badge: allTickets.filter(t => t.status === "in_progress").length || undefined },
@@ -509,12 +529,15 @@ export default function AdminPage() {
             <div key={group.section}>
               <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#6b8ab5] uppercase tracking-wider">{group.section}</div>
               {group.items.map((item) => {
-                const isActive = item.view ? currentView === item.view : (item.filter ? ticketQueueFilter === item.filter : false);
+                const isActive = item.view ? currentView === item.view
+                  : item.dept ? (ticketDeptFilter === item.dept && !ticketQueueFilter.match(/^(new|open|in_progress|waiting|resolved|mine|unassigned)$/))
+                  : (item.filter ? ticketQueueFilter === item.filter : false);
                 return (
                   <button
                     key={item.label}
                     onClick={() => {
                       if (item.view) setCurrentView(item.view);
+                      if (item.dept) { setTicketDeptFilter(item.dept); setTicketQueueFilter("all"); setCurrentView("tickets"); }
                       if (item.filter) { setTicketQueueFilter(item.filter); setCurrentView("tickets"); }
                     }}
                     className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
@@ -563,7 +586,7 @@ export default function AdminPage() {
           {currentView === "invoices" && <InvoicesView token={token} />}
           {currentView === "customers" && <CustomersView token={token} />}
           {currentView === "settings" && <SettingsView token={token} />}
-          {currentView === "tickets" && <TicketsView token={token} tickets={allTickets} filter={ticketQueueFilter} userId={user?.id || ""} onRefresh={loadTickets} />}
+          {currentView === "tickets" && <TicketsView token={token} tickets={allTickets} filter={ticketQueueFilter} deptFilter={ticketDeptFilter} userId={user?.id || ""} onRefresh={loadTickets} />}
         </div>
       </div>
 
@@ -2318,7 +2341,7 @@ const INVITATION_PLACEHOLDERS = [
   { var: "{{portalUrl}}", desc: "Portal login URL" },
 ];
 
-function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: string | null; tickets: any[]; filter: string; userId: string; onRefresh: () => void }) {
+function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: { token: string | null; tickets: any[]; filter: string; deptFilter: string; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [ticketDetail, setTicketDetail] = useState<any | null>(null);
@@ -2327,7 +2350,7 @@ function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: str
   const [replyInternal, setReplyInternal] = useState(false);
   const [sending, setSending] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
-  const [newTicket, setNewTicket] = useState({ subject: "", body: "", category: "general", priority: "normal", customerId: "" });
+  const [newTicket, setNewTicket] = useState({ subject: "", body: "", category: "support", priority: "normal", customerId: "" });
   const [creating, setCreating] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [updatingField, setUpdatingField] = useState(false);
@@ -2340,14 +2363,18 @@ function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: str
   useEffect(() => {
     setTicketDetail(null);
     setSelectedTicket(null);
-  }, [filter]);
+  }, [filter, deptFilter]);
 
   const filteredTickets = useMemo(() => {
-    if (filter === "all") return tickets;
-    if (filter === "mine") return tickets.filter(t => String(t.assignedTo) === String(userId));
-    if (filter === "unassigned") return tickets.filter(t => !t.assignedTo);
-    return tickets.filter(t => t.status === filter);
-  }, [tickets, filter, userId]);
+    let result = tickets;
+    if (deptFilter && deptFilter !== "all") {
+      result = result.filter(t => t.category === deptFilter);
+    }
+    if (filter === "all") return result;
+    if (filter === "mine") return result.filter(t => String(t.assignedTo) === String(userId));
+    if (filter === "unassigned") return result.filter(t => !t.assignedTo);
+    return result.filter(t => t.status === filter);
+  }, [tickets, filter, deptFilter, userId]);
 
   async function loadTicketDetail(id: number) {
     setLoadingDetail(true);
@@ -2542,7 +2569,11 @@ function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: str
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="h-[28px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0">
-        <span className="text-[11px] font-semibold text-[#1e1e1e]">{filter === "all" ? "All Tickets" : filter === "mine" ? "My Tickets" : filter === "unassigned" ? "Unassigned" : `${filter.replace("_", " ")} Tickets`} ({filteredTickets.length})</span>
+        <span className="text-[11px] font-semibold text-[#1e1e1e]">
+          {deptFilter !== "all" ? `${deptFilter === "smart_hands" ? "SmartHands" : deptFilter.charAt(0).toUpperCase() + deptFilter.slice(1)} Queue` : "All Queues"}
+          {filter !== "all" ? ` — ${filter === "mine" ? "My Tickets" : filter === "unassigned" ? "Unassigned" : filter.replace("_", " ")}` : ""}
+          {` (${filteredTickets.length})`}
+        </span>
         <div className="flex-1" />
         <button onClick={() => setShowNewModal(true)} className="flex items-center gap-1 px-2 py-[2px] bg-[#2563eb] text-white text-[10px] font-medium hover:bg-[#1d4ed8]" data-testid="button-new-ticket">
           <Plus className="h-[10px] w-[10px]" />
@@ -2618,10 +2649,13 @@ function TicketsView({ token, tickets, filter, userId, onRefresh }: { token: str
                 <label className="text-[10px] text-[#666] block mb-[2px]">Category</label>
                 <select value={newTicket.category} onChange={(e) => setNewTicket(p => ({ ...p, category: e.target.value }))}
                   className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-category">
-                  <option value="general">General</option>
-                  <option value="technical">Technical</option>
+                  <option value="support">Support</option>
+                  <option value="sales">Sales</option>
                   <option value="billing">Billing</option>
-                  <option value="smart_hands">Smart Hands</option>
+                  <option value="provisioning">Provisioning</option>
+                  <option value="smart_hands">SmartHands</option>
+                  <option value="abuse">Abuse</option>
+                  <option value="general">General</option>
                 </select>
               </div>
               <div className="flex-1">

@@ -337,7 +337,7 @@ export default function PortalPage() {
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTicketSubject, setNewTicketSubject] = useState("");
   const [newTicketBody, setNewTicketBody] = useState("");
-  const [newTicketCategory, setNewTicketCategory] = useState("general");
+  const [newTicketCategory, setNewTicketCategory] = useState("support");
   const [newTicketPriority, setNewTicketPriority] = useState("normal");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -469,7 +469,7 @@ export default function PortalPage() {
       setShowNewTicket(false);
       setNewTicketSubject("");
       setNewTicketBody("");
-      setNewTicketCategory("general");
+      setNewTicketCategory("support");
       setNewTicketPriority("normal");
       toast({ title: "Ticket Created", description: "Your support ticket has been submitted." });
     },
@@ -918,10 +918,13 @@ export default function PortalPage() {
                       className="mt-1 w-full h-8 text-xs border border-slate-200 rounded-md px-2 bg-white"
                       data-testid="select-ticket-category"
                     >
-                      <option value="general">General</option>
-                      <option value="technical">Technical</option>
+                      <option value="support">Support</option>
+                      <option value="sales">Sales</option>
                       <option value="billing">Billing</option>
-                      <option value="smart_hands">Smart Hands</option>
+                      <option value="provisioning">Provisioning</option>
+                      <option value="smart_hands">SmartHands</option>
+                      <option value="abuse">Abuse</option>
+                      <option value="general">General</option>
                     </select>
                   </div>
                   <div>

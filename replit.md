@@ -163,9 +163,9 @@ The database schema is shared between frontend and backend through the `shared/`
 
 ### Ticketing System
 - **Tables**: tickets + ticket_replies (UUID primary keys)
-- **Ticket Fields**: customerId, userId (creator), subject, body, category (general/technical/billing/smart_hands), priority (low/normal/high/urgent), status (new/open/in_progress/waiting/resolved/closed), assignedTo (nullable, admin user), timestamps
+- **Ticket Fields**: customerId, userId (creator), subject, body, category (support/sales/billing/provisioning/smart_hands/abuse/general), priority (low/normal/high/urgent), status (new/open/in_progress/waiting/resolved/closed), assignedTo (nullable, admin user), timestamps
 - **Internal Notes**: ticket_replies.isInternal — admin-only notes hidden from customer API responses (filtered server-side)
-- **Admin Features**: Full CRUD, status/priority/assignee management via property panel, queue filtering by status/assignment, new ticket creation on behalf of customers
+- **Admin Features**: Full CRUD, status/priority/assignee management via property panel, Ubersmith-style department queue sidebar (Support, Sales, Billing, Provisioning, SmartHands, Abuse, General) with status and assignment sub-filters, new ticket creation on behalf of customers
 - **Customer Portal**: Create tickets, view own tickets, reply to tickets (isInternal hidden), permission-gated via permSupportView/permSupportCreate
 - **Endpoints**: GET/POST /api/tickets, GET/PUT /api/tickets/:id, POST /api/tickets/:id/replies
 
