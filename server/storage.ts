@@ -12,9 +12,10 @@ import {
   type DeviceInterface, type InsertDeviceInterface,
   type CustomerContact, type InsertCustomerContact,
   type CustomerNote, type InsertCustomerNote,
+  type ContactAccessBadge, type InsertContactAccessBadge,
   users, sessions, services, invoices, invoiceItems, customers, billingSettings,
   tickets, ticketReplies, devices, deviceIps, deviceInterfaces,
-  customerContacts, customerNotes
+  customerContacts, customerNotes, contactAccessBadges
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, desc, isNull } from "drizzle-orm";
@@ -86,12 +87,19 @@ export interface IStorage {
   deleteDeviceInterface(id: string): Promise<boolean>;
 
   getCustomerContacts(customerId: string): Promise<CustomerContact[]>;
+  getCustomerContact(contactId: string): Promise<CustomerContact | undefined>;
   createCustomerContact(contact: InsertCustomerContact): Promise<CustomerContact>;
   updateCustomerContact(id: string, updates: Partial<InsertCustomerContact>): Promise<CustomerContact | undefined>;
   deleteCustomerContact(id: string): Promise<boolean>;
 
   getCustomerNotes(customerId: string): Promise<CustomerNote[]>;
   createCustomerNote(note: InsertCustomerNote): Promise<CustomerNote>;
+
+  getContactAccessBadges(contactId: string): Promise<ContactAccessBadge[]>;
+  getAccessBadgesByDevice(deviceId: string): Promise<ContactAccessBadge[]>;
+  getAccessBadgesByFacility(facility: string): Promise<ContactAccessBadge[]>;
+  createContactAccessBadge(badge: InsertContactAccessBadge): Promise<ContactAccessBadge>;
+  deleteContactAccessBadge(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -384,6 +392,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(customerContacts).where(eq(customerContacts.customerId, customerId));
   }
 
+  async getCustomerContact(contactId: string): Promise<CustomerContact | undefined> {
+    const [contact] = await db.select().from(customerContacts).where(eq(customerContacts.id, contactId));
+    return contact;
+  }
+
   async createCustomerContact(contact: InsertCustomerContact): Promise<CustomerContact> {
     const [created] = await db.insert(customerContacts).values(contact).returning();
     return created;
@@ -406,6 +419,28 @@ export class DatabaseStorage implements IStorage {
   async createCustomerNote(note: InsertCustomerNote): Promise<CustomerNote> {
     const [created] = await db.insert(customerNotes).values(note).returning();
     return created;
+  }
+
+  async getContactAccessBadges(contactId: string): Promise<ContactAccessBadge[]> {
+    return db.select().from(contactAccessBadges).where(eq(contactAccessBadges.contactId, contactId));
+  }
+
+  async getAccessBadgesByDevice(deviceId: string): Promise<ContactAccessBadge[]> {
+    return db.select().from(contactAccessBadges).where(eq(contactAccessBadges.deviceId, deviceId));
+  }
+
+  async getAccessBadgesByFacility(facility: string): Promise<ContactAccessBadge[]> {
+    return db.select().from(contactAccessBadges).where(eq(contactAccessBadges.facility, facility));
+  }
+
+  async createContactAccessBadge(badge: InsertContactAccessBadge): Promise<ContactAccessBadge> {
+    const [created] = await db.insert(contactAccessBadges).values(badge).returning();
+    return created;
+  }
+
+  async deleteContactAccessBadge(id: string): Promise<boolean> {
+    const result = await db.delete(contactAccessBadges).where(eq(contactAccessBadges.id, id)).returning();
+    return result.length > 0;
   }
 }
 

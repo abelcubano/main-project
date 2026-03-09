@@ -60,20 +60,24 @@ export function AdminLayout({
   sidebarGroups,
   breadcrumbs,
   userName,
+  userRole,
   onLogout,
   children,
   topNavExtra,
   supportBadge,
+  hiddenSections = [],
 }: {
   currentSection: AdminSection;
   onSectionChange: (section: AdminSection) => void;
   sidebarGroups: SidebarGroup[];
   breadcrumbs: string[];
   userName: string;
+  userRole?: string;
   onLogout: () => void;
   children: React.ReactNode;
   topNavExtra?: React.ReactNode;
   supportBadge?: number;
+  hiddenSections?: AdminSection[];
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -113,7 +117,7 @@ export function AdminLayout({
         </button>
 
         <div className="hidden md:flex items-center gap-0.5">
-          {(["clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).map(sec => {
+          {(["clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).filter(sec => !hiddenSections.includes(sec)).map(sec => {
             const Icon = sectionIcons[sec];
             const isActive = currentSection === sec;
             return (
@@ -153,7 +157,10 @@ export function AdminLayout({
         {topNavExtra}
 
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-slate-400 text-xs hidden sm:inline">{userName}</span>
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-slate-400 text-xs">{userName}</span>
+            {userRole && <span className="text-[10px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">{userRole.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
+          </div>
           <button
             onClick={onLogout}
             className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-xs"
@@ -168,7 +175,7 @@ export function AdminLayout({
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#0f172a] border-t border-slate-700/50 px-4 py-2 flex-shrink-0 z-20" data-testid="mobile-menu">
           <div className="flex flex-wrap gap-1">
-            {(["home", "clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).map(sec => {
+            {(["home", "clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).filter(sec => !hiddenSections.includes(sec)).map(sec => {
               const Icon = sectionIcons[sec];
               const isActive = currentSection === sec;
               return (

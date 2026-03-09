@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   Activity,
@@ -163,6 +163,45 @@ function PermissionCheckboxGrid({ perms, onChange }: { perms: PermissionKeys; on
   );
 }
 
+type AdminPermKeys = {
+  adminPermDashboard: boolean;
+  adminPermClients: boolean;
+  adminPermSupport: boolean;
+  adminPermDevices: boolean;
+  adminPermOrders: boolean;
+  adminPermSales: boolean;
+  adminPermSettings: boolean;
+  adminPermUsers: boolean;
+  adminPermReports: boolean;
+};
+
+const DEFAULT_ADMIN_PERMS: AdminPermKeys = {
+  adminPermDashboard: true, adminPermClients: true, adminPermSupport: true,
+  adminPermDevices: true, adminPermOrders: true, adminPermSales: true,
+  adminPermSettings: true, adminPermUsers: true, adminPermReports: false,
+};
+
+const ADMIN_ROLE_TEMPLATES: { value: string; label: string; perms: AdminPermKeys }[] = [
+  { value: "super_admin", label: "Super Admin", perms: { adminPermDashboard: true, adminPermClients: true, adminPermSupport: true, adminPermDevices: true, adminPermOrders: true, adminPermSales: true, adminPermSettings: true, adminPermUsers: true, adminPermReports: true } },
+  { value: "datacenter_tech", label: "Datacenter Technician", perms: { adminPermDashboard: true, adminPermClients: true, adminPermSupport: true, adminPermDevices: true, adminPermOrders: false, adminPermSales: false, adminPermSettings: false, adminPermUsers: false, adminPermReports: false } },
+  { value: "security", label: "Security", perms: { adminPermDashboard: true, adminPermClients: true, adminPermSupport: true, adminPermDevices: true, adminPermOrders: false, adminPermSales: false, adminPermSettings: false, adminPermUsers: false, adminPermReports: false } },
+  { value: "billing_admin", label: "Billing Admin", perms: { adminPermDashboard: true, adminPermClients: true, adminPermSupport: false, adminPermDevices: false, adminPermOrders: true, adminPermSales: true, adminPermSettings: true, adminPermUsers: false, adminPermReports: true } },
+  { value: "support_agent", label: "Support Agent", perms: { adminPermDashboard: true, adminPermClients: true, adminPermSupport: true, adminPermDevices: false, adminPermOrders: false, adminPermSales: false, adminPermSettings: false, adminPermUsers: false, adminPermReports: false } },
+  { value: "readonly", label: "Read-Only", perms: { adminPermDashboard: true, adminPermClients: false, adminPermSupport: false, adminPermDevices: false, adminPermOrders: false, adminPermSales: false, adminPermSettings: false, adminPermUsers: false, adminPermReports: false } },
+];
+
+const ADMIN_PERM_LABELS: { key: keyof AdminPermKeys; label: string }[] = [
+  { key: "adminPermDashboard", label: "Dashboard" },
+  { key: "adminPermClients", label: "Clients" },
+  { key: "adminPermSupport", label: "Support" },
+  { key: "adminPermDevices", label: "Devices" },
+  { key: "adminPermOrders", label: "Orders" },
+  { key: "adminPermSales", label: "Sales / Invoices" },
+  { key: "adminPermSettings", label: "Settings" },
+  { key: "adminPermUsers", label: "User Management" },
+  { key: "adminPermReports", label: "Reports" },
+];
+
 type UserData = {
   id: string;
   username: string;
@@ -174,7 +213,8 @@ type UserData = {
   active: boolean;
   createdAt: string;
   lastLogin?: string;
-} & Partial<PermissionKeys>;
+  adminRole?: string | null;
+} & Partial<PermissionKeys> & Partial<AdminPermKeys>;
 
 type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings" | "tickets" | "devices" | "customer-detail";
 
@@ -384,6 +424,22 @@ export default function AdminPage() {
 
   const breadcrumbs = ["911-DC", sectionLabels[currentSection], viewLabels[currentView]];
 
+  const hiddenSections = useMemo(() => {
+    if (!user || (user as any).adminRole === "super_admin") return [] as AdminSection[];
+    const sectionPermMap: Record<AdminSection, keyof AdminPermKeys> = {
+      home: "adminPermDashboard",
+      clients: "adminPermClients",
+      support: "adminPermSupport",
+      devices: "adminPermDevices",
+      orders: "adminPermOrders",
+      sales: "adminPermSales",
+      settings: "adminPermSettings",
+    };
+    return (Object.entries(sectionPermMap) as [AdminSection, keyof AdminPermKeys][])
+      .filter(([, perm]) => (user as any)[perm] === false)
+      .map(([section]) => section);
+  }, [user]);
+
   return (
     <>
       <AdminLayout
@@ -392,8 +448,10 @@ export default function AdminPage() {
         sidebarGroups={sidebarGroups}
         breadcrumbs={breadcrumbs}
         userName={user?.name || "Admin"}
+        userRole={(user as any)?.adminRole || undefined}
         onLogout={handleLogout}
         supportBadge={openTicketCount}
+        hiddenSections={hiddenSections}
       >
         {currentView === "dashboard" && (
           <DashboardView
@@ -635,7 +693,14 @@ function UsersView({ users, loading, onNewUser, onEditUser, onDeleteUser, token 
     { key: "name", label: "Name", sortable: true, render: (row) => <span className="font-medium text-slate-900">{row.name}</span> },
     { key: "username", label: "Username", sortable: true },
     { key: "email", label: "Email", sortable: true },
-    { key: "role", label: "Role", sortable: true, render: (row) => <StatusBadge status={row.role} /> },
+    { key: "role", label: "Role", sortable: true, render: (row) => (
+      <div className="flex items-center gap-1">
+        <StatusBadge status={row.role} />
+        {row.role === "admin" && row.adminRole && (
+          <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{row.adminRole.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+        )}
+      </div>
+    )},
     { key: "permissions", label: "Permissions", render: (row) => (
       row.role === "customer" ? (
         <div className="flex flex-wrap gap-1" data-testid={`perms-summary-${row.id}`}>
@@ -643,6 +708,12 @@ function UsersView({ users, loading, onNewUser, onEditUser, onDeleteUser, token 
             <span key={b} className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 rounded-full">{b}</span>
           ))}
           {getPermSummaryBadges(row).length === 0 && <span className="text-xs text-slate-400">none</span>}
+        </div>
+      ) : row.role === "admin" ? (
+        <div className="flex flex-wrap gap-0.5" data-testid={`perms-summary-${row.id}`}>
+          {ADMIN_PERM_LABELS.filter(({ key }) => (row as any)[key] !== false).map(({ label }) => (
+            <span key={label} className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-emerald-50 text-emerald-700 rounded-full">{label}</span>
+          ))}
         </div>
       ) : <span className="text-xs text-slate-400">all</span>
     )},
@@ -741,8 +812,11 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
   const [showPassword, setShowPassword] = useState(false);
   const [roleTemplate, setRoleTemplate] = useState("custom");
   const [customerList, setCustomerList] = useState<Array<{ id: string; name: string }>>([]);
+  const [contactList, setContactList] = useState<Array<{ id: string; name: string; email: string; phone: string }>>([]);
   const [formData, setFormData] = useState({ username: "", password: "", name: "", email: "", role: "customer", customerId: "", active: true });
   const [perms, setPerms] = useState<PermissionKeys>({ ...DEFAULT_PERMS });
+  const [adminRole, setAdminRole] = useState("super_admin");
+  const [adminPerms, setAdminPerms] = useState<AdminPermKeys>({ ...DEFAULT_ADMIN_PERMS });
 
   useEffect(() => {
     if (open && token) {
@@ -750,6 +824,15 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
         .then(r => r.ok ? r.json() : []).then(data => setCustomerList(data)).catch(() => {});
     }
   }, [open, token]);
+
+  useEffect(() => {
+    if (open && token && formData.customerId && formData.role === "customer") {
+      fetch(`/api/admin/customers/${formData.customerId}/contacts`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : []).then(data => setContactList(data)).catch(() => setContactList([]));
+    } else {
+      setContactList([]);
+    }
+  }, [open, token, formData.customerId, formData.role]);
 
   useEffect(() => {
     if (open) {
@@ -765,10 +848,20 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
           permNotifyBilling: editingUser.permNotifyBilling ?? false, permNotifyIncidents: editingUser.permNotifyIncidents ?? false,
           permAdminUsers: editingUser.permAdminUsers ?? false,
         });
+        setAdminRole(editingUser.adminRole || "super_admin");
+        setAdminPerms({
+          adminPermDashboard: editingUser.adminPermDashboard ?? true, adminPermClients: editingUser.adminPermClients ?? true,
+          adminPermSupport: editingUser.adminPermSupport ?? true, adminPermDevices: editingUser.adminPermDevices ?? true,
+          adminPermOrders: editingUser.adminPermOrders ?? true, adminPermSales: editingUser.adminPermSales ?? true,
+          adminPermSettings: editingUser.adminPermSettings ?? true, adminPermUsers: editingUser.adminPermUsers ?? true,
+          adminPermReports: editingUser.adminPermReports ?? false,
+        });
         setRoleTemplate("custom");
       } else {
         setFormData({ username: "", password: "", name: "", email: "", role: "customer", customerId: "", active: true });
         setPerms({ ...DEFAULT_PERMS });
+        setAdminRole("super_admin");
+        setAdminPerms({ ...DEFAULT_ADMIN_PERMS });
         setRoleTemplate("custom");
       }
     }
@@ -791,6 +884,7 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
       const selectedCustomer = customerList.find(c => c.id === formData.customerId);
       if (selectedCustomer) { body.companyName = selectedCustomer.name; } else { body.customerId = null; body.companyName = null; }
       if (formData.role === "customer") Object.assign(body, perms);
+      if (formData.role === "admin") { body.adminRole = adminRole; Object.assign(body, adminPerms); }
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
       const data = await res.json();
       if (res.ok) { toast({ title: "Success", description: editingUser ? "User updated" : "User created" }); onSuccess(); }
@@ -807,6 +901,23 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
           <DialogDescription>{editingUser ? "Update user details and permissions" : "Create a new admin or customer account"}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!editingUser && formData.role === "customer" && formData.customerId && contactList.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <label className="text-xs text-blue-700 font-medium block mb-1.5">Import from Authorized Contact</label>
+              <Select onValueChange={(contactId) => {
+                const contact = contactList.find(c => c.id === contactId);
+                if (contact) {
+                  setFormData(prev => ({ ...prev, name: contact.name, email: contact.email || prev.email }));
+                  toast({ title: "Contact imported", description: `Pre-filled from ${contact.name}` });
+                }
+              }}>
+                <SelectTrigger className="h-8 text-xs bg-white" data-testid="select-import-contact"><SelectValue placeholder="Select a contact to pre-fill..." /></SelectTrigger>
+                <SelectContent>
+                  {contactList.map(c => <SelectItem key={c.id} value={c.id} className="text-xs">{c.name} {c.email ? `(${c.email})` : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-500 block mb-1">Username</label>
@@ -877,6 +988,50 @@ function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
               </div>
               <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
                 {getActivePermCount(perms)} of 15 permissions enabled
+              </div>
+            </div>
+          )}
+          {formData.role === "admin" && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+                <span className="text-sm font-semibold text-slate-900">Admin Role & Permissions</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Role:</span>
+                  <Select value={adminRole} onValueChange={(v) => {
+                    setAdminRole(v);
+                    const tpl = ADMIN_ROLE_TEMPLATES.find(t => t.value === v);
+                    if (tpl) setAdminPerms({ ...tpl.perms });
+                  }}>
+                    <SelectTrigger className="h-7 w-[200px] text-xs" data-testid="select-admin-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ADMIN_ROLE_TEMPLATES.map(t => <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Section Access</div>
+                <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+                  {ADMIN_PERM_LABELS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 text-[13px] text-slate-700 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={adminPerms[key]}
+                        onChange={(e) => setAdminPerms(prev => ({ ...prev, [key]: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-slate-300"
+                        disabled={adminRole === "super_admin"}
+                        data-testid={`checkbox-${key}`}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {adminRole === "super_admin" && (
+                  <div className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded">Super Admin has full access to all sections</div>
+                )}
+              </div>
+              <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
+                {Object.values(adminPerms).filter(Boolean).length} of {ADMIN_PERM_LABELS.length} sections enabled
               </div>
             </div>
           )}
@@ -2038,7 +2193,7 @@ function SettingsView({ token }: { token: string | null }) {
                   type="button"
                   onClick={async () => {
                     try {
-                      const res = await fetch("/api/admin/test-smtp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ smtpHost: billingData.smtpHost, smtpPort: billingData.smtpPort, smtpUser: billingData.smtpUser, smtpPassword: billingData.smtpPassword, smtpSecure: billingData.smtpSecure }) });
+                      const res = await fetch("/api/admin/test-smtp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ smtpHost: (settings as any).smtpHost, smtpPort: (settings as any).smtpPort, smtpUser: (settings as any).smtpUser, smtpPassword: (settings as any).smtpPassword, smtpSecure: (settings as any).smtpSecure }) });
                       const data = await res.json();
                       if (res.ok) toast({ title: "SMTP Test Passed", description: data.message || "Connection successful" });
                       else toast({ title: "SMTP Test Failed", description: data.error || "Connection failed", variant: "destructive" });
@@ -2593,6 +2748,48 @@ function CustomerDetailView({ token, customerId, onBack }: { token: string | nul
   const [addingNote, setAddingNote] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", email: "", phone: "", role: "", isPrimary: false });
+  const [expandedContactId, setExpandedContactId] = useState<string | null>(null);
+  const [contactBadges, setContactBadges] = useState<Record<string, any[]>>({});
+  const [showBadgeForm, setShowBadgeForm] = useState<string | null>(null);
+  const [newBadge, setNewBadge] = useState({ deviceId: "", facility: "", accessLevel: "escorted", notes: "", expiresAt: "" });
+
+  async function loadContactBadges(contactId: string) {
+    try {
+      const res = await fetch(`/api/admin/contacts/${contactId}/access-badges`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const badges = await res.json();
+        setContactBadges(prev => ({ ...prev, [contactId]: badges }));
+      }
+    } catch {}
+  }
+
+  async function handleAddBadge(contactId: string) {
+    try {
+      const body: any = { contactId, accessLevel: newBadge.accessLevel, notes: newBadge.notes || null };
+      if (newBadge.deviceId) body.deviceId = newBadge.deviceId;
+      if (newBadge.facility) body.facility = newBadge.facility;
+      if (newBadge.expiresAt) body.expiresAt = new Date(newBadge.expiresAt).toISOString();
+      const res = await fetch(`/api/admin/contacts/${contactId}/access-badges`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setNewBadge({ deviceId: "", facility: "", accessLevel: "escorted", notes: "", expiresAt: "" });
+        setShowBadgeForm(null);
+        loadContactBadges(contactId);
+        toast({ title: "Access badge added" });
+      }
+    } catch { toast({ title: "Error", description: "Failed to add badge", variant: "destructive" }); }
+  }
+
+  async function handleDeleteBadge(contactId: string, badgeId: string) {
+    try {
+      const res = await fetch(`/api/admin/contacts/${contactId}/access-badges/${badgeId}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) { loadContactBadges(contactId); toast({ title: "Badge removed" }); }
+    } catch { toast({ title: "Error", description: "Failed to delete badge", variant: "destructive" }); }
+  }
 
   async function loadDetail() {
     setLoading(true);
@@ -2732,26 +2929,129 @@ function CustomerDetailView({ token, customerId, onBack }: { token: string | nul
                 </div>
               )}
               {contacts.length === 0 ? <div className="text-xs text-slate-400 italic">No authorized contacts</div> : (
-                <table className="w-full" data-testid="table-contacts">
-                  <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
-                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
-                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Phone</th>
-                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Role</th>
-                    <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
-                  </tr></thead>
-                  <tbody>
-                    {contacts.map((c: any, i: number) => (
-                      <tr key={c.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-contact-${c.id}`}>
-                        <td className="text-[13px] text-slate-900 py-2 px-3">{c.name}{c.isPrimary && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Primary</span>}</td>
-                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.email || "—"}</td>
-                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.phone || "—"}</td>
-                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.role || "—"}</td>
-                        <td className="py-2 px-3 text-center"><button onClick={() => handleDeleteContact(c.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-contact-${c.id}`}><Trash2 className="w-3.5 h-3.5" /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="space-y-0" data-testid="table-contacts">
+                  <table className="w-full">
+                    <thead><tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Phone</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Role</th>
+                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Badges</th>
+                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
+                    </tr></thead>
+                    <tbody>
+                      {contacts.map((c: any, i: number) => (
+                        <React.Fragment key={c.id}>
+                          <tr className={`border-b border-slate-100 cursor-pointer ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-blue-50/30`}
+                            onClick={() => { const newId = expandedContactId === c.id ? null : c.id; setExpandedContactId(newId); if (newId) loadContactBadges(c.id); }}
+                            data-testid={`row-contact-${c.id}`}>
+                            <td className="text-[13px] text-slate-900 py-2 px-3">{c.name}{c.isPrimary && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Primary</span>}</td>
+                            <td className="text-[13px] text-slate-500 py-2 px-3">{c.email || "—"}</td>
+                            <td className="text-[13px] text-slate-500 py-2 px-3">{c.phone || "—"}</td>
+                            <td className="text-[13px] text-slate-500 py-2 px-3">{c.role || "—"}</td>
+                            <td className="py-2 px-3 text-center">
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{contactBadges[c.id]?.length || 0}</span>
+                            </td>
+                            <td className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={() => handleDeleteContact(c.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-contact-${c.id}`}><Trash2 className="w-3.5 h-3.5" /></button>
+                            </td>
+                          </tr>
+                          {expandedContactId === c.id && (
+                            <tr><td colSpan={6} className="p-0">
+                              <div className="bg-slate-50 border-t border-b border-slate-200 px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-semibold text-slate-700 flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-emerald-600" />Access Badges for {c.name}</span>
+                                  <button onClick={() => setShowBadgeForm(showBadgeForm === c.id ? null : c.id)} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid={`button-add-badge-${c.id}`}><Plus className="w-3 h-3" />Add Badge</button>
+                                </div>
+                                {showBadgeForm === c.id && (
+                                  <div className="mb-3 p-3 bg-white rounded-md border border-slate-200 space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Device</label>
+                                        <select value={newBadge.deviceId} onChange={(e) => setNewBadge({ ...newBadge, deviceId: e.target.value })} className={inputCls} data-testid="select-badge-device">
+                                          <option value="">— Facility-level only —</option>
+                                          {(detail?.devices || []).map((d: any) => <option key={d.id} value={d.id}>#{d.deviceNumber} - {d.name}</option>)}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Facility</label>
+                                        <input value={newBadge.facility} onChange={(e) => setNewBadge({ ...newBadge, facility: e.target.value })} placeholder="e.g. NAP of Americas" className={inputCls} data-testid="input-badge-facility" />
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Access Level</label>
+                                        <select value={newBadge.accessLevel} onChange={(e) => setNewBadge({ ...newBadge, accessLevel: e.target.value })} className={inputCls} data-testid="select-badge-access">
+                                          <option value="escorted">Escorted</option>
+                                          <option value="unescorted">Unescorted</option>
+                                          <option value="restricted">Restricted</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Expires</label>
+                                        <input type="date" value={newBadge.expiresAt} onChange={(e) => setNewBadge({ ...newBadge, expiresAt: e.target.value })} className={inputCls} />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Notes</label>
+                                        <input value={newBadge.notes} onChange={(e) => setNewBadge({ ...newBadge, notes: e.target.value })} placeholder="Optional notes" className={inputCls} />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button onClick={() => handleAddBadge(c.id)} className={btnPrimary} data-testid="button-save-badge">Add Badge</button>
+                                      <button onClick={() => setShowBadgeForm(null)} className={btnSecondary}>Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {(contactBadges[c.id] || []).length === 0 ? (
+                                  <div className="text-xs text-slate-400 italic">No access badges assigned</div>
+                                ) : (
+                                  <table className="w-full">
+                                    <thead><tr className="border-b border-slate-200">
+                                      <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2">Device / Facility</th>
+                                      <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2">Access Level</th>
+                                      <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2">Issued</th>
+                                      <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2">Expires</th>
+                                      <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2">Status</th>
+                                      <th className="text-center text-[10px] font-semibold text-slate-500 uppercase tracking-wider py-1.5 px-2"></th>
+                                    </tr></thead>
+                                    <tbody>
+                                      {(contactBadges[c.id] || []).map((b: any) => {
+                                        const isExpired = b.expiresAt && new Date(b.expiresAt) < new Date();
+                                        return (
+                                          <tr key={b.id} className="border-b border-slate-100">
+                                            <td className="text-[12px] text-slate-900 py-1.5 px-2">
+                                              {b.deviceName ? <span>#{b.deviceNumber} - {b.deviceName}</span> : <span className="italic text-slate-500">Facility only</span>}
+                                              {b.facility && <span className="ml-1 text-[10px] text-slate-400">({b.facility})</span>}
+                                            </td>
+                                            <td className="text-[12px] py-1.5 px-2">
+                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${b.accessLevel === "unescorted" ? "bg-green-100 text-green-700" : b.accessLevel === "restricted" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                                {b.accessLevel}
+                                              </span>
+                                            </td>
+                                            <td className="text-[12px] text-slate-500 py-1.5 px-2">{new Date(b.issuedAt).toLocaleDateString()}</td>
+                                            <td className="text-[12px] text-slate-500 py-1.5 px-2">{b.expiresAt ? new Date(b.expiresAt).toLocaleDateString() : "Never"}</td>
+                                            <td className="text-[12px] py-1.5 px-2">
+                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isExpired ? "bg-red-100 text-red-700" : b.active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                                                {isExpired ? "Expired" : b.active ? "Active" : "Inactive"}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-center">
+                                              <button onClick={() => handleDeleteBadge(c.id, b.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-badge-${b.id}`}><Trash2 className="w-3 h-3" /></button>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td></tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

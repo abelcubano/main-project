@@ -29,7 +29,9 @@ The platform follows a modular, component-based architecture designed for scalab
 - **ORM**: Drizzle ORM with Drizzle Kit for migrations.
 - **Schema & Validation**: Zod schemas generated from Drizzle schemas (`drizzle-zod`) define data structures for `customers`, `customer_contacts`, `users`, `services`, `devices`, `invoices`, and `tickets`, among others.
 - **Key Features**:
-    - **Customer & User Management**: Detailed customer accounts, contacts, and role-based user permissions (Ubersmith-style).
+    - **Customer & User Management**: Detailed customer accounts, contacts with access badges, and role-based user permissions (Ubersmith-style).
+    - **Admin Role Hierarchy**: Admin users have roles (Super Admin, Datacenter Technician, Security, Billing Admin, Support Agent, Read-Only) with section-level permissions (Dashboard, Clients, Support, Devices, Orders, Sales, Settings, Users, Reports). Nav sections hidden for unauthorized roles.
+    - **Contact Access Badges**: Authorized contacts can be granted facility/device access badges (escorted/unescorted/restricted) with expiration dates. Security team sees who can access which devices/locations.
     - **Service & Device Management**: Comprehensive tracking of datacenter services and devices, including facility location, SNMP/PDU configuration, and Grafana monitoring links.
     - **Billing System**: Automated invoice generation (draft/approval workflow), configurable billing settings, and PDF invoice generation.
     - **Ticketing System**: Support ticket creation, management, and reply threads with internal notes functionality.

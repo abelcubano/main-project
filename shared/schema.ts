@@ -64,6 +64,16 @@ export const users = pgTable("users", {
   permNotifyBilling: boolean("perm_notify_billing").notNull().default(false),
   permNotifyIncidents: boolean("perm_notify_incidents").notNull().default(false),
   permAdminUsers: boolean("perm_admin_users").notNull().default(false),
+  adminRole: text("admin_role"),
+  adminPermDashboard: boolean("admin_perm_dashboard").notNull().default(true),
+  adminPermClients: boolean("admin_perm_clients").notNull().default(true),
+  adminPermSupport: boolean("admin_perm_support").notNull().default(true),
+  adminPermDevices: boolean("admin_perm_devices").notNull().default(true),
+  adminPermOrders: boolean("admin_perm_orders").notNull().default(true),
+  adminPermSales: boolean("admin_perm_sales").notNull().default(true),
+  adminPermSettings: boolean("admin_perm_settings").notNull().default(true),
+  adminPermUsers: boolean("admin_perm_users").notNull().default(true),
+  adminPermReports: boolean("admin_perm_reports").notNull().default(false),
 });
 
 export const sessions = pgTable("sessions", {
@@ -105,6 +115,16 @@ export const insertUserSchema = createInsertSchema(users).pick({
   permNotifyBilling: true,
   permNotifyIncidents: true,
   permAdminUsers: true,
+  adminRole: true,
+  adminPermDashboard: true,
+  adminPermClients: true,
+  adminPermSupport: true,
+  adminPermDevices: true,
+  adminPermOrders: true,
+  adminPermSales: true,
+  adminPermSettings: true,
+  adminPermUsers: true,
+  adminPermReports: true,
 });
 
 export const PERMISSION_FIELDS = [
@@ -394,3 +414,23 @@ export type InsertCustomerContact = z.infer<typeof insertCustomerContactSchema>;
 export type CustomerContact = typeof customerContacts.$inferSelect;
 export type InsertCustomerNote = z.infer<typeof insertCustomerNoteSchema>;
 export type CustomerNote = typeof customerNotes.$inferSelect;
+
+export const contactAccessBadges = pgTable("contact_access_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => customerContacts.id),
+  deviceId: varchar("device_id").references(() => devices.id),
+  facility: text("facility"),
+  accessLevel: text("access_level").notNull().default("escorted"),
+  notes: text("notes"),
+  issuedAt: timestamp("issued_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  active: boolean("active").notNull().default(true),
+});
+
+export const insertContactAccessBadgeSchema = createInsertSchema(contactAccessBadges).omit({
+  id: true,
+  issuedAt: true,
+});
+
+export type InsertContactAccessBadge = z.infer<typeof insertContactAccessBadgeSchema>;
+export type ContactAccessBadge = typeof contactAccessBadges.$inferSelect;

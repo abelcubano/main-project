@@ -6,7 +6,7 @@ import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, PERMISSION_FIELDS } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, insertContactAccessBadgeSchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
 
@@ -30,7 +30,7 @@ function extractUserPermissions(user: any) {
 }
 
 function sanitizeUser(user: any) {
-  return {
+  const base: any = {
     id: user.id,
     username: user.username,
     name: user.name,
@@ -39,8 +39,24 @@ function sanitizeUser(user: any) {
     companyName: user.companyName,
     customerId: user.customerId,
     customerRole: user.customerRole,
+    active: user.active,
+    createdAt: user.createdAt,
+    lastLogin: user.lastLogin,
     ...extractUserPermissions(user),
   };
+  if (user.role === "admin") {
+    base.adminRole = user.adminRole;
+    base.adminPermDashboard = user.adminPermDashboard;
+    base.adminPermClients = user.adminPermClients;
+    base.adminPermSupport = user.adminPermSupport;
+    base.adminPermDevices = user.adminPermDevices;
+    base.adminPermOrders = user.adminPermOrders;
+    base.adminPermSales = user.adminPermSales;
+    base.adminPermSettings = user.adminPermSettings;
+    base.adminPermUsers = user.adminPermUsers;
+    base.adminPermReports = user.adminPermReports;
+  }
+  return base;
 }
 
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -80,6 +96,21 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();
+}
+
+function requireAdminPerm(permission: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    if (user.adminRole === "super_admin") return next();
+    const permKey = `adminPerm${permission.charAt(0).toUpperCase() + permission.slice(1)}` as keyof typeof user;
+    if (user[permKey] === false) {
+      return res.status(403).json({ error: `Access denied: ${permission} permission required` });
+    }
+    next();
+  };
 }
 
 export async function registerRoutes(
@@ -153,7 +184,7 @@ export async function registerRoutes(
     res.json(sanitizeUser(user));
   });
 
-  app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/users", requireAuth, requireAdmin, requireAdminPerm("users"), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users.map(u => ({
@@ -168,7 +199,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/users", requireAuth, requireAdmin, requireAdminPerm("users"), async (req, res) => {
     try {
       const schema = insertUserSchema.extend({
         password: z.string().min(6, "Password must be at least 6 characters"),
@@ -204,7 +235,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/users/:id", requireAuth, requireAdmin, requireAdminPerm("users"), async (req, res) => {
     try {
       const { id } = req.params;
       const updates: any = {};
@@ -221,6 +252,14 @@ export async function registerRoutes(
       }
 
       for (const field of PERMISSION_FIELDS) {
+        if (typeof req.body[field] === "boolean") {
+          updates[field] = req.body[field];
+        }
+      }
+
+      const ADMIN_PERM_FIELDS = ["adminPermDashboard", "adminPermClients", "adminPermSupport", "adminPermDevices", "adminPermOrders", "adminPermSales", "adminPermSettings", "adminPermUsers", "adminPermReports"];
+      if (req.body.adminRole) updates.adminRole = req.body.adminRole;
+      for (const field of ADMIN_PERM_FIELDS) {
         if (typeof req.body[field] === "boolean") {
           updates[field] = req.body[field];
         }
@@ -244,7 +283,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/users/:id", requireAuth, requireAdmin, requireAdminPerm("users"), async (req, res) => {
     try {
       const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const currentUser = (req as any).user;
@@ -317,7 +356,7 @@ export async function registerRoutes(
   });
 
   // Admin service management
-  app.post("/api/admin/services", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/services", requireAuth, requireAdmin, requireAdminPerm("orders"), async (req, res) => {
     try {
       const body = { ...req.body };
       if (body.startDate && typeof body.startDate === 'string') {
@@ -339,7 +378,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/services/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/services/:id", requireAuth, requireAdmin, requireAdminPerm("orders"), async (req, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const body = { ...req.body };
@@ -359,7 +398,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/services/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/services/:id", requireAuth, requireAdmin, requireAdminPerm("orders"), async (req, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const deleted = await storage.deleteService(serviceId);
@@ -478,7 +517,7 @@ export async function registerRoutes(
   });
 
   // Run billing cycle
-  app.post("/api/admin/billing/run", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/billing/run", requireAuth, requireAdmin, requireAdminPerm("sales"), async (req, res) => {
     try {
       const result = await runMonthlyBilling();
       res.json(result);
@@ -489,7 +528,7 @@ export async function registerRoutes(
   });
 
   // Billing settings
-  app.get("/api/admin/billing-settings", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/billing-settings", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
     try {
       const settings = await storage.getBillingSettings();
       res.json(settings);
@@ -499,7 +538,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/billing-settings", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/billing-settings", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
     try {
       const settings = await storage.updateBillingSettings(req.body);
       res.json(settings);
@@ -510,7 +549,7 @@ export async function registerRoutes(
   });
 
   // Approve invoice (draft -> pending)
-  app.post("/api/admin/invoices/:id/approve", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/invoices/:id/approve", requireAuth, requireAdmin, requireAdminPerm("sales"), async (req, res) => {
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const invoice = await storage.getInvoice(id);
@@ -579,7 +618,7 @@ export async function registerRoutes(
   });
 
   // Send invitation email
-  app.post("/api/admin/users/:id/send-invitation", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/users/:id/send-invitation", requireAuth, requireAdmin, requireAdminPerm("users"), async (req, res) => {
     try {
       const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = await storage.getUser(userId);
@@ -613,7 +652,7 @@ export async function registerRoutes(
   });
 
   // Admin invoice management
-  app.post("/api/admin/invoices", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/invoices", requireAuth, requireAdmin, requireAdminPerm("sales"), async (req, res) => {
     try {
       const { items, ...invoiceData } = req.body;
       if (invoiceData.issueDate && typeof invoiceData.issueDate === 'string') {
@@ -650,7 +689,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/invoices/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/invoices/:id", requireAuth, requireAdmin, requireAdminPerm("sales"), async (req, res) => {
     try {
       const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const { items, ...updates } = req.body;
@@ -684,7 +723,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/invoices/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/invoices/:id", requireAuth, requireAdmin, requireAdminPerm("sales"), async (req, res) => {
     try {
       const invoiceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const deleted = await storage.deleteInvoice(invoiceId);
@@ -701,7 +740,7 @@ export async function registerRoutes(
   });
 
   // Get customer users for dropdowns (services/invoices)
-  app.get("/api/admin/customer-users", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/customer-users", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const allCustomers = await storage.getAllCustomers();
       const result: Array<{ id: string; name: string; companyName: string | null; email: string | null; customerId: string }> = [];
@@ -733,7 +772,7 @@ export async function registerRoutes(
   });
 
   // Customer (Company) CRUD
-  app.get("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/customers", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const allCustomers = await storage.getAllCustomers();
       res.json(allCustomers);
@@ -743,7 +782,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/customers/:id", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const customer = await storage.getCustomer(customerId);
@@ -781,7 +820,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/customers", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/customers", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const validation = insertCustomerSchema.safeParse(req.body);
       if (!validation.success) {
@@ -795,7 +834,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/customers/:id", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const customer = await storage.updateCustomer(customerId, req.body);
@@ -809,7 +848,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/customers/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/customers/:id", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const deleted = await storage.deleteCustomer(customerId);
@@ -824,7 +863,7 @@ export async function registerRoutes(
   });
 
   // Add/remove user from customer
-  app.post("/api/admin/customers/:id/users", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/customers/:id/users", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const { username, password, email, name, customerRole, ...rest } = req.body;
@@ -859,7 +898,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.customerId) ? req.params.customerId[0] : req.params.customerId;
       const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
@@ -887,7 +926,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/customers/:customerId/users/:userId", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
       await storage.updateUser(userId, { customerId: null, customerRole: null } as any);
@@ -1236,7 +1275,7 @@ export async function registerRoutes(
   });
 
   // SMTP test endpoint
-  app.post("/api/admin/test-smtp", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/test-smtp", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
     try {
       const settings = await storage.getBillingSettings();
       const testSettings = {
@@ -1256,7 +1295,7 @@ export async function registerRoutes(
   });
 
   // Device CRUD
-  app.get("/api/admin/devices", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/devices", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const allDevices = await storage.getAllDevices();
       const allCustomers = await storage.getAllCustomers();
@@ -1273,7 +1312,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/devices/:id", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const device = await storage.getDevice(deviceId);
@@ -1302,7 +1341,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/devices", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/devices", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const validation = insertDeviceSchema.safeParse(req.body);
       if (!validation.success) {
@@ -1316,7 +1355,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/devices/:id", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const device = await storage.updateDevice(deviceId, req.body);
@@ -1328,7 +1367,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/devices/:id", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const deleted = await storage.deleteDevice(deviceId);
@@ -1340,7 +1379,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/devices/:id/ips", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/devices/:id/ips", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const ips = await storage.getDeviceIps(deviceId);
@@ -1350,7 +1389,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/devices/:id/ips", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/devices/:id/ips", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const validation = insertDeviceIpSchema.safeParse({ ...req.body, deviceId });
@@ -1362,7 +1401,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/devices/:deviceId/ips/:ipId", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/devices/:deviceId/ips/:ipId", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const ipId = Array.isArray(req.params.ipId) ? req.params.ipId[0] : req.params.ipId;
       await storage.deleteDeviceIp(ipId);
@@ -1372,7 +1411,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const interfaces = await storage.getDeviceInterfaces(deviceId);
@@ -1382,7 +1421,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const validation = insertDeviceInterfaceSchema.safeParse({ ...req.body, deviceId });
@@ -1394,7 +1433,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/devices/:deviceId/interfaces/:ifaceId", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/devices/:deviceId/interfaces/:ifaceId", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const ifaceId = Array.isArray(req.params.ifaceId) ? req.params.ifaceId[0] : req.params.ifaceId;
       await storage.deleteDeviceInterface(ifaceId);
@@ -1405,7 +1444,7 @@ export async function registerRoutes(
   });
 
   // Customer contacts and notes
-  app.get("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const contacts = await storage.getCustomerContacts(customerId);
@@ -1415,7 +1454,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const validation = insertCustomerContactSchema.safeParse({ ...req.body, customerId });
@@ -1427,7 +1466,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
       const contact = await storage.updateCustomerContact(contactId, req.body);
@@ -1438,7 +1477,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, async (req, res) => {
+  app.delete("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
       await storage.deleteCustomerContact(contactId);
@@ -1448,7 +1487,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/customers/:id/notes", requireAuth, requireAdmin, async (req, res) => {
+  app.get("/api/admin/customers/:id/notes", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const notes = await storage.getCustomerNotes(customerId);
@@ -1463,7 +1502,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/customers/:id/notes", requireAuth, requireAdmin, async (req, res) => {
+  app.post("/api/admin/customers/:id/notes", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
     try {
       const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = (req as any).user;
@@ -1473,6 +1512,62 @@ export async function registerRoutes(
       res.json({ ...note, authorName: user.name });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.get("/api/admin/contacts/:contactId/access-badges", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
+    try {
+      const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
+      const badges = await storage.getContactAccessBadges(contactId);
+      const allDevices = await storage.getAllDevices();
+      const enriched = badges.map(b => {
+        const device = allDevices.find(d => d.id === b.deviceId);
+        return { ...b, deviceName: device?.name || null, deviceNumber: device?.deviceNumber || null };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch access badges" });
+    }
+  });
+
+  app.post("/api/admin/contacts/:contactId/access-badges", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
+    try {
+      const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
+      const validation = insertContactAccessBadgeSchema.safeParse({ ...req.body, contactId });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const badge = await storage.createContactAccessBadge(validation.data);
+      res.json(badge);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create access badge" });
+    }
+  });
+
+  app.delete("/api/admin/contacts/:contactId/access-badges/:badgeId", requireAuth, requireAdmin, requireAdminPerm("clients"), async (req, res) => {
+    try {
+      const badgeId = Array.isArray(req.params.badgeId) ? req.params.badgeId[0] : req.params.badgeId;
+      await storage.deleteContactAccessBadge(badgeId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete access badge" });
+    }
+  });
+
+  app.get("/api/admin/devices/:id/access-badges", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const badges = await storage.getAccessBadgesByDevice(deviceId);
+      const allContacts: any[] = [];
+      for (const b of badges) {
+        const contact = await storage.getCustomerContact(b.contactId);
+        if (contact) allContacts.push(contact);
+      }
+      const enriched = badges.map(b => {
+        const contact = allContacts.find(c => c.id === b.contactId);
+        return { ...b, contactName: contact?.name || "Unknown", contactEmail: contact?.email || null };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch device access badges" });
     }
   });
 
