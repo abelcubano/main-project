@@ -1,0 +1,332 @@
+I want you to redesign my platform UI so it feels like a modernized Ubersmith-style operations system, especially the Dashboard and Support Manager sections.
+
+Do not copy Ubersmith exactly. Instead, use it as a UX reference for layout, structure, and workflow. The goal is to create a cleaner, more modern, more professional version of that same operational style for my system.
+
+Overall design direction
+
+Build a responsive admin interface with these characteristics:
+
+Top horizontal navigation bar
+
+Left contextual sidebar for the active module
+
+Main content area with dashboard widgets, tables, filters, and actions
+
+Clean enterprise look
+
+Modern spacing, typography, and card styling
+
+Keep it practical and operational, not flashy
+
+Design should feel like a datacenter / billing / support / device management platform
+
+Use a dark top nav and light content area
+
+Use subtle borders, muted backgrounds, clear hierarchy, and strong table usability
+
+Main UX inspiration
+
+I want the app structure to resemble Ubersmith’s navigation model:
+
+Top navigation modules
+
+Include a top nav with primary modules like:
+
+Clients
+
+Support
+
+Devices
+
+Orders
+
+Sales
+
+Reports
+
+Settings
+
+Each top-level module should open its own section, and the selected module should clearly appear active.
+
+1) Dashboard / Home redesign
+
+I want the dashboard to follow the same general concept shown in Ubersmith:
+
+Dashboard layout requirements
+
+A welcome/header area at the top
+
+A message board / announcements panel near the top
+
+A row of summary manager cards/widgets
+
+Each widget should represent a major area of the system
+
+Dashboard cards/widgets
+
+Create cards similar to:
+
+Client Manager
+
+Support Manager
+
+Device Manager
+
+Billing Manager
+
+Orders Manager
+
+Infrastructure / Monitoring Manager
+
+Each card should include:
+
+Section title
+
+“Day at a glance” summary
+
+4–6 important KPIs
+
+A clear CTA link/button such as:
+
+Go to Client Manager
+
+Go to Support Manager
+
+Go to Device Manager
+
+Dashboard behavior
+
+The dashboard should work like an executive operations overview:
+
+fast scanning
+
+clear counts
+
+status visibility
+
+quick entry into each module
+
+Use clean cards in a responsive grid. On desktop, show multiple cards per row. On mobile/tablet, stack them nicely.
+
+2) Support Manager redesign
+
+I want the Support section to follow the Ubersmith-style workflow:
+
+Support page layout
+
+Top title/header area for the Support module
+
+Left sidebar with ticket-related navigation
+
+Main content area showing ticket tables
+
+Filters and actions at the top
+
+Strong focus on usability for support operations
+
+Left sidebar requirements
+
+Include sections like:
+
+New Tickets
+
+My Tickets
+
+Unassigned
+
+Subscribed
+
+Departments
+
+Under Departments, show expandable/clickable department filters such as:
+
+All Departments
+
+Billing
+
+Support
+
+Sales
+
+NOC
+
+Remote Hands
+
+The left sidebar should be collapsible.
+
+Main support content
+
+Build an “All Open Tickets” view with:
+
+Ticket table
+
+Search/filter row
+
+Status dropdown
+
+Department filter
+
+Priority filter
+
+“Submit Ticket” button
+
+Bulk actions area
+
+Ticket table columns
+
+Include columns similar to:
+
+Ticket #
+
+Subject
+
+Client / Author
+
+Opened / Due
+
+Updated
+
+TTR / SLA
+
+Priority
+
+Impact
+
+Owner
+
+Type
+
+Classification
+
+Billable
+
+Status
+
+Ticket table UX
+
+Sortable columns
+
+Colored priority badges
+
+Visual SLA indicators
+
+Row hover states
+
+Bulk selection checkboxes
+
+Quick actions
+
+Pagination
+
+Optional auto-refresh
+
+3) Modernization goals
+
+I do not want an outdated clone. I want a modern redesign inspired by Ubersmith, with:
+
+better spacing
+
+better typography
+
+cleaner cards
+
+cleaner tables
+
+better alignment
+
+more polished filters
+
+more visually clear navigation
+
+subtle icons
+
+improved responsive behavior
+
+improved visual consistency across modules
+
+Think:
+“Ubersmith UX structure, but redesigned for 2026 SaaS standards.”
+
+4) Technical request
+
+Please redesign this using my existing stack and components where possible.
+
+Important:
+
+Reuse existing routes, data sources, and business logic
+
+Focus first on UI/UX and layout redesign
+
+Create reusable layout components for:
+
+Top navigation
+
+Sidebar navigation
+
+Dashboard cards
+
+Table toolbar
+
+Data tables
+
+Status/priority badges
+
+Keep the design system consistent across all modules
+
+5) Deliverables I want from you
+
+Please do the following:
+
+Redesign the main app shell/layout
+
+Redesign the Dashboard/Home page
+
+Redesign the Support Manager screens
+
+Create reusable UI components for cards, tables, filters, and sidebars
+
+Make the UI responsive
+
+Keep the design enterprise-grade and operations-focused
+
+6) Visual style
+
+Use:
+
+dark navy or deep blue header
+
+light gray / white content panels
+
+subtle shadows
+
+clear section headers
+
+compact but readable tables
+
+professional enterprise typography
+
+icon-supported navigation
+
+Avoid:
+
+flashy startup gradients
+
+oversized padding
+
+overly rounded cards
+
+consumer-style dashboard design
+
+7) Important note
+
+This is a design inspiration request, not a request to copy Ubersmith literally. Please reinterpret the UX pattern into an original, modern interface for my system.
+
+Start by redesigning:
+
+App shell
+
+Dashboard
+
+Support Manager
+
+Then show me the updated pages.
