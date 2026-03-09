@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
+import type { BillingSettings } from "@shared/schema";
 
 const LOG_FILE = path.join(process.cwd(), "logs", "email.log");
 
@@ -14,7 +15,7 @@ function emailLog(message: string) {
   } catch {}
 }
 
-const transporter = nodemailer.createTransport({
+const defaultTransporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST || "smtp.titan.email",
   port: parseInt(process.env.MAIL_PORT || "465"),
   secure: true,
@@ -23,6 +24,21 @@ const transporter = nodemailer.createTransport({
     pass: process.env.MAIL_PASSWORD,
   },
 });
+
+function createTransporterFromSettings(settings: BillingSettings) {
+  if (settings.smtpHost && settings.smtpUser && settings.smtpPassword) {
+    return nodemailer.createTransport({
+      host: settings.smtpHost,
+      port: settings.smtpPort || 465,
+      secure: settings.smtpSecure ?? true,
+      auth: {
+        user: settings.smtpUser,
+        pass: settings.smtpPassword,
+      },
+    });
+  }
+  return defaultTransporter;
+}
 
 export interface DispatchRequest {
   name: string;
@@ -160,7 +176,7 @@ Submitted: ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" }
   `;
 
   try {
-    await transporter.sendMail({
+    await defaultTransporter.sendMail({
       from: `"SF Smart Hands" <${fromAddress}>`,
       to: toAddress,
       replyTo: request.email,
@@ -213,9 +229,11 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
 export async function sendInvoiceEmail(
   data: InvoiceEmailData,
   templateOverride?: { subject?: string; body?: string },
-  pdfBuffer?: Buffer
+  pdfBuffer?: Buffer,
+  settings?: BillingSettings
 ): Promise<{ success: boolean; error?: string }> {
-  const fromAddress = process.env.MAIL_BILLING_FROM || "abel.monzon@911dc.us";
+  const transport = settings ? createTransporterFromSettings(settings) : defaultTransporter;
+  const fromAddress = settings?.smtpUser || process.env.MAIL_BILLING_FROM || "abel.monzon@911dc.us";
 
   const vars: Record<string, string> = {
     customerName: data.customerName,
@@ -262,14 +280,14 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
 <div class="footer">911-DC | Datacenter Operations & SmartHands Services | Miami, FL</div>
 </div></div></body></html>`;
 
-  const textBody = bodyText || `Invoice ${data.invoiceNumber} - $${data.total}\nDue: ${data.dueDate}\n${data.itemCount} service(s)\n\n911-DC`;
+  const plainText = bodyText || `Invoice ${data.invoiceNumber} - $${data.total}\nDue: ${data.dueDate}\n${data.itemCount} service(s)\n\n911-DC`;
 
   try {
     const mailOptions: any = {
       from: `"911-DC Billing" <${fromAddress}>`,
       to: data.email,
       subject,
-      text: textBody,
+      text: plainText,
       html: htmlBody,
     };
     if (pdfBuffer) {
@@ -279,7 +297,7 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
         contentType: "application/pdf",
       }];
     }
-    await transporter.sendMail(mailOptions);
+    await transport.sendMail(mailOptions);
     emailLog(`[EMAIL] Invoice notification sent to ${data.email} for ${data.invoiceNumber}${pdfBuffer ? " (with PDF)" : ""}`);
     return { success: true };
   } catch (error: any) {
@@ -297,9 +315,11 @@ export interface InvitationEmailData {
 
 export async function sendInvitationEmail(
   data: InvitationEmailData,
-  templateOverride?: { subject?: string; body?: string }
+  templateOverride?: { subject?: string; body?: string },
+  settings?: BillingSettings
 ): Promise<{ success: boolean; error?: string }> {
-  const fromAddress = process.env.MAIL_FROM || "abel.monzon@911dc.us";
+  const transport = settings ? createTransporterFromSettings(settings) : defaultTransporter;
+  const fromAddress = settings?.smtpUser || process.env.MAIL_FROM || "abel.monzon@911dc.us";
 
   const vars: Record<string, string> = {
     userName: data.userName,
@@ -319,7 +339,7 @@ export async function sendInvitationEmail(
   const htmlBody = wrapInEmailHtml(bodyText);
 
   try {
-    await transporter.sendMail({
+    await transport.sendMail({
       from: `"911-DC" <${fromAddress}>`,
       to: data.userEmail,
       subject,
@@ -334,9 +354,75 @@ export async function sendInvitationEmail(
   }
 }
 
+export interface TicketNotificationData {
+  recipientEmail: string;
+  ticketNumber: number;
+  subject: string;
+  replyBody: string;
+  replyAuthor: string;
+  customerName: string;
+  isNewTicket?: boolean;
+}
+
+export async function sendTicketNotificationEmail(
+  data: TicketNotificationData,
+  settings?: BillingSettings
+): Promise<{ success: boolean; error?: string }> {
+  const transport = settings ? createTransporterFromSettings(settings) : defaultTransporter;
+  const fromAddress = settings?.supportEmailAddress || settings?.smtpUser || process.env.MAIL_FROM || "abel.monzon@911dc.us";
+
+  const vars: Record<string, string> = {
+    ticketNumber: String(data.ticketNumber),
+    subject: data.subject,
+    replyBody: data.replyBody,
+    replyAuthor: data.replyAuthor,
+    customerName: data.customerName,
+  };
+
+  const subjectTemplate = settings?.ticketEmailSubject || "[Ticket #{{ticketNumber}}] {{subject}}";
+  const bodyTemplate = settings?.ticketEmailTemplate || "Hello {{customerName}},\n\n{{replyAuthor}} has replied to your ticket #{{ticketNumber}}:\n\nSubject: {{subject}}\n\n{{replyBody}}\n\nYou can view and respond to this ticket in your customer portal.\n\nThank you,\n911-DC Support";
+
+  const emailSubject = data.isNewTicket
+    ? `[New Ticket #${data.ticketNumber}] ${data.subject}`
+    : replaceTemplatePlaceholders(subjectTemplate, vars);
+
+  const emailBody = data.isNewTicket
+    ? `New ticket #${data.ticketNumber} has been submitted by ${data.replyAuthor} (${data.customerName}).\n\nSubject: ${data.subject}\n\n${data.replyBody}\n\nPlease review and respond.\n\n911-DC Support`
+    : replaceTemplatePlaceholders(bodyTemplate, vars);
+
+  const htmlBody = wrapInEmailHtml(emailBody);
+
+  try {
+    await transport.sendMail({
+      from: `"911-DC Support" <${fromAddress}>`,
+      to: data.recipientEmail,
+      subject: emailSubject,
+      text: emailBody,
+      html: htmlBody,
+    });
+    emailLog(`[EMAIL] Ticket notification sent to ${data.recipientEmail} for ticket #${data.ticketNumber}`);
+    return { success: true };
+  } catch (error: any) {
+    emailLog(`[EMAIL ERROR] Failed to send ticket notification: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function testSmtpConnection(settings: BillingSettings): Promise<{ success: boolean; error?: string }> {
+  try {
+    const transport = createTransporterFromSettings(settings);
+    await transport.verify();
+    emailLog("[EMAIL] SMTP test connection verified successfully");
+    return { success: true };
+  } catch (error: any) {
+    emailLog(`[EMAIL ERROR] SMTP test connection failed: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
-    await transporter.verify();
+    await defaultTransporter.verify();
     emailLog("[EMAIL] SMTP connection verified successfully");
     return true;
   } catch (error: any) {

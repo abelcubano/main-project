@@ -1,12 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { sendDispatchEmail, sendInvoiceEmail, sendInvitationEmail, verifyEmailConnection, type DispatchRequest } from "./email";
+import { sendDispatchEmail, sendInvoiceEmail, sendInvitationEmail, sendTicketNotificationEmail, testSmtpConnection, verifyEmailConnection, type DispatchRequest } from "./email";
 import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, PERMISSION_FIELDS } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
 
@@ -751,7 +751,30 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Customer not found" });
       }
       const customerUsers = await storage.getUsersByCustomer(customerId);
-      res.json({ ...customer, users: customerUsers.map(u => ({ ...sanitizeUser(u), active: u.active })) });
+      const contacts = await storage.getCustomerContacts(customerId);
+      const notes = await storage.getCustomerNotes(customerId);
+      const customerTickets = await storage.getTicketsByCustomer(customerId);
+      const allDevices = await storage.getDevicesByCustomer(customerId);
+      const allServices = await storage.getAllServices();
+      const customerServices = allServices.filter(s => customerUsers.some(u => u.id === s.userId));
+      const allInvoices = await storage.getAllInvoices();
+      const customerInvoices = allInvoices.filter(inv => customerUsers.some(u => u.id === inv.userId));
+      const allUsersForNotes = await storage.getAllUsers();
+      const enrichedNotes = notes.map(n => {
+        const author = allUsersForNotes.find(u => u.id === n.userId);
+        return { ...n, authorName: author?.name || "Unknown" };
+      });
+      res.json({
+        ...customer,
+        users: customerUsers.map(u => ({ ...sanitizeUser(u), active: u.active, createdAt: u.createdAt, lastLogin: u.lastLogin })),
+        contacts,
+        notes: enrichedNotes,
+        tickets: customerTickets.slice(0, 10),
+        devices: allDevices,
+        services: customerServices,
+        invoices: customerInvoices.slice(0, 10),
+        invoiceBalance: customerInvoices.filter(i => i.status === "pending").reduce((sum, i) => sum + Number(i.total), 0).toFixed(2),
+      });
     } catch (error: any) {
       console.error("[ADMIN] Get customer error:", error);
       res.status(500).json({ error: "Failed to fetch customer" });
@@ -967,6 +990,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
       }
       const ticket = await storage.createTicket(validation.data);
+
+      try {
+        const settings = await storage.getBillingSettings();
+        const supportEmail = settings.supportEmailAddress || "info@911dc.us";
+        const creator = await storage.getUser(ticket.userId);
+        const customer = ticket.customerId ? await storage.getCustomer(ticket.customerId) : null;
+        await sendTicketNotificationEmail({
+          recipientEmail: supportEmail,
+          ticketNumber: ticket.ticketNumber,
+          subject: ticket.subject,
+          replyBody: ticket.body,
+          replyAuthor: creator?.name || "Customer",
+          customerName: customer?.name || creator?.companyName || "Unknown",
+          isNewTicket: true,
+        }, settings);
+      } catch (emailErr: any) {
+        console.error("[TICKETS] Email notification error:", emailErr.message);
+      }
+
       res.json(ticket);
     } catch (error: any) {
       console.error("[TICKETS] Create ticket error:", error);
@@ -1033,6 +1075,48 @@ export async function registerRoutes(
       }
       const reply = await storage.createTicketReply(validation.data);
       await storage.updateTicket(ticketId, {});
+
+      try {
+        if (!replyData.isInternal) {
+          const settings = await storage.getBillingSettings();
+          const customer = ticket.customerId ? await storage.getCustomer(ticket.customerId) : null;
+
+          if (user.role === "admin") {
+            if (ticket.customerId) {
+              const customerUsers = await storage.getUsersByCustomer(ticket.customerId);
+              const recipients = customerUsers.filter(u => u.email && u.permSupportView);
+              for (const recipient of recipients) {
+                await sendTicketNotificationEmail({
+                  recipientEmail: recipient.email,
+                  ticketNumber: ticket.ticketNumber,
+                  subject: ticket.subject,
+                  replyBody: req.body.body,
+                  replyAuthor: user.name,
+                  customerName: customer?.name || "Customer",
+                }, settings);
+              }
+            }
+          } else {
+            const supportEmail = settings.supportEmailAddress || "info@911dc.us";
+            let recipientEmail = supportEmail;
+            if (ticket.assignedTo) {
+              const assignee = await storage.getUser(ticket.assignedTo);
+              if (assignee?.email) recipientEmail = assignee.email;
+            }
+            await sendTicketNotificationEmail({
+              recipientEmail,
+              ticketNumber: ticket.ticketNumber,
+              subject: ticket.subject,
+              replyBody: req.body.body,
+              replyAuthor: user.name,
+              customerName: customer?.name || user.companyName || "Customer",
+            }, settings);
+          }
+        }
+      } catch (emailErr: any) {
+        console.error("[TICKETS] Reply email notification error:", emailErr.message);
+      }
+
       res.json(reply);
     } catch (error: any) {
       console.error("[TICKETS] Create reply error:", error);
@@ -1148,6 +1232,267 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[PDU] Reboot port error:", error);
       res.status(500).json({ error: error.message || "Failed to reboot PDU port" });
+    }
+  });
+
+  // SMTP test endpoint
+  app.post("/api/admin/test-smtp", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      const testSettings = {
+        ...settings,
+        ...(req.body?.smtpHost && { smtpHost: req.body.smtpHost }),
+        ...(req.body?.smtpPort && { smtpPort: req.body.smtpPort }),
+        ...(req.body?.smtpUser && { smtpUser: req.body.smtpUser }),
+        ...(req.body?.smtpPassword && { smtpPassword: req.body.smtpPassword }),
+        ...(req.body?.smtpSecure !== undefined && { smtpSecure: req.body.smtpSecure }),
+      };
+      const result = await testSmtpConnection(testSettings);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[ADMIN] Test SMTP error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Device CRUD
+  app.get("/api/admin/devices", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const allDevices = await storage.getAllDevices();
+      const allCustomers = await storage.getAllCustomers();
+      const allServices = await storage.getAllServices();
+      const enriched = allDevices.map(d => {
+        const customer = d.customerId ? allCustomers.find(c => c.id === d.customerId) : null;
+        const service = d.serviceId ? allServices.find(s => s.id === d.serviceId) : null;
+        return { ...d, customerName: customer?.name || null, serviceName: service?.name || null };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("[ADMIN] Get devices error:", error);
+      res.status(500).json({ error: "Failed to fetch devices" });
+    }
+  });
+
+  app.get("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const device = await storage.getDevice(deviceId);
+      if (!device) return res.status(404).json({ error: "Device not found" });
+      const ips = await storage.getDeviceIps(deviceId);
+      const interfaces = await storage.getDeviceInterfaces(deviceId);
+      const children = await storage.getChildDevices(deviceId);
+      const customer = device.customerId ? await storage.getCustomer(device.customerId) : null;
+      const service = device.serviceId ? await storage.getService(device.serviceId) : null;
+      const allDevices = await storage.getAllDevices();
+      const enrichedInterfaces = interfaces.map(i => {
+        const connDev = i.connectedDeviceId ? allDevices.find(d => d.id === i.connectedDeviceId) : null;
+        return { ...i, connectedDeviceName: connDev?.name || null };
+      });
+      res.json({
+        ...device,
+        customerName: customer?.name || null,
+        serviceName: service?.name || null,
+        ips,
+        interfaces: enrichedInterfaces,
+        children: children.map(c => ({ id: c.id, deviceNumber: c.deviceNumber, name: c.name, deviceType: c.deviceType, status: c.status })),
+      });
+    } catch (error: any) {
+      console.error("[ADMIN] Get device error:", error);
+      res.status(500).json({ error: "Failed to fetch device" });
+    }
+  });
+
+  app.post("/api/admin/devices", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const validation = insertDeviceSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      }
+      const device = await storage.createDevice(validation.data);
+      res.json(device);
+    } catch (error: any) {
+      console.error("[ADMIN] Create device error:", error);
+      res.status(500).json({ error: "Failed to create device" });
+    }
+  });
+
+  app.put("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const device = await storage.updateDevice(deviceId, req.body);
+      if (!device) return res.status(404).json({ error: "Device not found" });
+      res.json(device);
+    } catch (error: any) {
+      console.error("[ADMIN] Update device error:", error);
+      res.status(500).json({ error: "Failed to update device" });
+    }
+  });
+
+  app.delete("/api/admin/devices/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const deleted = await storage.deleteDevice(deviceId);
+      if (!deleted) return res.status(404).json({ error: "Device not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ADMIN] Delete device error:", error);
+      res.status(500).json({ error: "Failed to delete device" });
+    }
+  });
+
+  app.get("/api/admin/devices/:id/ips", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const ips = await storage.getDeviceIps(deviceId);
+      res.json(ips);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch device IPs" });
+    }
+  });
+
+  app.post("/api/admin/devices/:id/ips", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const validation = insertDeviceIpSchema.safeParse({ ...req.body, deviceId });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const ip = await storage.createDeviceIp(validation.data);
+      res.json(ip);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create device IP" });
+    }
+  });
+
+  app.delete("/api/admin/devices/:deviceId/ips/:ipId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const ipId = Array.isArray(req.params.ipId) ? req.params.ipId[0] : req.params.ipId;
+      await storage.deleteDeviceIp(ipId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete device IP" });
+    }
+  });
+
+  app.get("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const interfaces = await storage.getDeviceInterfaces(deviceId);
+      res.json(interfaces);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch device interfaces" });
+    }
+  });
+
+  app.post("/api/admin/devices/:id/interfaces", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const validation = insertDeviceInterfaceSchema.safeParse({ ...req.body, deviceId });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const iface = await storage.createDeviceInterface(validation.data);
+      res.json(iface);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create device interface" });
+    }
+  });
+
+  app.delete("/api/admin/devices/:deviceId/interfaces/:ifaceId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const ifaceId = Array.isArray(req.params.ifaceId) ? req.params.ifaceId[0] : req.params.ifaceId;
+      await storage.deleteDeviceInterface(ifaceId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete device interface" });
+    }
+  });
+
+  // Customer contacts and notes
+  app.get("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const contacts = await storage.getCustomerContacts(customerId);
+      res.json(contacts);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch contacts" });
+    }
+  });
+
+  app.post("/api/admin/customers/:id/contacts", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const validation = insertCustomerContactSchema.safeParse({ ...req.body, customerId });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const contact = await storage.createCustomerContact(validation.data);
+      res.json(contact);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create contact" });
+    }
+  });
+
+  app.put("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
+      const contact = await storage.updateCustomerContact(contactId, req.body);
+      if (!contact) return res.status(404).json({ error: "Contact not found" });
+      res.json(contact);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
+
+  app.delete("/api/admin/customers/:customerId/contacts/:contactId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const contactId = Array.isArray(req.params.contactId) ? req.params.contactId[0] : req.params.contactId;
+      await storage.deleteCustomerContact(contactId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete contact" });
+    }
+  });
+
+  app.get("/api/admin/customers/:id/notes", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const notes = await storage.getCustomerNotes(customerId);
+      const allUsers = await storage.getAllUsers();
+      const enriched = notes.map(n => {
+        const author = allUsers.find(u => u.id === n.userId);
+        return { ...n, authorName: author?.name || "Unknown" };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  app.post("/api/admin/customers/:id/notes", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const customerId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const user = (req as any).user;
+      const validation = insertCustomerNoteSchema.safeParse({ ...req.body, customerId, userId: user.id });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const note = await storage.createCustomerNote(validation.data);
+      res.json({ ...note, authorName: user.name });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  // Customer devices endpoint (for customer portal)
+  app.get("/api/devices", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role === "admin") {
+        const allDevices = await storage.getAllDevices();
+        return res.json(allDevices);
+      }
+      if (!user.customerId) return res.json([]);
+      const customerDevices = await storage.getDevicesByCustomer(user.customerId);
+      const sanitized = customerDevices.map(d => {
+        const { snmpCommunity, ...rest } = d;
+        return rest;
+      });
+      res.json(sanitized);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch devices" });
     }
   });
 

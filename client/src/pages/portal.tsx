@@ -751,6 +751,7 @@ export default function PortalPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50 border-slate-100">
+                      <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Ticket #</TableHead>
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Subject</TableHead>
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Category</TableHead>
                       <TableHead className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Priority</TableHead>
@@ -760,12 +761,13 @@ export default function PortalPage() {
                   </TableHeader>
                   <TableBody>
                     {ticketsLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="h-4 w-4 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="h-4 w-4 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
                     ) : tickets.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs text-slate-500">No tickets found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-xs text-slate-500">No tickets found</TableCell></TableRow>
                     ) : (
-                      tickets.map((t) => (
+                      tickets.map((t: any) => (
                         <TableRow key={t.id} className="border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`ticket-${t.id}`} onClick={() => setSelectedTicketId(t.id)}>
+                          <TableCell className="text-xs text-slate-500 font-mono">#{(t as any).ticketNumber || t.id}</TableCell>
                           <TableCell className="text-xs font-medium text-slate-900">{t.subject}</TableCell>
                           <TableCell className="text-xs text-slate-600 capitalize">{t.category.replace("_", " ")}</TableCell>
                           <TableCell><StatusBadge status={t.priority} /></TableCell>
@@ -799,6 +801,7 @@ export default function PortalPage() {
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-xs text-slate-500 font-mono mr-1">#{(ticketDetail as any).ticketNumber || ticketDetail.id}</span>
                         <span className="text-sm font-semibold text-slate-900" data-testid="text-ticket-subject">{ticketDetail.subject}</span>
                       </div>
                       <div className="flex items-center gap-2">

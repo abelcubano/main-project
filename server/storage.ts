@@ -7,8 +7,14 @@ import {
   type BillingSettings, type InsertBillingSettings,
   type Ticket, type InsertTicket,
   type TicketReply, type InsertTicketReply,
+  type Device, type InsertDevice,
+  type DeviceIp, type InsertDeviceIp,
+  type DeviceInterface, type InsertDeviceInterface,
+  type CustomerContact, type InsertCustomerContact,
+  type CustomerNote, type InsertCustomerNote,
   users, sessions, services, invoices, invoiceItems, customers, billingSettings,
-  tickets, ticketReplies
+  tickets, ticketReplies, devices, deviceIps, deviceInterfaces,
+  customerContacts, customerNotes
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, desc, isNull } from "drizzle-orm";
@@ -64,6 +70,28 @@ export interface IStorage {
   updateTicket(id: string, updates: Partial<InsertTicket>): Promise<Ticket | undefined>;
   getTicketReplies(ticketId: string): Promise<TicketReply[]>;
   createTicketReply(reply: InsertTicketReply): Promise<TicketReply>;
+
+  getAllDevices(): Promise<Device[]>;
+  getDevice(id: string): Promise<Device | undefined>;
+  getDevicesByCustomer(customerId: string): Promise<Device[]>;
+  getChildDevices(parentId: string): Promise<Device[]>;
+  createDevice(device: InsertDevice): Promise<Device>;
+  updateDevice(id: string, updates: Partial<InsertDevice>): Promise<Device | undefined>;
+  deleteDevice(id: string): Promise<boolean>;
+  getDeviceIps(deviceId: string): Promise<DeviceIp[]>;
+  createDeviceIp(ip: InsertDeviceIp): Promise<DeviceIp>;
+  deleteDeviceIp(id: string): Promise<boolean>;
+  getDeviceInterfaces(deviceId: string): Promise<DeviceInterface[]>;
+  createDeviceInterface(iface: InsertDeviceInterface): Promise<DeviceInterface>;
+  deleteDeviceInterface(id: string): Promise<boolean>;
+
+  getCustomerContacts(customerId: string): Promise<CustomerContact[]>;
+  createCustomerContact(contact: InsertCustomerContact): Promise<CustomerContact>;
+  updateCustomerContact(id: string, updates: Partial<InsertCustomerContact>): Promise<CustomerContact | undefined>;
+  deleteCustomerContact(id: string): Promise<boolean>;
+
+  getCustomerNotes(customerId: string): Promise<CustomerNote[]>;
+  createCustomerNote(note: InsertCustomerNote): Promise<CustomerNote>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -283,6 +311,100 @@ export class DatabaseStorage implements IStorage {
 
   async createTicketReply(reply: InsertTicketReply): Promise<TicketReply> {
     const [created] = await db.insert(ticketReplies).values(reply).returning();
+    return created;
+  }
+
+  async getAllDevices(): Promise<Device[]> {
+    return db.select().from(devices).orderBy(desc(devices.updatedAt));
+  }
+
+  async getDevice(id: string): Promise<Device | undefined> {
+    const [device] = await db.select().from(devices).where(eq(devices.id, id));
+    return device;
+  }
+
+  async getDevicesByCustomer(customerId: string): Promise<Device[]> {
+    return db.select().from(devices).where(eq(devices.customerId, customerId)).orderBy(desc(devices.updatedAt));
+  }
+
+  async getChildDevices(parentId: string): Promise<Device[]> {
+    return db.select().from(devices).where(eq(devices.parentDeviceId, parentId));
+  }
+
+  async createDevice(device: InsertDevice): Promise<Device> {
+    const [created] = await db.insert(devices).values(device).returning();
+    return created;
+  }
+
+  async updateDevice(id: string, updates: Partial<InsertDevice>): Promise<Device | undefined> {
+    const [updated] = await db.update(devices)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(devices.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDevice(id: string): Promise<boolean> {
+    await db.delete(deviceIps).where(eq(deviceIps.deviceId, id));
+    await db.delete(deviceInterfaces).where(eq(deviceInterfaces.deviceId, id));
+    await db.update(devices).set({ parentDeviceId: null }).where(eq(devices.parentDeviceId, id));
+    const result = await db.delete(devices).where(eq(devices.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getDeviceIps(deviceId: string): Promise<DeviceIp[]> {
+    return db.select().from(deviceIps).where(eq(deviceIps.deviceId, deviceId));
+  }
+
+  async createDeviceIp(ip: InsertDeviceIp): Promise<DeviceIp> {
+    const [created] = await db.insert(deviceIps).values(ip).returning();
+    return created;
+  }
+
+  async deleteDeviceIp(id: string): Promise<boolean> {
+    const result = await db.delete(deviceIps).where(eq(deviceIps.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getDeviceInterfaces(deviceId: string): Promise<DeviceInterface[]> {
+    return db.select().from(deviceInterfaces).where(eq(deviceInterfaces.deviceId, deviceId));
+  }
+
+  async createDeviceInterface(iface: InsertDeviceInterface): Promise<DeviceInterface> {
+    const [created] = await db.insert(deviceInterfaces).values(iface).returning();
+    return created;
+  }
+
+  async deleteDeviceInterface(id: string): Promise<boolean> {
+    const result = await db.delete(deviceInterfaces).where(eq(deviceInterfaces.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getCustomerContacts(customerId: string): Promise<CustomerContact[]> {
+    return db.select().from(customerContacts).where(eq(customerContacts.customerId, customerId));
+  }
+
+  async createCustomerContact(contact: InsertCustomerContact): Promise<CustomerContact> {
+    const [created] = await db.insert(customerContacts).values(contact).returning();
+    return created;
+  }
+
+  async updateCustomerContact(id: string, updates: Partial<InsertCustomerContact>): Promise<CustomerContact | undefined> {
+    const [updated] = await db.update(customerContacts).set(updates).where(eq(customerContacts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomerContact(id: string): Promise<boolean> {
+    const result = await db.delete(customerContacts).where(eq(customerContacts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getCustomerNotes(customerId: string): Promise<CustomerNote[]> {
+    return db.select().from(customerNotes).where(eq(customerNotes.customerId, customerId)).orderBy(desc(customerNotes.createdAt));
+  }
+
+  async createCustomerNote(note: InsertCustomerNote): Promise<CustomerNote> {
+    const [created] = await db.insert(customerNotes).values(note).returning();
     return created;
   }
 }

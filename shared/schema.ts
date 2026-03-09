@@ -1,10 +1,11 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, decimal, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientNumber: serial("client_number").notNull().unique(),
   name: text("name").notNull(),
   address: text("address"),
   city: text("city"),
@@ -12,9 +13,26 @@ export const customers = pgTable("customers", {
   zip: text("zip"),
   phone: text("phone"),
   email: text("email"),
+  fax: text("fax"),
+  website: text("website"),
   contactName: text("contact_name"),
   notes: text("notes"),
   active: boolean("active").notNull().default(true),
+  accountType: text("account_type").notNull().default("standard"),
+  billingMethod: text("billing_method").notNull().default("invoice"),
+  paymentTerms: text("payment_terms").notNull().default("Net 30"),
+  discount: text("discount").notNull().default("0"),
+  gracePeriod: integer("grace_period").notNull().default(0),
+  lateFeeSchedule: text("late_fee_schedule"),
+  deliveryMethod: text("delivery_method").notNull().default("email"),
+  defaultTicketPriority: text("default_ticket_priority").notNull().default("normal"),
+  tags: text("tags"),
+  contractStatus: text("contract_status"),
+  contractStartDate: timestamp("contract_start_date"),
+  contractEndDate: timestamp("contract_end_date"),
+  contractTermMonths: integer("contract_term_months"),
+  assignedSalesperson: varchar("assigned_salesperson").references(() => users.id),
+  assignedAccountManager: varchar("assigned_account_manager").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -58,6 +76,7 @@ export const sessions = pgTable("sessions", {
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
   id: true,
+  clientNumber: true,
   createdAt: true,
 });
 
@@ -128,6 +147,19 @@ export const billingSettings = pgTable("billing_settings", {
   billingEmailTemplate: text("billing_email_template").notNull().default("Dear {{customerName}},\n\nPlease find attached your invoice {{invoiceNumber}} for the amount of ${{totalAmount}}.\n\nIssue Date: {{issueDate}}\nDue Date: {{dueDate}}\nItems: {{itemCount}}\n\nFor questions, contact billing@911dc.us.\n\nThank you for your business.\n911-DC"),
   invitationEmailSubject: text("invitation_email_subject").notNull().default("Welcome to 911-DC Customer Portal"),
   invitationEmailTemplate: text("invitation_email_template").notNull().default("Dear {{userName}},\n\nYour account has been created on the 911-DC Customer Portal.\n\nUsername: {{userEmail}}\nCompany: {{companyName}}\n\nPlease log in at {{portalUrl}} to access your services, billing, and support.\n\nWelcome aboard!\n911-DC"),
+  smtpHost: text("smtp_host").notNull().default("smtp.titan.email"),
+  smtpPort: integer("smtp_port").notNull().default(465),
+  smtpUser: text("smtp_user").notNull().default(""),
+  smtpPassword: text("smtp_password").notNull().default(""),
+  smtpSecure: boolean("smtp_secure").notNull().default(true),
+  imapHost: text("imap_host").notNull().default(""),
+  imapPort: integer("imap_port").notNull().default(993),
+  imapUser: text("imap_user").notNull().default(""),
+  imapPassword: text("imap_password").notNull().default(""),
+  imapSecure: boolean("imap_secure").notNull().default(true),
+  supportEmailAddress: text("support_email_address").notNull().default("info@911dc.us"),
+  ticketEmailSubject: text("ticket_email_subject").notNull().default("[Ticket #{{ticketNumber}}] {{subject}}"),
+  ticketEmailTemplate: text("ticket_email_template").notNull().default("Hello {{customerName}},\n\n{{replyAuthor}} has replied to your ticket #{{ticketNumber}}:\n\nSubject: {{subject}}\n\n{{replyBody}}\n\nYou can view and respond to this ticket in your customer portal.\n\nThank you,\n911-DC Support"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -211,6 +243,7 @@ export type InsertBillingSettings = z.infer<typeof insertBillingSettingsSchema>;
 
 export const tickets = pgTable("tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketNumber: serial("ticket_number").notNull().unique(),
   customerId: varchar("customer_id").references(() => customers.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   subject: text("subject").notNull(),
@@ -235,6 +268,7 @@ export const ticketReplies = pgTable("ticket_replies", {
 
 export const insertTicketSchema = createInsertSchema(tickets).omit({
   id: true,
+  ticketNumber: true,
   createdAt: true,
   updatedAt: true,
   closedAt: true,
@@ -249,3 +283,114 @@ export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
 export type InsertTicketReply = z.infer<typeof insertTicketReplySchema>;
 export type TicketReply = typeof ticketReplies.$inferSelect;
+
+export const devices = pgTable("devices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deviceNumber: serial("device_number").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  deviceType: text("device_type").notNull().default("server"),
+  status: text("status").notNull().default("active"),
+  monitorStatus: text("monitor_status").notNull().default("unknown"),
+  customerId: varchar("customer_id").references(() => customers.id),
+  serviceId: varchar("service_id").references(() => services.id),
+  parentDeviceId: varchar("parent_device_id"),
+  facility: text("facility"),
+  zone: text("zone"),
+  cage: text("cage"),
+  row: text("row"),
+  rack: text("rack"),
+  rackPosition: text("rack_position"),
+  rackUnits: integer("rack_units"),
+  snmpHost: text("snmp_host"),
+  snmpPort: integer("snmp_port"),
+  snmpCommunity: text("snmp_community"),
+  snmpVersion: text("snmp_version"),
+  snmpOidStatus: text("snmp_oid_status"),
+  snmpOidControl: text("snmp_oid_control"),
+  grafanaUrl: text("grafana_url"),
+  grafanaDashboardUid: text("grafana_dashboard_uid"),
+  grafanaPanelId: text("grafana_panel_id"),
+  grafanaOrgId: text("grafana_org_id"),
+  grafanaVar: text("grafana_var"),
+  tags: text("tags"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const deviceIps = pgTable("device_ips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id").notNull().references(() => devices.id),
+  ipAddress: text("ip_address").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("public"),
+  vlan: text("vlan"),
+  ptrRecord: text("ptr_record"),
+});
+
+export const deviceInterfaces = pgTable("device_interfaces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id").notNull().references(() => devices.id),
+  name: text("name").notNull(),
+  status: text("status").notNull().default("up"),
+  connectedDeviceId: varchar("connected_device_id").references(() => devices.id),
+  connectedPort: text("connected_port"),
+  vlan: text("vlan"),
+  speed: text("speed"),
+});
+
+export const customerContacts = pgTable("customer_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => customers.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  role: text("role"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+});
+
+export const customerNotes = pgTable("customer_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => customers.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  isPublic: boolean("is_public").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDeviceSchema = createInsertSchema(devices).omit({
+  id: true,
+  deviceNumber: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDeviceIpSchema = createInsertSchema(deviceIps).omit({
+  id: true,
+});
+
+export const insertDeviceInterfaceSchema = createInsertSchema(deviceInterfaces).omit({
+  id: true,
+});
+
+export const insertCustomerContactSchema = createInsertSchema(customerContacts).omit({
+  id: true,
+});
+
+export const insertCustomerNoteSchema = createInsertSchema(customerNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDevice = z.infer<typeof insertDeviceSchema>;
+export type Device = typeof devices.$inferSelect;
+export type InsertDeviceIp = z.infer<typeof insertDeviceIpSchema>;
+export type DeviceIp = typeof deviceIps.$inferSelect;
+export type InsertDeviceInterface = z.infer<typeof insertDeviceInterfaceSchema>;
+export type DeviceInterface = typeof deviceInterfaces.$inferSelect;
+export type InsertCustomerContact = z.infer<typeof insertCustomerContactSchema>;
+export type CustomerContact = typeof customerContacts.$inferSelect;
+export type InsertCustomerNote = z.infer<typeof insertCustomerNoteSchema>;
+export type CustomerNote = typeof customerNotes.$inferSelect;

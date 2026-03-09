@@ -2,28 +2,37 @@ import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   Activity,
+  ArrowLeft,
   ArrowRight,
   Bell,
   Building2,
+  Cable,
   CreditCard,
+  Edit,
   Eye,
   EyeOff,
   FileText,
   Globe,
   HardHat,
+  Hash,
   Headset,
   LayoutDashboard,
   Loader2,
   Mail,
   MessageSquare,
+  Monitor,
+  Network,
   Plus,
   Send,
   Server,
   Settings,
   Shield,
+  StickyNote,
   Ticket,
+  Trash2,
   Save,
   Users,
+  Wifi,
   X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -167,7 +176,7 @@ type UserData = {
   lastLogin?: string;
 } & Partial<PermissionKeys>;
 
-type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings" | "tickets";
+type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings" | "tickets" | "devices" | "customer-detail";
 
 const inputCls = "w-full h-9 px-3 text-[13px] bg-white border border-slate-200 rounded-md outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors";
 const btnPrimary = "inline-flex items-center gap-1.5 px-4 h-9 bg-blue-600 text-white text-[13px] font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50";
@@ -186,6 +195,8 @@ export default function AdminPage() {
   const [ticketQueueFilter, setTicketQueueFilter] = useState("all");
   const [ticketDeptFilter, setTicketDeptFilter] = useState("all");
   const [allTickets, setAllTickets] = useState<any[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [allDevices, setAllDevices] = useState<any[]>([]);
 
   function navigateToSection(section: AdminSection) {
     setCurrentSection(section);
@@ -193,13 +204,25 @@ export default function AdminPage() {
       home: "dashboard",
       clients: "customers",
       support: "tickets",
-      devices: "dashboard",
+      devices: "devices",
       orders: "services",
       sales: "invoices",
       settings: "settings",
     };
     setCurrentView(defaultViews[section]);
+    if (section !== "clients") setSelectedCustomerId(null);
   }
+
+  async function loadDevices() {
+    try {
+      const res = await fetch("/api/admin/devices", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setAllDevices(await res.json());
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadDevices();
+  }, []);
 
   async function loadTickets() {
     try {
@@ -314,7 +337,12 @@ export default function AdminPage() {
           ]},
         ];
       case "devices":
-        return [{ title: "Devices", items: [{ icon: Server, label: "Coming Soon", id: "devices-placeholder" }] }];
+        return [{ title: "Devices", items: [
+          { icon: Server, label: "All Devices", id: "devices", active: currentView === "devices", badge: allDevices.length || undefined, onClick: () => setCurrentView("devices") },
+          { icon: Monitor, label: "Servers", id: "filter-servers" },
+          { icon: Network, label: "Network", id: "filter-network" },
+          { icon: Wifi, label: "Monitoring", id: "filter-monitoring" },
+        ]}];
       case "orders":
         return [{ title: "Service Orders", items: [
           { icon: Server, label: "All Services", id: "services", active: currentView === "services", onClick: () => setCurrentView("services") },
@@ -340,6 +368,8 @@ export default function AdminPage() {
     customers: "Customer Accounts",
     settings: "Settings",
     tickets: "Support Tickets",
+    devices: "Device Management",
+    "customer-detail": "Client Detail",
   };
 
   const sectionLabels: Record<AdminSection, string> = {
@@ -368,6 +398,7 @@ export default function AdminPage() {
         {currentView === "dashboard" && (
           <DashboardView
             tickets={allTickets}
+            devices={allDevices}
             token={token}
             onNavigate={(section: AdminSection) => navigateToSection(section)}
           />
@@ -384,7 +415,13 @@ export default function AdminPage() {
         )}
         {currentView === "services" && <ServicesView token={token} />}
         {currentView === "invoices" && <InvoicesView token={token} />}
-        {currentView === "customers" && <CustomersView token={token} />}
+        {currentView === "customers" && (
+          <CustomersView token={token} onOpenDetail={(id) => { setSelectedCustomerId(id); setCurrentView("customer-detail"); }} />
+        )}
+        {currentView === "customer-detail" && selectedCustomerId && (
+          <CustomerDetailView token={token} customerId={selectedCustomerId} onBack={() => { setSelectedCustomerId(null); setCurrentView("customers"); }} />
+        )}
+        {currentView === "devices" && <DevicesView token={token} devices={allDevices} onRefresh={loadDevices} />}
         {currentView === "settings" && <SettingsView token={token} />}
         {currentView === "tickets" && (
           <TicketsView
@@ -409,7 +446,7 @@ export default function AdminPage() {
   );
 }
 
-function DashboardView({ tickets, token, onNavigate }: { tickets: any[]; token: string | null; onNavigate: (section: AdminSection) => void }) {
+function DashboardView({ tickets, devices, token, onNavigate }: { tickets: any[]; devices: any[]; token: string | null; onNavigate: (section: AdminSection) => void }) {
   const [customers, setCustomers] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -490,15 +527,16 @@ function DashboardView({ tickets, token, onNavigate }: { tickets: any[]; token: 
             ]} />
           </AdminCard>
 
-          <AdminCard title="Device Manager" subtitle="Coming Soon" icon={Server} accentColor="slate"
+          <AdminCard title="Device Manager" subtitle="Day at a Glance" icon={Server} accentColor="emerald"
             footer={
-              <span className="text-[13px] text-slate-400 font-medium flex items-center gap-1">
-                Coming Soon
-              </span>
+              <button onClick={() => onNavigate("devices")} className="text-[13px] text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1" data-testid="button-goto-devices">
+                Go to Device Manager <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             }>
             <KpiRow items={[
+              { label: "Total Devices", value: devices.length },
+              { label: "Active", value: devices.filter((d: any) => d.status === "active").length },
               { label: "Locations", value: 8 },
-              { label: "Main Hub", value: "iM Critical" },
             ]} />
           </AdminCard>
 
@@ -551,6 +589,7 @@ function DashboardView({ tickets, token, onNavigate }: { tickets: any[]; token: 
             <table className="w-full" data-testid="table-tickets">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Ticket #</th>
                   <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Subject</th>
                   <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Customer</th>
                   <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Priority</th>
@@ -562,6 +601,7 @@ function DashboardView({ tickets, token, onNavigate }: { tickets: any[]; token: 
               <tbody>
                 {openTickets.slice(0, 5).map((t: any, i: number) => (
                   <tr key={t.id} onClick={() => onNavigate("support")} className={`border-b border-slate-100 cursor-pointer ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-slate-50`} data-testid={`row-ticket-${t.id}`}>
+                    <td className="text-[13px] text-slate-500 py-2.5 px-4 font-mono">#{t.ticketNumber || t.id}</td>
                     <td className="text-[13px] text-slate-900 py-2.5 px-4 font-medium">{t.subject}</td>
                     <td className="text-[13px] text-slate-500 py-2.5 px-4">{t.customerName || "—"}</td>
                     <td className="py-2.5 px-4"><StatusBadge status={t.priority} /></td>
@@ -860,7 +900,7 @@ type CompanyData = {
 
 type CompanyUser = { id: string; name: string; email: string; username: string; customerRole: string | null; active: boolean } & Partial<PermissionKeys>;
 
-function CustomersView({ token }: { token: string | null }) {
+function CustomersView({ token, onOpenDetail }: { token: string | null; onOpenDetail: (id: string) => void }) {
   const { toast } = useToast();
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -917,6 +957,7 @@ function CustomersView({ token }: { token: string | null }) {
   const selectedCompany = companies.find(c => c.id === selectedId);
 
   const columns: ColumnDef<CompanyData>[] = [
+    { key: "clientNumber", label: "Client #", width: "90px", sortable: true, render: (row: any) => <span className="font-mono text-slate-500">#{row.clientNumber || "—"}</span> },
     { key: "name", label: "Company Name", sortable: true, render: (row) => (
       <span className="font-medium text-slate-900">
         {row.name}
@@ -929,6 +970,7 @@ function CustomersView({ token }: { token: string | null }) {
     { key: "active", label: "Status", render: (row) => <StatusBadge status={row.active ? "active" : "suspended"} showDot /> },
     { key: "actions", label: "Actions", align: "center", render: (row) => (
       <div className="flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); onOpenDetail(row.id); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-view-customer-${row.id}`}>View</button>
         <button onClick={(e) => { e.stopPropagation(); setEditingCompany(row); setShowCompanyModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-edit-customer-${row.id}`}>Edit</button>
         <button onClick={(e) => { e.stopPropagation(); handleDeleteCompany(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-delete-customer-${row.id}`}>Delete</button>
       </div>
@@ -944,10 +986,9 @@ function CustomersView({ token }: { token: string | null }) {
           <AdminTable
             data={companies}
             columns={columns}
-            onRowClick={(row) => handleSelect(row.id)}
+            onRowClick={(row) => onOpenDetail(row.id)}
             searchPlaceholder="Search customers..."
             searchKeys={["name", "email", "contactName"]}
-            selectedId={selectedId}
             getRowId={(row) => row.id}
             rowTestIdPrefix="customer"
             actions={
@@ -957,64 +998,6 @@ function CustomersView({ token }: { token: string | null }) {
             }
             className="flex-1"
           />
-          {selectedCompany && (
-            <div className="border-t border-slate-200 bg-white p-5 flex-shrink-0 max-h-[280px] overflow-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-900">Customer Details — {selectedCompany.name}</h3>
-                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-[13px] mb-4">
-                <div><span className="text-slate-500">Address:</span> <span className="text-slate-900 ml-1">{[selectedCompany.address, selectedCompany.city, selectedCompany.state, selectedCompany.zip].filter(Boolean).join(", ") || "—"}</span></div>
-                <div><span className="text-slate-500">Contact:</span> <span className="text-slate-900 ml-1">{selectedCompany.contactName || "—"}</span></div>
-                <div><span className="text-slate-500">Email:</span> <span className="text-slate-900 ml-1">{selectedCompany.email || "—"}</span></div>
-                <div><span className="text-slate-500">Phone:</span> <span className="text-slate-900 ml-1">{selectedCompany.phone || "—"}</span></div>
-                <div><span className="text-slate-500">Notes:</span> <span className="text-slate-900 ml-1">{selectedCompany.notes || "—"}</span></div>
-              </div>
-              <div className="flex items-center justify-between mb-2 border-t border-slate-100 pt-3">
-                <span className="text-sm font-semibold text-slate-900">Associated Users</span>
-                <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid={`button-add-user-${selectedCompany.id}`}>
-                  <Plus className="w-3.5 h-3.5" />Add User
-                </button>
-              </div>
-              {loadingUsers ? (
-                <div className="text-xs text-slate-500">Loading users...</div>
-              ) : expandedUsers.length === 0 ? (
-                <div className="text-xs text-slate-400 italic">No users associated.</div>
-              ) : (
-                <table className="w-full" data-testid="table-customer-users">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
-                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Username</th>
-                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
-                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Permissions</th>
-                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expandedUsers.map((u, i) => (
-                      <tr key={u.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-customer-user-${u.id}`}>
-                        <td className="text-[13px] text-slate-900 py-2 px-3">{u.name}</td>
-                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.username}</td>
-                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.email}</td>
-                        <td className="py-2 px-3">
-                          <div className="flex flex-wrap gap-1">
-                            {getPermSummaryBadges(u).map((b) => (
-                              <span key={b} className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 rounded-full">{b}</span>
-                            ))}
-                            {getPermSummaryBadges(u).length === 0 && <span className="text-xs text-slate-400">none</span>}
-                          </div>
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-remove-user-${u.id}`}>Remove</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
         </>
       )}
       <CompanyModal open={showCompanyModal} onOpenChange={setShowCompanyModal} editing={editingCompany} token={token} onSuccess={() => { setShowCompanyModal(false); loadCompanies(); }} />
@@ -1706,7 +1689,7 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
         <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0 gap-3">
           <button onClick={() => { setTicketDetail(null); setSelectedTicket(null); }} className="text-sm text-blue-600 hover:text-blue-700 font-medium" data-testid="button-back-tickets">&larr; Back to Queue</button>
           <div className="h-5 w-px bg-slate-200" />
-          <span className="text-sm font-semibold text-slate-900">Ticket #{ticketDetail.id}: {ticketDetail.subject}</span>
+          <span className="text-sm font-semibold text-slate-900">Ticket #{ticketDetail.ticketNumber || ticketDetail.id}: {ticketDetail.subject}</span>
           <div className="flex-1" />
           <StatusBadge status={ticketDetail.priority} />
           <StatusBadge status={ticketDetail.status} showDot />
@@ -1808,7 +1791,7 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
   }
 
   const ticketColumns: ColumnDef<any>[] = [
-    { key: "id", label: "#", width: "60px", sortable: true, render: (row) => <span className="text-slate-500">{row.id}</span> },
+    { key: "ticketNumber", label: "Ticket #", width: "90px", sortable: true, render: (row: any) => <span className="font-mono text-slate-500">#{row.ticketNumber || row.id}</span> },
     { key: "subject", label: "Subject", sortable: true, render: (row) => <span className="font-medium text-slate-900">{row.subject}</span> },
     { key: "customerName", label: "Customer", sortable: true, render: (row) => <span>{row.customerName || "—"}</span> },
     { key: "category", label: "Category", sortable: true, render: (row) => <span className="capitalize">{row.category?.replace("_", " ") || "—"}</span> },
@@ -1907,6 +1890,9 @@ type BillingSettingsData = {
   id?: string; invoicePrefix: string; nextInvoiceNumber: number; paymentTerms: string;
   billingEmailSubject: string; billingEmailTemplate: string;
   invitationEmailSubject: string; invitationEmailTemplate: string;
+  smtpHost?: string; smtpPort?: number; smtpUser?: string; smtpPassword?: string; smtpSecure?: boolean;
+  imapHost?: string; imapPort?: number; imapUser?: string; imapPassword?: string; imapSecure?: boolean;
+  supportEmailAddress?: string; ticketEmailSubject?: string; ticketEmailTemplate?: string;
 };
 
 const BILLING_PLACEHOLDERS = [
@@ -1927,7 +1913,7 @@ const INVITATION_PLACEHOLDERS = [
 
 function SettingsView({ token }: { token: string | null }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"billing" | "email">("billing");
+  const [activeTab, setActiveTab] = useState<"billing" | "email" | "email-server">("billing");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<BillingSettingsData>({
@@ -1958,6 +1944,12 @@ function SettingsView({ token }: { token: string | null }) {
           paymentTerms: settings.paymentTerms, billingEmailSubject: settings.billingEmailSubject,
           billingEmailTemplate: settings.billingEmailTemplate, invitationEmailSubject: settings.invitationEmailSubject,
           invitationEmailTemplate: settings.invitationEmailTemplate,
+          smtpHost: settings.smtpHost, smtpPort: settings.smtpPort, smtpUser: settings.smtpUser,
+          smtpPassword: settings.smtpPassword, smtpSecure: settings.smtpSecure,
+          imapHost: settings.imapHost, imapPort: settings.imapPort, imapUser: settings.imapUser,
+          imapPassword: settings.imapPassword, imapSecure: settings.imapSecure,
+          supportEmailAddress: settings.supportEmailAddress, ticketEmailSubject: settings.ticketEmailSubject,
+          ticketEmailTemplate: settings.ticketEmailTemplate,
         }),
       });
       if (res.ok) { const updated = await res.json(); setSettings(updated); toast({ title: "Settings saved" }); }
@@ -1993,6 +1985,9 @@ function SettingsView({ token }: { token: string | null }) {
           <button onClick={() => setActiveTab("email")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
             data-testid="tab-email-templates">Email Templates</button>
+          <button onClick={() => setActiveTab("email-server")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email-server" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            data-testid="tab-email-server">Email Server</button>
         </div>
         <div className="flex-1" />
         <button onClick={handleSave} disabled={saving} className={btnPrimary} data-testid="button-save-settings">
@@ -2014,6 +2009,96 @@ function SettingsView({ token }: { token: string | null }) {
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm text-slate-600">
               <span className="font-semibold text-slate-900">Preview:</span> Next invoice will be numbered <code className="font-mono font-semibold text-blue-600">{settings.invoicePrefix}-{String(settings.nextInvoiceNumber).padStart(3, "0")}</code>
+            </div>
+          </div>
+        )}
+        {activeTab === "email-server" && (
+          <div className="max-w-xl space-y-6" data-testid="email-server-panel">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-1">SMTP Configuration</h3>
+              <p className="text-xs text-slate-500 mb-3">Outbound email server for notifications, invoices, and ticket emails.</p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2"><label className="text-xs text-slate-500 block mb-1">SMTP Host</label>
+                    <input value={settings.smtpHost || ""} onChange={(e) => setSettings({ ...settings, smtpHost: e.target.value })} placeholder="smtp.example.com" className={inputCls} data-testid="input-smtp-host" /></div>
+                  <div><label className="text-xs text-slate-500 block mb-1">Port</label>
+                    <input type="number" value={settings.smtpPort || ""} onChange={(e) => setSettings({ ...settings, smtpPort: parseInt(e.target.value) || undefined })} placeholder="465" className={inputCls} data-testid="input-smtp-port" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-slate-500 block mb-1">Username</label>
+                    <input value={settings.smtpUser || ""} onChange={(e) => setSettings({ ...settings, smtpUser: e.target.value })} placeholder="user@example.com" className={inputCls} data-testid="input-smtp-user" /></div>
+                  <div><label className="text-xs text-slate-500 block mb-1">Password</label>
+                    <input type="password" value={settings.smtpPassword || ""} onChange={(e) => setSettings({ ...settings, smtpPassword: e.target.value })} className={inputCls} data-testid="input-smtp-password" /></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="smtp-secure" checked={settings.smtpSecure ?? true} onChange={(e) => setSettings({ ...settings, smtpSecure: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+                  <label htmlFor="smtp-secure" className="text-sm text-slate-700">Use SSL/TLS (recommended)</label>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/admin/test-smtp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ smtpHost: billingData.smtpHost, smtpPort: billingData.smtpPort, smtpUser: billingData.smtpUser, smtpPassword: billingData.smtpPassword, smtpSecure: billingData.smtpSecure }) });
+                      const data = await res.json();
+                      if (res.ok) toast({ title: "SMTP Test Passed", description: data.message || "Connection successful" });
+                      else toast({ title: "SMTP Test Failed", description: data.error || "Connection failed", variant: "destructive" });
+                    } catch { toast({ title: "Error", description: "Failed to test SMTP connection", variant: "destructive" }); }
+                  }}
+                  className={btnSecondary}
+                  data-testid="button-test-smtp"
+                >
+                  <Mail className="w-4 h-4" />Test SMTP Connection
+                </button>
+              </div>
+            </div>
+            <div className="border-t border-slate-200 pt-5">
+              <h3 className="text-base font-semibold text-slate-900 mb-1">IMAP Configuration</h3>
+              <p className="text-xs text-slate-500 mb-3">Inbound email server — for future email-to-ticket integration.</p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2"><label className="text-xs text-slate-500 block mb-1">IMAP Host</label>
+                    <input value={settings.imapHost || ""} onChange={(e) => setSettings({ ...settings, imapHost: e.target.value })} placeholder="imap.example.com" className={inputCls} data-testid="input-imap-host" /></div>
+                  <div><label className="text-xs text-slate-500 block mb-1">Port</label>
+                    <input type="number" value={settings.imapPort || ""} onChange={(e) => setSettings({ ...settings, imapPort: parseInt(e.target.value) || undefined })} placeholder="993" className={inputCls} data-testid="input-imap-port" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-slate-500 block mb-1">Username</label>
+                    <input value={settings.imapUser || ""} onChange={(e) => setSettings({ ...settings, imapUser: e.target.value })} placeholder="user@example.com" className={inputCls} data-testid="input-imap-user" /></div>
+                  <div><label className="text-xs text-slate-500 block mb-1">Password</label>
+                    <input type="password" value={settings.imapPassword || ""} onChange={(e) => setSettings({ ...settings, imapPassword: e.target.value })} className={inputCls} data-testid="input-imap-password" /></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="imap-secure" checked={settings.imapSecure ?? true} onChange={(e) => setSettings({ ...settings, imapSecure: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+                  <label htmlFor="imap-secure" className="text-sm text-slate-700">Use SSL/TLS</label>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-slate-200 pt-5">
+              <h3 className="text-base font-semibold text-slate-900 mb-1">Support Email</h3>
+              <p className="text-xs text-slate-500 mb-3">Address for inbound support notifications and ticket email routing.</p>
+              <div><label className="text-xs text-slate-500 block mb-1">Support Email Address</label>
+                <input value={settings.supportEmailAddress || ""} onChange={(e) => setSettings({ ...settings, supportEmailAddress: e.target.value })} placeholder="support@911dc.us" className={inputCls} data-testid="input-support-email" /></div>
+            </div>
+            <div className="border-t border-slate-200 pt-5">
+              <h3 className="text-base font-semibold text-slate-900 mb-1">Ticket Email Template</h3>
+              <p className="text-xs text-slate-500 mb-3">Template used for ticket notification emails.</p>
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Subject Template</label>
+                  <input value={settings.ticketEmailSubject || ""} onChange={(e) => setSettings({ ...settings, ticketEmailSubject: e.target.value })} placeholder="[Ticket #{{ticketNumber}}] {{subject}}" className={inputCls} data-testid="input-ticket-email-subject" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Body Template</label>
+                  <textarea value={settings.ticketEmailTemplate || ""} onChange={(e) => setSettings({ ...settings, ticketEmailTemplate: e.target.value })} rows={6}
+                    className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 font-mono resize-y" data-testid="textarea-ticket-email-template" /></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    <span><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{"{{ticketNumber}}"}</code> <span className="text-slate-500">Ticket number</span></span>
+                    <span><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{"{{subject}}"}</code> <span className="text-slate-500">Ticket subject</span></span>
+                    <span><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{"{{customerName}}"}</code> <span className="text-slate-500">Company name</span></span>
+                    <span><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{"{{body}}"}</code> <span className="text-slate-500">Message body</span></span>
+                    <span><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{"{{authorName}}"}</code> <span className="text-slate-500">Author name</span></span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -2083,6 +2168,718 @@ function SettingsView({ token }: { token: string | null }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DevicesView({ token, devices, onRefresh }: { token: string | null; devices: any[]; onRefresh: () => void }) {
+  const { toast } = useToast();
+  const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<any | null>(null);
+  const [deviceDetail, setDeviceDetail] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deviceIps, setDeviceIps] = useState<any[]>([]);
+  const [deviceInterfaces, setDeviceInterfaces] = useState<any[]>([]);
+  const [childDevices, setChildDevices] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [newIp, setNewIp] = useState({ ipAddress: "", description: "", type: "public", vlan: "", ptrRecord: "" });
+  const [newInterface, setNewInterface] = useState({ name: "", status: "up", connectedPort: "", vlan: "", speed: "" });
+  const [showIpForm, setShowIpForm] = useState(false);
+  const [showInterfaceForm, setShowInterfaceForm] = useState(false);
+
+  useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    fetch("/api/admin/customers", { headers: h }).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
+    fetch("/api/services", { headers: h }).then(r => r.ok ? r.json() : []).then(setServices).catch(() => {});
+  }, [token]);
+
+  async function loadDeviceDetail(id: string) {
+    setLoadingDetail(true);
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const [dev, ips, ifaces] = await Promise.all([
+        fetch(`/api/admin/devices/${id}`, { headers: h }).then(r => r.ok ? r.json() : null),
+        fetch(`/api/admin/devices/${id}/ips`, { headers: h }).then(r => r.ok ? r.json() : []),
+        fetch(`/api/admin/devices/${id}/interfaces`, { headers: h }).then(r => r.ok ? r.json() : []),
+      ]);
+      if (dev) { setDeviceDetail(dev); setSelectedDevice(dev); }
+      setDeviceIps(ips);
+      setDeviceInterfaces(ifaces);
+      const children = devices.filter(d => d.parentDeviceId === id);
+      setChildDevices(children);
+    } catch {} finally { setLoadingDetail(false); }
+  }
+
+  async function handleDeleteDevice(id: string) {
+    if (!confirm("Delete this device?")) return;
+    try {
+      const res = await fetch(`/api/admin/devices/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { toast({ title: "Device deleted" }); onRefresh(); setDeviceDetail(null); setSelectedDevice(null); }
+    } catch { toast({ title: "Error", description: "Failed to delete device", variant: "destructive" }); }
+  }
+
+  async function handleAddIp() {
+    if (!newIp.ipAddress.trim() || !deviceDetail) return;
+    try {
+      const res = await fetch(`/api/admin/devices/${deviceDetail.id}/ips`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newIp),
+      });
+      if (res.ok) { setNewIp({ ipAddress: "", description: "", type: "public", vlan: "", ptrRecord: "" }); setShowIpForm(false); loadDeviceDetail(deviceDetail.id); toast({ title: "IP added" }); }
+    } catch { toast({ title: "Error", description: "Failed to add IP", variant: "destructive" }); }
+  }
+
+  async function handleDeleteIp(ipId: string) {
+    if (!deviceDetail) return;
+    try {
+      const res = await fetch(`/api/admin/devices/${deviceDetail.id}/ips/${ipId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { loadDeviceDetail(deviceDetail.id); toast({ title: "IP removed" }); }
+    } catch {}
+  }
+
+  async function handleAddInterface() {
+    if (!newInterface.name.trim() || !deviceDetail) return;
+    try {
+      const res = await fetch(`/api/admin/devices/${deviceDetail.id}/interfaces`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newInterface),
+      });
+      if (res.ok) { setNewInterface({ name: "", status: "up", connectedPort: "", vlan: "", speed: "" }); setShowInterfaceForm(false); loadDeviceDetail(deviceDetail.id); toast({ title: "Interface added" }); }
+    } catch { toast({ title: "Error", description: "Failed to add interface", variant: "destructive" }); }
+  }
+
+  async function handleDeleteInterface(ifId: string) {
+    if (!deviceDetail) return;
+    try {
+      const res = await fetch(`/api/admin/devices/${deviceDetail.id}/interfaces/${ifId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { loadDeviceDetail(deviceDetail.id); toast({ title: "Interface removed" }); }
+    } catch {}
+  }
+
+  if (deviceDetail) {
+    const cust = customers.find((c: any) => c.id === deviceDetail.customerId);
+    const svc = services.find((s: any) => s.id === deviceDetail.serviceId);
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden" data-testid="device-detail-view">
+        <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0 gap-3">
+          <button onClick={() => { setDeviceDetail(null); setSelectedDevice(null); }} className="text-sm text-blue-600 hover:text-blue-700 font-medium" data-testid="button-back-devices">&larr; Back to Devices</button>
+          <div className="h-5 w-px bg-slate-200" />
+          <span className="text-sm font-semibold text-slate-900">Device #{deviceDetail.deviceNumber}: {deviceDetail.name}</span>
+          <div className="flex-1" />
+          <StatusBadge status={deviceDetail.status} showDot />
+          <button onClick={() => { setEditingDevice(deviceDetail); setShowModal(true); }} className={btnSecondary} data-testid="button-edit-device"><Edit className="w-3.5 h-3.5" />Edit</button>
+          <button onClick={() => handleDeleteDevice(deviceDetail.id)} className="inline-flex items-center gap-1.5 px-3 h-9 text-red-600 text-[13px] font-medium rounded-md border border-red-200 hover:bg-red-50 transition-colors" data-testid="button-delete-device"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+        </div>
+        <div className="flex-1 overflow-auto p-5">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Server className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">Device Information</span></div>
+              <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Device #:</span> <span className="text-slate-900 ml-1 font-mono">#{deviceDetail.deviceNumber}</span></div>
+                <div><span className="text-slate-500">Type:</span> <span className="text-slate-900 ml-1 capitalize">{deviceDetail.deviceType}</span></div>
+                <div><span className="text-slate-500">Status:</span> <span className="text-slate-900 ml-1 capitalize">{deviceDetail.status}</span></div>
+                <div><span className="text-slate-500">Monitor:</span> <span className="text-slate-900 ml-1 capitalize">{deviceDetail.monitorStatus || "unknown"}</span></div>
+                <div className="col-span-2"><span className="text-slate-500">Description:</span> <span className="text-slate-900 ml-1">{deviceDetail.description || "—"}</span></div>
+                <div><span className="text-slate-500">Customer:</span> <span className="text-slate-900 ml-1">{cust?.name || "—"}</span></div>
+                <div><span className="text-slate-500">Service:</span> <span className="text-slate-900 ml-1">{svc?.name || "—"}</span></div>
+                {deviceDetail.tags && <div className="col-span-2"><span className="text-slate-500">Tags:</span> <span className="text-slate-900 ml-1">{deviceDetail.tags}</span></div>}
+                {deviceDetail.notes && <div className="col-span-2"><span className="text-slate-500">Notes:</span> <span className="text-slate-900 ml-1">{deviceDetail.notes}</span></div>}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Globe className="w-4 h-4 text-teal-600" /><span className="text-sm font-semibold text-slate-900">Location</span></div>
+              <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Facility:</span> <span className="text-slate-900 ml-1">{deviceDetail.facility || "—"}</span></div>
+                <div><span className="text-slate-500">Zone:</span> <span className="text-slate-900 ml-1">{deviceDetail.zone || "—"}</span></div>
+                <div><span className="text-slate-500">Cage:</span> <span className="text-slate-900 ml-1">{deviceDetail.cage || "—"}</span></div>
+                <div><span className="text-slate-500">Row:</span> <span className="text-slate-900 ml-1">{deviceDetail.row || "—"}</span></div>
+                <div><span className="text-slate-500">Rack:</span> <span className="text-slate-900 ml-1">{deviceDetail.rack || "—"}</span></div>
+                <div><span className="text-slate-500">Position:</span> <span className="text-slate-900 ml-1">{deviceDetail.rackPosition || "—"}</span></div>
+                <div><span className="text-slate-500">Height:</span> <span className="text-slate-900 ml-1">{deviceDetail.rackUnits ? `${deviceDetail.rackUnits}U` : "—"}</span></div>
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Network className="w-4 h-4 text-violet-600" /><span className="text-sm font-semibold text-slate-900">IP Assignments ({deviceIps.length})</span></div>
+                <button onClick={() => setShowIpForm(!showIpForm)} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid="button-add-ip"><Plus className="w-3.5 h-3.5" />Add IP</button>
+              </div>
+              <div className="p-4">
+                {showIpForm && (
+                  <div className="mb-3 p-3 bg-slate-50 rounded-md border border-slate-200 space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={newIp.ipAddress} onChange={(e) => setNewIp({ ...newIp, ipAddress: e.target.value })} placeholder="IP Address" className={inputCls} data-testid="input-new-ip" />
+                      <input value={newIp.description} onChange={(e) => setNewIp({ ...newIp, description: e.target.value })} placeholder="Description" className={inputCls} />
+                      <select value={newIp.type} onChange={(e) => setNewIp({ ...newIp, type: e.target.value })} className={inputCls}>
+                        <option value="public">Public</option><option value="private">Private</option><option value="local">Local</option><option value="service">Service</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleAddIp} className={btnPrimary} data-testid="button-save-ip">Add</button>
+                      <button onClick={() => setShowIpForm(false)} className={btnSecondary}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {deviceIps.length === 0 ? <div className="text-xs text-slate-400 italic">No IP assignments</div> : (
+                  <table className="w-full" data-testid="table-device-ips">
+                    <thead><tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">IP Address</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Type</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Description</th>
+                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
+                    </tr></thead>
+                    <tbody>
+                      {deviceIps.map((ip: any, i: number) => (
+                        <tr key={ip.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-ip-${ip.id}`}>
+                          <td className="text-[13px] text-slate-900 py-2 px-3 font-mono">{ip.ipAddress}</td>
+                          <td className="text-[13px] text-slate-500 py-2 px-3 capitalize">{ip.type}</td>
+                          <td className="text-[13px] text-slate-500 py-2 px-3">{ip.description || "—"}</td>
+                          <td className="py-2 px-3 text-center"><button onClick={() => handleDeleteIp(ip.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-ip-${ip.id}`}><Trash2 className="w-3.5 h-3.5" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Cable className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold text-slate-900">Network Interfaces ({deviceInterfaces.length})</span></div>
+                <button onClick={() => setShowInterfaceForm(!showInterfaceForm)} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid="button-add-interface"><Plus className="w-3.5 h-3.5" />Add Interface</button>
+              </div>
+              <div className="p-4">
+                {showInterfaceForm && (
+                  <div className="mb-3 p-3 bg-slate-50 rounded-md border border-slate-200 space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={newInterface.name} onChange={(e) => setNewInterface({ ...newInterface, name: e.target.value })} placeholder="eth0" className={inputCls} data-testid="input-new-interface" />
+                      <select value={newInterface.status} onChange={(e) => setNewInterface({ ...newInterface, status: e.target.value })} className={inputCls}>
+                        <option value="up">Up</option><option value="down">Down</option><option value="admin_down">Admin Down</option>
+                      </select>
+                      <input value={newInterface.speed} onChange={(e) => setNewInterface({ ...newInterface, speed: e.target.value })} placeholder="1Gbps" className={inputCls} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleAddInterface} className={btnPrimary} data-testid="button-save-interface">Add</button>
+                      <button onClick={() => setShowInterfaceForm(false)} className={btnSecondary}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {deviceInterfaces.length === 0 ? <div className="text-xs text-slate-400 italic">No interfaces</div> : (
+                  <table className="w-full" data-testid="table-device-interfaces">
+                    <thead><tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Speed</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">VLAN</th>
+                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
+                    </tr></thead>
+                    <tbody>
+                      {deviceInterfaces.map((iface: any, i: number) => (
+                        <tr key={iface.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-interface-${iface.id}`}>
+                          <td className="text-[13px] text-slate-900 py-2 px-3 font-mono">{iface.name}</td>
+                          <td className="py-2 px-3"><StatusBadge status={iface.status === "up" ? "active" : "suspended"} showDot /></td>
+                          <td className="text-[13px] text-slate-500 py-2 px-3">{iface.speed || "—"}</td>
+                          <td className="text-[13px] text-slate-500 py-2 px-3">{iface.vlan || "—"}</td>
+                          <td className="py-2 px-3 text-center"><button onClick={() => handleDeleteInterface(iface.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-interface-${iface.id}`}><Trash2 className="w-3.5 h-3.5" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+            {childDevices.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-lg shadow-sm col-span-full">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Server className="w-4 h-4 text-slate-600" /><span className="text-sm font-semibold text-slate-900">Child Devices ({childDevices.length})</span></div>
+                <div className="p-4">
+                  <table className="w-full">
+                    <thead><tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Device #</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Type</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                    </tr></thead>
+                    <tbody>
+                      {childDevices.map((d: any, i: number) => (
+                        <tr key={d.id} className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} onClick={() => loadDeviceDetail(d.id)}>
+                          <td className="text-[13px] text-slate-500 py-2 px-3 font-mono">#{d.deviceNumber}</td>
+                          <td className="text-[13px] text-slate-900 py-2 px-3 font-medium">{d.name}</td>
+                          <td className="text-[13px] text-slate-500 py-2 px-3 capitalize">{d.deviceType}</td>
+                          <td className="py-2 px-3"><StatusBadge status={d.status} showDot /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {deviceDetail.grafanaUrl && (
+              <div className="bg-white border border-slate-200 rounded-lg shadow-sm col-span-full">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Activity className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold text-slate-900">Monitoring</span></div>
+                <div className="p-1">
+                  <iframe
+                    src={`${deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPanelId || 1}&from=now-24h&to=now`}
+                    className="w-full h-[300px] border-0 rounded"
+                    title="Grafana Monitoring"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <DeviceModal open={showModal} onOpenChange={setShowModal} editing={editingDevice} customers={customers} services={services} devices={devices} token={token} onSuccess={() => { setShowModal(false); onRefresh(); if (deviceDetail) loadDeviceDetail(deviceDetail.id); }} />
+      </div>
+    );
+  }
+
+  const deviceColumns: ColumnDef<any>[] = [
+    { key: "deviceNumber", label: "Device #", width: "90px", sortable: true, render: (row: any) => <span className="font-mono text-slate-500">#{row.deviceNumber}</span> },
+    { key: "name", label: "Name", sortable: true, render: (row: any) => <span className="font-medium text-slate-900">{row.name}</span> },
+    { key: "deviceType", label: "Type", sortable: true, render: (row: any) => <span className="capitalize">{row.deviceType}</span> },
+    { key: "status", label: "Status", render: (row: any) => <StatusBadge status={row.status} showDot /> },
+    { key: "facility", label: "Facility", sortable: true, render: (row: any) => <span>{row.facility || "—"}</span> },
+    { key: "rack", label: "Rack", render: (row: any) => <span>{row.rack ? `${row.rack}${row.rackPosition ? ` / U${row.rackPosition}` : ""}` : "—"}</span> },
+    { key: "customerName", label: "Customer", sortable: true, render: (row: any) => <span>{row.customerName || "—"}</span> },
+    { key: "actions", label: "", align: "center", render: (row: any) => (
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); setEditingDevice(row); setShowModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-edit-device-${row.id}`}>Edit</button>
+        <button onClick={(e) => { e.stopPropagation(); handleDeleteDevice(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-delete-device-${row.id}`}>Delete</button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="devices-view">
+      <AdminTable
+        data={devices}
+        columns={deviceColumns}
+        onRowClick={(row) => loadDeviceDetail(row.id)}
+        searchPlaceholder="Search devices..."
+        searchKeys={["name", "deviceType", "facility", "customerName"]}
+        getRowId={(row) => row.id}
+        rowTestIdPrefix="device"
+        actions={
+          <button onClick={() => { setEditingDevice(null); setShowModal(true); }} className={btnPrimary} data-testid="button-add-device">
+            <Plus className="w-4 h-4" />Add Device
+          </button>
+        }
+        className="flex-1"
+      />
+      <DeviceModal open={showModal} onOpenChange={setShowModal} editing={editingDevice} customers={customers} services={services} devices={devices} token={token} onSuccess={() => { setShowModal(false); onRefresh(); }} />
+    </div>
+  );
+}
+
+function DeviceModal({ open, onOpenChange, editing, customers, services, devices, token, onSuccess }: {
+  open: boolean; onOpenChange: (open: boolean) => void; editing: any | null;
+  customers: any[]; services: any[]; devices: any[]; token: string | null; onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "",
+    facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "",
+    tags: "", notes: "",
+  });
+
+  useEffect(() => {
+    if (editing) {
+      setForm({
+        name: editing.name || "", description: editing.description || "", deviceType: editing.deviceType || "server",
+        status: editing.status || "active", customerId: editing.customerId || "", serviceId: editing.serviceId || "",
+        parentDeviceId: editing.parentDeviceId || "", facility: editing.facility || "", zone: editing.zone || "",
+        cage: editing.cage || "", row: editing.row || "", rack: editing.rack || "", rackPosition: editing.rackPosition || "",
+        rackUnits: editing.rackUnits?.toString() || "", tags: editing.tags || "", notes: editing.notes || "",
+      });
+    } else {
+      setForm({ name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "", facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "", tags: "", notes: "" });
+    }
+  }, [editing, open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) { toast({ title: "Device name is required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      const body: any = { ...form, rackUnits: form.rackUnits ? parseInt(form.rackUnits) : null };
+      if (!body.customerId) body.customerId = null;
+      if (!body.serviceId) body.serviceId = null;
+      if (!body.parentDeviceId) body.parentDeviceId = null;
+      const url = editing ? `/api/admin/devices/${editing.id}` : "/api/admin/devices";
+      const res = await fetch(url, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      if (res.ok) { toast({ title: editing ? "Device updated" : "Device created" }); onSuccess(); }
+      else { const err = await res.json(); toast({ title: "Error", description: err.error || "Failed to save", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save device", variant: "destructive" }); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Edit Device" : "Add Device"}</DialogTitle>
+          <DialogDescription>{editing ? "Update device details." : "Register a new device."}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Device Name *</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-device-name" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Type</label>
+              <select value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })} className={inputCls} data-testid="select-device-type">
+                <option value="server">Server</option><option value="switch">Switch</option><option value="router">Router</option>
+                <option value="firewall">Firewall</option><option value="pdu">PDU</option><option value="other">Other</option>
+              </select></div>
+          </div>
+          <div><label className="text-xs text-slate-500 block mb-1">Description</label>
+            <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} data-testid="input-device-description" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputCls} data-testid="select-device-status">
+                <option value="active">Active</option><option value="inactive">Inactive</option>
+                <option value="maintenance">Maintenance</option><option value="decommissioned">Decommissioned</option>
+              </select></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Customer</label>
+              <select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} className={inputCls} data-testid="select-device-customer">
+                <option value="">— None —</option>
+                {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Linked Service</label>
+              <select value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} className={inputCls} data-testid="select-device-service">
+                <option value="">— None —</option>
+                {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Parent Device</label>
+              <select value={form.parentDeviceId} onChange={(e) => setForm({ ...form, parentDeviceId: e.target.value })} className={inputCls} data-testid="select-device-parent">
+                <option value="">— None —</option>
+                {devices.filter(d => d.id !== editing?.id).map((d: any) => <option key={d.id} value={d.id}>{d.name} (#{d.deviceNumber})</option>)}
+              </select></div>
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <span className="text-xs font-semibold text-slate-700 block mb-2">Location</span>
+            <div className="grid grid-cols-3 gap-3">
+              <div><label className="text-xs text-slate-500 block mb-1">Facility</label><input value={form.facility} onChange={(e) => setForm({ ...form, facility: e.target.value })} className={inputCls} data-testid="input-device-facility" /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Zone</label><input value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })} className={inputCls} /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Cage</label><input value={form.cage} onChange={(e) => setForm({ ...form, cage: e.target.value })} className={inputCls} /></div>
+            </div>
+            <div className="grid grid-cols-4 gap-3 mt-2">
+              <div><label className="text-xs text-slate-500 block mb-1">Row</label><input value={form.row} onChange={(e) => setForm({ ...form, row: e.target.value })} className={inputCls} /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Rack</label><input value={form.rack} onChange={(e) => setForm({ ...form, rack: e.target.value })} className={inputCls} data-testid="input-device-rack" /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Position (U)</label><input value={form.rackPosition} onChange={(e) => setForm({ ...form, rackPosition: e.target.value })} className={inputCls} /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Height (U)</label><input value={form.rackUnits} onChange={(e) => setForm({ ...form, rackUnits: e.target.value })} className={inputCls} /></div>
+            </div>
+          </div>
+          <div><label className="text-xs text-slate-500 block mb-1">Tags (comma-separated)</label><input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className={inputCls} /></div>
+          <div><label className="text-xs text-slate-500 block mb-1">Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} /></div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={saving} className={btnPrimary} data-testid="button-save-device">{saving ? "Saving..." : editing ? "Update" : "Create"}</button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CustomerDetailView({ token, customerId, onBack }: { token: string | null; customerId: string; onBack: () => void }) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState<any>(null);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [newContact, setNewContact] = useState({ name: "", email: "", phone: "", role: "", isPrimary: false });
+
+  async function loadDetail() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setDetail(data);
+        setContacts(data.contacts || []);
+        setNotes(data.notes || []);
+      }
+    } catch { toast({ title: "Error", description: "Failed to load customer detail", variant: "destructive" }); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadDetail(); }, [customerId]);
+
+  async function handleAddNote() {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/notes`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ body: newNote, isPublic: true }),
+      });
+      if (res.ok) { setNewNote(""); loadDetail(); toast({ title: "Note added" }); }
+    } catch { toast({ title: "Error", description: "Failed to add note", variant: "destructive" }); }
+    finally { setAddingNote(false); }
+  }
+
+  async function handleAddContact() {
+    if (!newContact.name.trim()) return;
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/contacts`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newContact),
+      });
+      if (res.ok) { setNewContact({ name: "", email: "", phone: "", role: "", isPrimary: false }); setShowContactForm(false); loadDetail(); toast({ title: "Contact added" }); }
+    } catch { toast({ title: "Error", description: "Failed to add contact", variant: "destructive" }); }
+  }
+
+  async function handleDeleteContact(contactId: string) {
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/contacts/${contactId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { loadDetail(); toast({ title: "Contact removed" }); }
+    } catch {}
+  }
+
+  if (loading) {
+    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading client detail...</div>;
+  }
+
+  if (!detail) {
+    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Client not found</div>;
+  }
+
+  const cust = detail;
+  const users = detail.users || [];
+  const custServices = detail.services || [];
+  const custTickets = detail.tickets || [];
+  const custDevices = detail.devices || [];
+  const custInvoices = detail.invoices || [];
+  const invoiceBalance = detail.invoiceBalance || 0;
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="customer-detail-view">
+      <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0 gap-3">
+        <button onClick={onBack} className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="button-back-customers">
+          <ArrowLeft className="w-4 h-4" />Back to Customers
+        </button>
+        <div className="h-5 w-px bg-slate-200" />
+        <span className="text-sm font-semibold text-slate-900">Client #{cust.clientNumber}: {cust.name}</span>
+        <div className="flex-1" />
+        <StatusBadge status={cust.active ? "active" : "suspended"} showDot />
+      </div>
+      <div className="flex-1 overflow-auto p-5">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">General Information</span></div>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+              <div><span className="text-slate-500">Client #:</span> <span className="text-slate-900 ml-1 font-mono">#{cust.clientNumber}</span></div>
+              <div><span className="text-slate-500">Account Type:</span> <span className="text-slate-900 ml-1 capitalize">{cust.accountType || "standard"}</span></div>
+              <div><span className="text-slate-500">Company:</span> <span className="text-slate-900 ml-1 font-medium">{cust.name}</span></div>
+              <div><span className="text-slate-500">Contact:</span> <span className="text-slate-900 ml-1">{cust.contactName || "—"}</span></div>
+              <div><span className="text-slate-500">Email:</span> <span className="text-slate-900 ml-1">{cust.email || "—"}</span></div>
+              <div><span className="text-slate-500">Phone:</span> <span className="text-slate-900 ml-1">{cust.phone || "—"}</span></div>
+              <div><span className="text-slate-500">Fax:</span> <span className="text-slate-900 ml-1">{cust.fax || "—"}</span></div>
+              <div><span className="text-slate-500">Website:</span> <span className="text-slate-900 ml-1">{cust.website || "—"}</span></div>
+              <div className="col-span-2"><span className="text-slate-500">Address:</span> <span className="text-slate-900 ml-1">{[cust.address, cust.city, cust.state, cust.zip].filter(Boolean).join(", ") || "—"}</span></div>
+              {cust.tags && <div className="col-span-2"><span className="text-slate-500">Tags:</span> <span className="text-slate-900 ml-1">{cust.tags}</span></div>}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><CreditCard className="w-4 h-4 text-emerald-600" /><span className="text-sm font-semibold text-slate-900">Billing Summary</span></div>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+              <div><span className="text-slate-500">Payment Terms:</span> <span className="text-slate-900 ml-1">{cust.paymentTerms || "Net 30"}</span></div>
+              <div><span className="text-slate-500">Billing Method:</span> <span className="text-slate-900 ml-1 capitalize">{cust.billingMethod || "invoice"}</span></div>
+              <div><span className="text-slate-500">Discount:</span> <span className="text-slate-900 ml-1">{cust.discount || "0"}%</span></div>
+              <div><span className="text-slate-500">Grace Period:</span> <span className="text-slate-900 ml-1">{cust.gracePeriod || 0} days</span></div>
+              <div><span className="text-slate-500">Delivery:</span> <span className="text-slate-900 ml-1 capitalize">{cust.deliveryMethod || "email"}</span></div>
+              <div><span className="text-slate-500">Outstanding:</span> <span className={`ml-1 font-semibold ${invoiceBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>${Number(invoiceBalance).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></div>
+              <div><span className="text-slate-500">Total Invoices:</span> <span className="text-slate-900 ml-1">{custInvoices.length}</span></div>
+              <div><span className="text-slate-500">Active Services:</span> <span className="text-slate-900 ml-1">{custServices.filter((s: any) => s.status === "active").length}</span></div>
+            </div>
+          </div>
+          {(cust.contractStatus || cust.contractStartDate) && (
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><FileText className="w-4 h-4 text-violet-600" /><span className="text-sm font-semibold text-slate-900">Contract Details</span></div>
+              <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Status:</span> <span className="text-slate-900 ml-1 capitalize">{cust.contractStatus || "—"}</span></div>
+                <div><span className="text-slate-500">Term:</span> <span className="text-slate-900 ml-1">{cust.contractTermMonths ? `${cust.contractTermMonths} months` : "—"}</span></div>
+                <div><span className="text-slate-500">Start:</span> <span className="text-slate-900 ml-1">{cust.contractStartDate ? new Date(cust.contractStartDate).toLocaleDateString() : "—"}</span></div>
+                <div><span className="text-slate-500">End:</span> <span className="text-slate-900 ml-1">{cust.contractEndDate ? new Date(cust.contractEndDate).toLocaleDateString() : "—"}</span></div>
+              </div>
+            </div>
+          )}
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2"><Users className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold text-slate-900">Authorized Contacts ({contacts.length})</span></div>
+              <button onClick={() => setShowContactForm(!showContactForm)} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid="button-add-contact"><Plus className="w-3.5 h-3.5" />Add</button>
+            </div>
+            <div className="p-4">
+              {showContactForm && (
+                <div className="mb-3 p-3 bg-slate-50 rounded-md border border-slate-200 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} placeholder="Name" className={inputCls} data-testid="input-contact-name" />
+                    <input value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} placeholder="Email" className={inputCls} data-testid="input-contact-email" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} placeholder="Phone" className={inputCls} />
+                    <input value={newContact.role} onChange={(e) => setNewContact({ ...newContact, role: e.target.value })} placeholder="Role (e.g. CTO)" className={inputCls} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleAddContact} className={btnPrimary} data-testid="button-save-contact">Add Contact</button>
+                    <button onClick={() => setShowContactForm(false)} className={btnSecondary}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {contacts.length === 0 ? <div className="text-xs text-slate-400 italic">No authorized contacts</div> : (
+                <table className="w-full" data-testid="table-contacts">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Phone</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Role</th>
+                    <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
+                  </tr></thead>
+                  <tbody>
+                    {contacts.map((c: any, i: number) => (
+                      <tr key={c.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-contact-${c.id}`}>
+                        <td className="text-[13px] text-slate-900 py-2 px-3">{c.name}{c.isPrimary && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Primary</span>}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.email || "—"}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.phone || "—"}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{c.role || "—"}</td>
+                        <td className="py-2 px-3 text-center"><button onClick={() => handleDeleteContact(c.id)} className="text-red-600 hover:text-red-700 text-xs" data-testid={`button-delete-contact-${c.id}`}><Trash2 className="w-3.5 h-3.5" /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Users className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">User Accounts ({users.length})</span></div>
+            <div className="p-4">
+              {users.length === 0 ? <div className="text-xs text-slate-400 italic">No user accounts</div> : (
+                <table className="w-full">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Username</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {users.map((u: any, i: number) => (
+                      <tr key={u.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-user-${u.id}`}>
+                        <td className="text-[13px] text-slate-900 py-2 px-3">{u.name}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.username}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.email}</td>
+                        <td className="py-2 px-3"><StatusBadge status={u.active ? "active" : "suspended"} showDot /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Server className="w-4 h-4 text-teal-600" /><span className="text-sm font-semibold text-slate-900">Services ({custServices.length})</span></div>
+            <div className="p-4">
+              {custServices.length === 0 ? <div className="text-xs text-slate-400 italic">No services</div> : (
+                <table className="w-full">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Service</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Type</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                    <th className="text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Monthly</th>
+                  </tr></thead>
+                  <tbody>
+                    {custServices.map((s: any, i: number) => (
+                      <tr key={s.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
+                        <td className="text-[13px] text-slate-900 py-2 px-3 font-medium">{s.name}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3 capitalize">{s.type}</td>
+                        <td className="py-2 px-3"><StatusBadge status={s.status} showDot /></td>
+                        <td className="text-[13px] text-slate-900 py-2 px-3 text-right">${s.monthlyPrice}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Ticket className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold text-slate-900">Recent Tickets ({custTickets.length})</span></div>
+            <div className="p-4">
+              {custTickets.length === 0 ? <div className="text-xs text-slate-400 italic">No tickets</div> : (
+                <table className="w-full">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Ticket #</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Subject</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Priority</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {custTickets.map((t: any, i: number) => (
+                      <tr key={t.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
+                        <td className="text-[13px] text-slate-500 py-2 px-3 font-mono">#{t.ticketNumber || t.id}</td>
+                        <td className="text-[13px] text-slate-900 py-2 px-3 font-medium">{t.subject}</td>
+                        <td className="py-2 px-3"><StatusBadge status={t.priority} /></td>
+                        <td className="py-2 px-3"><StatusBadge status={t.status} showDot /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Monitor className="w-4 h-4 text-slate-600" /><span className="text-sm font-semibold text-slate-900">Devices ({custDevices.length})</span></div>
+            <div className="p-4">
+              {custDevices.length === 0 ? <div className="text-xs text-slate-400 italic">No devices</div> : (
+                <table className="w-full">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Device #</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Type</th>
+                    <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {custDevices.map((d: any, i: number) => (
+                      <tr key={d.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
+                        <td className="text-[13px] text-slate-500 py-2 px-3 font-mono">#{d.deviceNumber}</td>
+                        <td className="text-[13px] text-slate-900 py-2 px-3 font-medium">{d.name}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3 capitalize">{d.deviceType}</td>
+                        <td className="py-2 px-3"><StatusBadge status={d.status} showDot /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm col-span-full">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><StickyNote className="w-4 h-4 text-slate-600" /><span className="text-sm font-semibold text-slate-900">Notes & Comments ({notes.length})</span></div>
+            <div className="p-4">
+              <div className="mb-3 flex gap-2">
+                <input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className={`${inputCls} flex-1`} data-testid="input-customer-note" />
+                <button onClick={handleAddNote} disabled={!newNote.trim() || addingNote} className={btnPrimary} data-testid="button-add-note">
+                  <Plus className="w-4 h-4" />{addingNote ? "Adding..." : "Add Note"}
+                </button>
+              </div>
+              {notes.length === 0 ? <div className="text-xs text-slate-400 italic">No notes yet</div> : (
+                <div className="space-y-2">
+                  {notes.map((n: any) => (
+                    <div key={n.id} className="p-3 bg-slate-50 rounded-md border border-slate-200" data-testid={`note-${n.id}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-slate-700">{n.authorName || "Admin"}</span>
+                        <span className="text-[10px] text-slate-500">{new Date(n.createdAt).toLocaleString()}</span>
+                      </div>
+                      <div className="text-[13px] text-slate-800">{n.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
