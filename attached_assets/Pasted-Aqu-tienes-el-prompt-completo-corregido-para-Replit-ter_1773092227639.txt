@@ -1,0 +1,262 @@
+Aquí tienes el prompt completo corregido para Replit (terminado y bien estructurado):
+
+Device Detail Page (Ubersmith-style Infrastructure View)
+
+I want the Device Details page to be redesigned similar to how Ubersmith displays infrastructure devices.
+
+When a user clicks on a device (server, switch, router, firewall, PDU, etc.), the system should open a complete device overview page that shows all operational, physical, network, and monitoring information in one place.
+
+The goal is to provide a single operational dashboard per device similar to Ubersmith.
+
+1. Device Information Section
+
+This section should display the core metadata of the device.
+
+Fields should include:
+
+Device Name / Label
+
+Device Description
+
+Parent Device (for example: a server connected to a switch)
+
+Device Type (server, switch, router, firewall, PDU, etc.)
+
+Facility / Datacenter
+
+Zone / Cage
+
+Row
+
+Rack
+
+Rack Position (U position)
+
+Rack Units (height)
+
+Connection Node Type
+
+Device Tags or Labels
+
+This section should clearly show the physical datacenter location, including:
+
+Facility → Zone → Cage → Row → Rack → Rack Position
+
+2. Device Status
+
+This section should show the operational state of the device.
+
+Fields should include:
+
+Device Status (Up / Down / Warning)
+
+Monitor Status (for example: 2 of 3 monitors up)
+
+Last Check Timestamp
+
+Monitoring Source (Zabbix / SNMP / API)
+
+3. Device Actions
+
+Provide quick operational actions such as:
+
+Enable Switch Ports
+
+Disable Switch Ports
+
+Re-discover Device
+
+Add Child Device
+
+Duplicate Device
+
+Assign Device to Client
+
+These actions should be visible in a small action panel.
+
+4. IP Assignments
+
+Show all IP addresses assigned to the device.
+
+Columns should include:
+
+IP Address
+
+Description
+
+Type (Local / Public / Private / Service)
+
+Owner
+
+VLAN
+
+PTR record
+
+Edit / Delete actions
+
+5. Network Interfaces
+
+Display all device interfaces.
+
+Columns should include:
+
+Interface Name
+
+Status
+
+Connected Device / Port
+
+VLAN
+
+Speed
+
+Edit Connection
+
+Example:
+
+eth0 → connected to switch1 port 1
+
+6. DNS Records
+
+Show DNS records associated with the device.
+
+For example:
+
+A records
+
+PTR records
+
+CNAME records
+
+If none exist, display:
+
+"No DNS records found"
+
+7. Child Devices
+
+Allow devices to have hierarchical relationships.
+
+Example:
+
+Switch
+└ Server
+└ Firewall
+└ Router
+
+The interface should allow:
+
+Add Child Device
+
+View Connected Devices
+
+8. Monitoring Graphs (Grafana / SNMP)
+
+Inside the Device page there should be a Monitoring panel showing live graphs.
+
+These graphs should be embedded from:
+
+Grafana dashboards OR SNMP data sources
+
+Examples:
+
+CPU usage
+Network traffic
+Temperature
+Power usage
+Bandwidth utilization
+
+If the device is a PDU, show SNMP metrics such as:
+
+Voltage
+
+Amperage
+
+Total Load
+
+Outlet Power Consumption
+
+Example graphs:
+
+Power usage per outlet
+
+Total rack amperage
+
+Power trend over time
+
+These graphs should be embedded using Grafana panel iframe embedding.
+
+9. Monitoring Sources
+
+Monitoring data can come from:
+
+Zabbix
+
+SNMP
+
+API
+
+Prometheus
+
+Grafana dashboards
+
+Each device should have an option to configure:
+
+Monitoring Source
+
+Device SNMP credentials
+
+Grafana dashboard ID
+
+10. UI Layout
+
+The page layout should resemble Ubersmith style infrastructure management.
+
+Structure:
+
+Left column:
+
+Device Information
+
+Device Status
+
+Custom Fields
+
+Right column:
+
+Actions
+
+IP Assignments
+
+DNS Records
+
+Interfaces
+
+Monitoring Graphs
+
+The design should be:
+
+Dense with useful information
+
+Clean and organized
+
+Fast to scan
+
+Suitable for infrastructure engineers
+
+Final Goal
+
+When an engineer opens a device page, they should immediately see:
+
+Where the device is located in the datacenter
+
+What network connections it has
+
+What IPs it owns
+
+What devices it connects to
+
+Its operational status
+
+Live monitoring graphs from Grafana or SNMP
+
+This should function as a full infrastructure device management view similar to Ubersmith.

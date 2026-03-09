@@ -1,0 +1,156 @@
+I want the Client Details page to behave more like Ubersmith.
+
+When I select a client, the system should open a complete client profile view and display all important client information in a structured dashboard layout, instead of showing only basic or limited details.
+
+Please redesign the client view so that, after clicking a client, it shows sections like these:
+
+1. General Client Information
+
+Client name
+
+Company name
+
+Full address
+
+Email
+
+Phone
+
+Fax
+
+Internal client ID / account number
+
+2. Billing Summary
+
+Invoice balance
+
+Credit balance
+
+Account balance
+
+Discount
+
+Invoice send date
+
+Grace period
+
+Invoice charge date
+
+Preferred billing method
+
+Late fee schedule
+
+Delivery method
+
+Account credits
+
+Client since / created date
+
+3. Account Information
+
+Business status
+
+Default ticket priority
+
+Account type
+
+Status
+
+Any custom account settings
+
+4. Login Information
+
+Login name / username
+
+Password status or reset option
+
+Two-factor authentication status
+
+5. Permissions
+
+Client portal permissions
+
+Access roles
+
+User privileges
+
+6. Authorized Contacts
+
+Primary contact
+
+Additional contacts
+
+Phone
+
+Email
+
+Actions like edit / deactivate / view details
+
+7. Similar or Related Clients
+
+Related accounts or similar client records
+
+Basic identifying information
+
+8. Tags
+
+Labels or tags assigned to the client
+
+Ability to add/edit tags
+
+9. Latest Comments / Notes
+
+Internal notes
+
+Public notes
+
+Timeline of recent comments
+
+Add new comment button
+
+10. Service Agreement / Contract Details
+
+Master service agreement
+
+Status
+
+PDF/document link
+
+Signed date
+
+Expiration date
+
+Term length
+
+11. User Relationships
+
+Assigned salesperson
+
+Assigned account manager
+
+Assigned support contact
+
+Internal ownership / relationship mapping
+
+12. Custom Fields
+
+Any business-specific custom fields such as cloud billing, infrastructure notes, contract metadata, or service preferences
+
+I want this page to feel like a full account overview, where all the most important customer data is visible in one place using a clean, organized, multi-section layout.
+
+UI/UX requirements:
+
+Use a professional admin dashboard style
+
+Group information into clear cards or panels
+
+Make it easy to scan quickly
+
+Keep edit actions visible for each section
+
+Support both desktop readability and responsive behavior
+
+The page should look dense with useful information, but still clean and modern
+
+Goal:
+When a staff member clicks a client, they should immediately see a complete 360-degree view of that customer: account info, billing, contacts, permissions, notes, agreements, and internal relationships.
