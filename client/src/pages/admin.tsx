@@ -1,35 +1,28 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { useMemo, useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import {
   Activity,
   ArrowRight,
   Bell,
-  Boxes,
   Building2,
-  ChevronDown,
-  ChevronRight,
   CreditCard,
-  Download,
   Eye,
   EyeOff,
   FileText,
+  Globe,
   HardHat,
+  Headset,
   LayoutDashboard,
   Loader2,
-  LogOut,
   Mail,
-  MapPin,
   MessageSquare,
-  Pencil,
   Plus,
-  Search,
   Send,
   Server,
   Settings,
   Shield,
   Ticket,
   Save,
-  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -37,6 +30,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { AdminLayout, type AdminSection, type SidebarGroup } from "@/components/admin/AdminLayout";
+import { AdminCard, KpiRow } from "@/components/admin/AdminCard";
+import { AdminTable, type ColumnDef } from "@/components/admin/AdminTable";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 
 type PermissionKeys = {
   permPortalAccess: boolean;
@@ -133,18 +130,18 @@ function getPermSummaryBadges(perms: Partial<PermissionKeys>): string[] {
 
 function PermissionCheckboxGrid({ perms, onChange }: { perms: PermissionKeys; onChange: (perms: PermissionKeys) => void }) {
   return (
-    <div className="space-y-[6px]" data-testid="permission-grid">
+    <div className="space-y-3" data-testid="permission-grid">
       {PERMISSION_GROUPS.map((group) => (
         <div key={group.label}>
-          <div className="text-[9px] font-semibold text-[#999] uppercase tracking-wider mb-[2px]">{group.label}</div>
-          <div className="grid grid-cols-2 gap-x-2 gap-y-[1px]">
+          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{group.label}</div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             {group.keys.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-[4px] text-[10px] text-[#1e1e1e] cursor-pointer hover:bg-[#eef1f6] px-1 py-[1px]">
+              <label key={key} className="flex items-center gap-2 text-[13px] text-slate-700 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded">
                 <input
                   type="checkbox"
                   checked={perms[key]}
                   onChange={(e) => onChange({ ...perms, [key]: e.target.checked })}
-                  className="h-[10px] w-[10px]"
+                  className="h-3.5 w-3.5 rounded border-slate-300"
                   data-testid={`checkbox-${key}`}
                 />
                 {label}
@@ -170,76 +167,11 @@ type UserData = {
   lastLogin?: string;
 } & Partial<PermissionKeys>;
 
-type AdminSection = "home" | "clients" | "support" | "devices" | "orders" | "sales" | "settings";
-
 type AdminView = "dashboard" | "users" | "services" | "invoices" | "customers" | "settings" | "tickets";
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    active: "bg-[#dff6dd] text-[#1e7b34]",
-    suspended: "bg-[#fff4ce] text-[#9d6b00]",
-    new: "bg-[#cce4f7] text-[#2563eb]",
-    open: "bg-[#cce4f7] text-[#2563eb]",
-    waiting: "bg-[#fff4ce] text-[#9d6b00]",
-    in_progress: "bg-[#e8daef] text-[#6c3483]",
-    resolved: "bg-[#dff6dd] text-[#1e7b34]",
-    closed: "bg-[#dce3ed] text-[#666]",
-    low: "bg-[#dce3ed] text-[#666]",
-    normal: "bg-[#dce3ed] text-[#666]",
-    high: "bg-[#fff4ce] text-[#9d6b00]",
-    urgent: "bg-[#fde7e9] text-[#c42b1c]",
-    admin: "bg-[#e8daef] text-[#6c3483]",
-    customer: "bg-[#cce4f7] text-[#2563eb]",
-    pending: "bg-[#fff4ce] text-[#9d6b00]",
-    paid: "bg-[#dff6dd] text-[#1e7b34]",
-    past_due: "bg-[#fde7e9] text-[#c42b1c]",
-    draft: "bg-[#dce3ed] text-[#888]",
-    provisioning: "bg-[#cce4f7] text-[#2563eb]",
-  };
-  return (
-    <span className={`inline-block px-[4px] py-[1px] text-[10px] font-medium ${colors[status] || "bg-[#dce3ed] text-[#666]"}`} style={{ lineHeight: "14px" }}>
-      {status.replace("_", " ")}
-    </span>
-  );
-}
-
-function DraggableDivider({ onDrag }: { onDrag: (deltaY: number) => void }) {
-  const dragging = useRef(false);
-  const lastY = useRef(0);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    dragging.current = true;
-    lastY.current = e.clientY;
-    e.preventDefault();
-  }, []);
-
-  useEffect(() => {
-    function handleMouseMove(e: MouseEvent) {
-      if (!dragging.current) return;
-      const delta = e.clientY - lastY.current;
-      lastY.current = e.clientY;
-      onDrag(delta);
-    }
-    function handleMouseUp() {
-      dragging.current = false;
-    }
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [onDrag]);
-
-  return (
-    <div
-      onMouseDown={handleMouseDown}
-      className="h-[4px] cursor-row-resize bg-[#dce3ed] border-t border-b border-[#b8c4d4] hover:bg-[#2563eb] active:bg-[#2563eb] flex-shrink-0"
-      style={{ minHeight: 4 }}
-      data-testid="draggable-divider"
-    />
-  );
-}
+const inputCls = "w-full h-9 px-3 text-[13px] bg-white border border-slate-200 rounded-md outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors";
+const btnPrimary = "inline-flex items-center gap-1.5 px-4 h-9 bg-blue-600 text-white text-[13px] font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50";
+const btnSecondary = "inline-flex items-center gap-1.5 px-4 h-9 bg-white text-slate-700 text-[13px] font-medium rounded-md border border-slate-200 hover:bg-slate-50 transition-colors";
 
 export default function AdminPage() {
   const { user, token, logout } = useAuth();
@@ -247,7 +179,6 @@ export default function AdminPage() {
   const { toast } = useToast();
   const [currentSection, setCurrentSection] = useState<AdminSection>("home");
   const [currentView, setCurrentView] = useState<AdminView>("dashboard");
-  const [query, setQuery] = useState("");
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -281,15 +212,15 @@ export default function AdminPage() {
     if (currentView === "tickets") loadTickets();
   }, [currentView]);
 
+  useEffect(() => {
+    loadTickets();
+  }, []);
+
   async function loadUsers() {
     setLoadingUsers(true);
     try {
-      const res = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setAllUsers(await res.json());
-      }
+      const res = await fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setAllUsers(await res.json());
     } catch {
       toast({ title: "Error", description: "Failed to load users", variant: "destructive" });
     } finally {
@@ -298,9 +229,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (currentView === "users") {
-      loadUsers();
-    }
+    if (currentView === "users") loadUsers();
   }, [currentView]);
 
   async function handleLogout() {
@@ -321,10 +250,7 @@ export default function AdminPage() {
   async function handleDeleteUser(id: string) {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
-      const res = await fetch(`/api/admin/users/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         toast({ title: "Success", description: "User deleted" });
         loadUsers();
@@ -337,11 +263,74 @@ export default function AdminPage() {
     }
   }
 
-  const filteredUsers = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allUsers;
-    return allUsers.filter((u) => [u.username, u.name, u.email, u.companyName].some((v) => v?.toLowerCase().includes(q)));
-  }, [query, allUsers]);
+  const openTicketCount = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status)).length;
+
+  const ticketDepts = [
+    { key: "all", label: "All Queues", icon: Ticket },
+    { key: "support", label: "Support", icon: HardHat },
+    { key: "sales", label: "Sales", icon: CreditCard },
+    { key: "billing", label: "Billing", icon: FileText },
+    { key: "provisioning", label: "Provisioning", icon: Server },
+    { key: "smart_hands", label: "SmartHands", icon: HardHat },
+    { key: "abuse", label: "Abuse", icon: Shield },
+    { key: "general", label: "General", icon: MessageSquare },
+  ];
+
+  function deptCount(dept: string) {
+    const active = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status));
+    if (dept === "all") return active.length;
+    return active.filter(t => t.category === dept).length;
+  }
+
+  const sidebarGroups: SidebarGroup[] = useMemo(() => {
+    switch (currentSection) {
+      case "home":
+        return [{ title: "Navigation", items: [
+          { icon: LayoutDashboard, label: "Dashboard", id: "dashboard", active: currentView === "dashboard", onClick: () => setCurrentView("dashboard") },
+          { icon: Activity, label: "Live Activity", id: "live-activity" },
+        ]}];
+      case "clients":
+        return [{ title: "Accounts", items: [
+          { icon: Building2, label: "All Customers", id: "customers", active: currentView === "customers", onClick: () => setCurrentView("customers") },
+          { icon: Users, label: "All Users", id: "users", active: currentView === "users", badge: allUsers.length || undefined, onClick: () => setCurrentView("users") },
+        ]}];
+      case "support":
+        return [
+          { title: "Queues", items: ticketDepts.map(d => ({
+            icon: d.icon, label: d.label, id: `dept-${d.key}`, badge: deptCount(d.key) || undefined,
+            active: ticketDeptFilter === d.key && !["new","open","in_progress","waiting","resolved","mine","unassigned"].includes(ticketQueueFilter),
+            onClick: () => { setTicketDeptFilter(d.key); setTicketQueueFilter("all"); setCurrentView("tickets"); },
+          }))},
+          { title: "Status", collapsible: true, items: [
+            { icon: Bell, label: "New", id: "filter-new", badge: allTickets.filter(t => t.status === "new").length || undefined, active: ticketQueueFilter === "new", onClick: () => { setTicketQueueFilter("new"); setCurrentView("tickets"); } },
+            { icon: Activity, label: "Open", id: "filter-open", badge: allTickets.filter(t => t.status === "open").length || undefined, active: ticketQueueFilter === "open", onClick: () => { setTicketQueueFilter("open"); setCurrentView("tickets"); } },
+            { icon: Loader2, label: "In Progress", id: "filter-in-progress", badge: allTickets.filter(t => t.status === "in_progress").length || undefined, active: ticketQueueFilter === "in_progress", onClick: () => { setTicketQueueFilter("in_progress"); setCurrentView("tickets"); } },
+            { icon: Bell, label: "Waiting", id: "filter-waiting", badge: allTickets.filter(t => t.status === "waiting").length || undefined, active: ticketQueueFilter === "waiting", onClick: () => { setTicketQueueFilter("waiting"); setCurrentView("tickets"); } },
+            { icon: Shield, label: "Resolved", id: "filter-resolved", active: ticketQueueFilter === "resolved", onClick: () => { setTicketQueueFilter("resolved"); setCurrentView("tickets"); } },
+          ]},
+          { title: "Assignment", collapsible: true, items: [
+            { icon: Users, label: "My Tickets", id: "filter-mine", active: ticketQueueFilter === "mine", onClick: () => { setTicketQueueFilter("mine"); setCurrentView("tickets"); } },
+            { icon: HardHat, label: "Unassigned", id: "filter-unassigned", badge: allTickets.filter(t => !t.assignedTo).length || undefined, active: ticketQueueFilter === "unassigned", onClick: () => { setTicketQueueFilter("unassigned"); setCurrentView("tickets"); } },
+          ]},
+        ];
+      case "devices":
+        return [{ title: "Devices", items: [{ icon: Server, label: "Coming Soon", id: "devices-placeholder" }] }];
+      case "orders":
+        return [{ title: "Service Orders", items: [
+          { icon: Server, label: "All Services", id: "services", active: currentView === "services", onClick: () => setCurrentView("services") },
+        ]}];
+      case "sales":
+        return [{ title: "Billing", items: [
+          { icon: CreditCard, label: "All Invoices", id: "invoices", active: currentView === "invoices", onClick: () => setCurrentView("invoices") },
+        ]}];
+      case "settings":
+        return [{ title: "Configuration", items: [
+          { icon: Settings, label: "Billing Config", id: "settings", active: currentView === "settings", onClick: () => setCurrentView("settings") },
+        ]}];
+      default:
+        return [];
+    }
+  }, [currentSection, currentView, allUsers.length, ticketQueueFilter, ticketDeptFilter, allTickets]);
 
   const viewLabels: Record<AdminView, string> = {
     dashboard: "Dashboard",
@@ -363,240 +352,51 @@ export default function AdminPage() {
     settings: "Settings",
   };
 
-  const sectionTabs: Record<AdminSection, { label: string; view: AdminView }[]> = {
-    home: [{ label: "Dashboard", view: "dashboard" }],
-    clients: [
-      { label: "Customers", view: "customers" },
-      { label: "Users", view: "users" },
-    ],
-    support: [{ label: "Tickets", view: "tickets" }],
-    devices: [],
-    orders: [{ label: "Services", view: "services" }],
-    sales: [{ label: "Invoices", view: "invoices" }],
-    settings: [{ label: "Settings", view: "settings" }],
-  };
-
-  const openTicketCount = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status)).length;
-
-  const ticketDepts = [
-    { key: "all", label: "All Queues", icon: Ticket },
-    { key: "support", label: "Support", icon: HardHat },
-    { key: "sales", label: "Sales", icon: CreditCard },
-    { key: "billing", label: "Billing", icon: FileText },
-    { key: "provisioning", label: "Provisioning", icon: Server },
-    { key: "smart_hands", label: "SmartHands", icon: HardHat },
-    { key: "abuse", label: "Abuse", icon: Shield },
-    { key: "general", label: "General", icon: MessageSquare },
-  ];
-
-  function deptCount(dept: string) {
-    const active = allTickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status));
-    if (dept === "all") return active.length;
-    return active.filter(t => t.category === dept).length;
-  }
-
-  type SidebarItem = { icon: typeof LayoutDashboard; label: string; view?: AdminView; badge?: number; filter?: string; dept?: string };
-  type SidebarGroup = { section: string; items: SidebarItem[] };
-
-  const sidebarItemsBySection: Record<AdminSection, SidebarGroup[]> = {
-    home: [
-      { section: "Navigation", items: [
-        { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
-        { icon: Activity, label: "Live Activity" },
-      ]},
-    ],
-    clients: [
-      { section: "Accounts", items: [
-        { icon: Building2, label: "All Customers", view: "customers" },
-        { icon: Users, label: "All Users", view: "users", badge: allUsers.length || undefined },
-      ]},
-    ],
-    support: [
-      { section: "Queues", items: ticketDepts.map(d => ({
-        icon: d.icon, label: d.label, dept: d.key, badge: deptCount(d.key) || undefined,
-      }))},
-      { section: "Status", items: [
-        { icon: Bell, label: "New", filter: "new", badge: allTickets.filter(t => t.status === "new").length || undefined },
-        { icon: Activity, label: "Open", filter: "open", badge: allTickets.filter(t => t.status === "open").length || undefined },
-        { icon: Loader2, label: "In Progress", filter: "in_progress", badge: allTickets.filter(t => t.status === "in_progress").length || undefined },
-        { icon: Bell, label: "Waiting", filter: "waiting", badge: allTickets.filter(t => t.status === "waiting").length || undefined },
-        { icon: Shield, label: "Resolved", filter: "resolved" },
-      ]},
-      { section: "Assignment", items: [
-        { icon: Users, label: "My Tickets", filter: "mine" },
-        { icon: HardHat, label: "Unassigned", filter: "unassigned", badge: allTickets.filter(t => !t.assignedTo).length || undefined },
-      ]},
-    ],
-    devices: [
-      { section: "Devices", items: [
-        { icon: Server, label: "Coming Soon" },
-      ]},
-    ],
-    orders: [
-      { section: "Service Orders", items: [
-        { icon: Server, label: "All Services", view: "services" },
-      ]},
-    ],
-    sales: [
-      { section: "Billing", items: [
-        { icon: CreditCard, label: "All Invoices", view: "invoices" },
-      ]},
-    ],
-    settings: [
-      { section: "Configuration", items: [
-        { icon: Settings, label: "Billing Config", view: "settings" },
-      ]},
-    ],
-  };
-
-  const currentSidebarItems = sidebarItemsBySection[currentSection] || [];
+  const breadcrumbs = ["911-DC", sectionLabels[currentSection], viewLabels[currentView]];
 
   return (
-    <div className="h-dvh flex flex-col bg-[#eef1f6] overflow-hidden" data-testid="page-admin" style={{ fontSize: "11px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
-      {/* Menu bar - Ubersmith-style section buttons */}
-      <div className="h-[22px] bg-[#1b2a4a] border-b border-[#152240] flex items-center px-2 flex-shrink-0" data-testid="menu-bar">
-        <button onClick={() => navigateToSection("home")} className="font-semibold text-[11px] text-white mr-3 hover:text-[#60a5fa] px-1" data-testid="button-home">911-DC</button>
-        <div className="h-[14px] w-[1px] bg-[#2c4060] mr-1" />
-        <div className="flex items-center text-[11px]">
-          {(["clients", "support", "devices", "orders", "sales", "settings"] as AdminSection[]).map((sec) => (
-            <button
-              key={sec}
-              onClick={() => navigateToSection(sec)}
-              className={`px-2 py-[1px] ${
-                currentSection === sec
-                  ? "text-white bg-[#2563eb] font-medium"
-                  : "text-[#8ea4c8] hover:text-white hover:bg-[#243656]"
-              }`}
-              data-testid={`section-${sec}`}
-            >
-              {sectionLabels[sec]}
-              {sec === "support" && openTicketCount > 0 && (
-                <span className="ml-1 text-[9px] bg-[#c42b1c] text-white px-[3px] rounded-sm">{openTicketCount}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2 text-[10px] text-[#8ea4c8]">
-          <span>{user?.name || "Admin"}</span>
-          <button onClick={handleLogout} className="hover:text-white hover:bg-[#243656] px-1" data-testid="button-logout">Sign Out</button>
-        </div>
-      </div>
-
-      {/* Tab bar - contextual per section */}
-      <div className="h-[26px] bg-[#243656] border-b border-[#1b2a4a] flex items-end px-1 flex-shrink-0" data-testid="tab-bar">
-        {sectionTabs[currentSection].map((tab) => (
-          <button
-            key={tab.view}
-            onClick={() => setCurrentView(tab.view)}
-            className={`px-3 h-[24px] text-[11px] border border-b-0 mr-[1px] flex items-center ${
-              currentView === tab.view
-                ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4] border-b-[#ffffff] -mb-[1px] z-10"
-                : "bg-[#1e3050] text-[#8ea4c8] border-[#1b2a4a] hover:bg-[#2c4060] hover:text-white"
-            }`}
-            data-testid={`tab-${tab.view}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Breadcrumb bar */}
-      <div className="h-[18px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 text-[10px] text-[#5a6a82]" data-testid="breadcrumb-bar">
-        <span>911-DC</span>
-        <ChevronRight className="h-[10px] w-[10px] mx-1" />
-        <span>{sectionLabels[currentSection]}</span>
-        <ChevronRight className="h-[10px] w-[10px] mx-1" />
-        <span className="text-[#1e1e1e] font-medium">{viewLabels[currentView]}</span>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#8a96a8]" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search..."
-            className="h-[16px] w-[140px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]"
-            data-testid="input-global-search"
+    <>
+      <AdminLayout
+        currentSection={currentSection}
+        onSectionChange={navigateToSection}
+        sidebarGroups={sidebarGroups}
+        breadcrumbs={breadcrumbs}
+        userName={user?.name || "Admin"}
+        onLogout={handleLogout}
+        supportBadge={openTicketCount}
+      >
+        {currentView === "dashboard" && (
+          <DashboardView
+            tickets={allTickets}
+            token={token}
+            onNavigate={(section: AdminSection) => navigateToSection(section)}
           />
-        </div>
-      </div>
-
-      {/* Main body */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - contextual per section */}
-        <div className="w-[140px] bg-[#2c3e5a] border-r border-[#1b2a4a] flex flex-col overflow-y-auto flex-shrink-0" data-testid="sidebar">
-          {currentSidebarItems.map((group) => (
-            <div key={group.section}>
-              <div className="px-2 pt-2 pb-[2px] text-[9px] font-semibold text-[#6b8ab5] uppercase tracking-wider">{group.section}</div>
-              {group.items.map((item) => {
-                const isActive = item.view ? currentView === item.view
-                  : item.dept ? (ticketDeptFilter === item.dept && !ticketQueueFilter.match(/^(new|open|in_progress|waiting|resolved|mine|unassigned)$/))
-                  : (item.filter ? ticketQueueFilter === item.filter : false);
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      if (item.view) setCurrentView(item.view);
-                      if (item.dept) { setTicketDeptFilter(item.dept); setTicketQueueFilter("all"); setCurrentView("tickets"); }
-                      if (item.filter) { setTicketQueueFilter(item.filter); setCurrentView("tickets"); }
-                    }}
-                    className={`w-full flex items-center gap-[4px] px-2 py-[2px] text-left text-[11px] ${
-                      isActive
-                        ? "bg-[#3b82f6] text-white font-medium"
-                        : "text-[#c8d6e5] hover:bg-[#374f6f] hover:text-white"
-                    }`}
-                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  >
-                    <item.icon className="h-[12px] w-[12px] flex-shrink-0" />
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span className="text-[9px] text-[#c8d6e5] bg-[#1b2a4a] px-[3px] rounded-sm">{item.badge}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-          <div className="flex-1" />
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-[4px] px-2 py-[3px] text-[11px] text-[#8ea4c8] hover:bg-[#374f6f] hover:text-white border-t border-[#1b2a4a]"
-            data-testid="button-sidebar-logout"
-          >
-            <LogOut className="h-[12px] w-[12px]" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {currentView === "dashboard" && <DashboardView tickets={allTickets} onManageUsers={() => { setCurrentSection("clients"); setCurrentView("users"); }} onViewTickets={() => navigateToSection("support")} />}
-          {currentView === "users" && (
-            <UsersView
-              users={filteredUsers}
-              loading={loadingUsers}
-              query={query}
-              setQuery={setQuery}
-              onNewUser={handleNewUser}
-              onEditUser={handleEditUser}
-              onDeleteUser={handleDeleteUser}
-            />
-          )}
-          {currentView === "services" && <ServicesView token={token} />}
-          {currentView === "invoices" && <InvoicesView token={token} />}
-          {currentView === "customers" && <CustomersView token={token} />}
-          {currentView === "settings" && <SettingsView token={token} />}
-          {currentView === "tickets" && <TicketsView token={token} tickets={allTickets} filter={ticketQueueFilter} deptFilter={ticketDeptFilter} userId={user?.id || ""} onRefresh={loadTickets} />}
-        </div>
-      </div>
-
-      {/* Status bar */}
-      <div className="h-[18px] bg-[#1b2a4a] flex items-center px-2 flex-shrink-0 text-[10px] text-[#8ea4c8]" data-testid="status-bar">
-        <span>Ready</span>
-        <div className="flex-1" />
-        <span className="mr-3">{allUsers.length} users</span>
-        <span>{new Date().toLocaleDateString()}</span>
-      </div>
+        )}
+        {currentView === "users" && (
+          <UsersView
+            users={allUsers}
+            loading={loadingUsers}
+            onNewUser={handleNewUser}
+            onEditUser={handleEditUser}
+            onDeleteUser={handleDeleteUser}
+            token={token}
+          />
+        )}
+        {currentView === "services" && <ServicesView token={token} />}
+        {currentView === "invoices" && <InvoicesView token={token} />}
+        {currentView === "customers" && <CustomersView token={token} />}
+        {currentView === "settings" && <SettingsView token={token} />}
+        {currentView === "tickets" && (
+          <TicketsView
+            token={token}
+            tickets={allTickets}
+            filter={ticketQueueFilter}
+            deptFilter={ticketDeptFilter}
+            userId={user?.id || ""}
+            onRefresh={loadTickets}
+          />
+        )}
+      </AdminLayout>
 
       <UserModal
         open={showUserModal}
@@ -605,261 +405,291 @@ export default function AdminPage() {
         token={token}
         onSuccess={() => { setShowUserModal(false); loadUsers(); }}
       />
-    </div>
+    </>
   );
 }
 
-function DashboardView({ tickets, onManageUsers, onViewTickets }: { tickets: any[]; onManageUsers: () => void; onViewTickets: () => void }) {
-  const [topHeight, setTopHeight] = useState(260);
-  const onDrag = useCallback((delta: number) => {
-    setTopHeight((h) => Math.max(100, Math.min(500, h + delta)));
-  }, []);
+function DashboardView({ tickets, token, onNavigate }: { tickets: any[]; token: string | null; onNavigate: (section: AdminSection) => void }) {
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+
+  useEffect(() => {
+    const headers = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch("/api/admin/customers", { headers }).then(r => r.ok ? r.json() : []),
+      fetch("/api/admin/users", { headers }).then(r => r.ok ? r.json() : []),
+      fetch("/api/services", { headers }).then(r => r.ok ? r.json() : []),
+      fetch("/api/invoices", { headers }).then(r => r.ok ? r.json() : []),
+    ]).then(([c, u, s, i]) => {
+      setCustomers(c);
+      setUsers(u);
+      setServices(s);
+      setInvoices(i);
+    }).catch(() => {});
+  }, [token]);
+
+  const openTickets = tickets.filter(t => ["new", "open", "in_progress", "waiting"].includes(t.status));
+  const urgentTickets = tickets.filter(t => t.priority === "urgent" && ["new", "open", "in_progress", "waiting"].includes(t.status));
+  const newToday = tickets.filter(t => {
+    const created = new Date(t.createdAt);
+    const today = new Date();
+    return created.toDateString() === today.toDateString();
+  });
+
+  const pendingInvoices = invoices.filter((i: any) => i.status === "pending" || i.status === "open");
+  const pastDueInvoices = invoices.filter((i: any) => i.status === "past_due");
+  const paidThisMonth = invoices.filter((i: any) => {
+    if (i.status !== "paid") return false;
+    const d = new Date(i.issueDate);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const totalOutstanding = pendingInvoices.reduce((sum: number, i: any) => sum + Number(i.total || 0), 0);
+
+  const activeServices = services.filter((s: any) => s.status === "active");
+  const provisioningServices = services.filter((s: any) => s.status === "provisioning");
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Top panel: Stats + tickets */}
-      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
-        <div className="p-2">
-          <div className="text-[12px] font-semibold text-[#1e1e1e] mb-2">Operations Overview</div>
-          <div className="grid grid-cols-4 gap-[1px] bg-[#b8c4d4] border border-[#b8c4d4] mb-2">
-            {[
-              { label: "Open Tickets", value: String(tickets.filter(t => ["new","open","in_progress","waiting"].includes(t.status)).length), sub: `${tickets.filter(t => t.priority === "urgent").length} urgent`, color: "#c42b1c" },
-              { label: "New Tickets", value: String(tickets.filter(t => t.status === "new").length), sub: "awaiting response", color: "#2563eb" },
-              { label: "Unassigned", value: String(tickets.filter(t => !t.assignedTo).length), sub: "needs assignment", color: "#9d6b00" },
-              { label: "Total Tickets", value: String(tickets.length), sub: `${tickets.filter(t => t.status === "resolved" || t.status === "closed").length} resolved`, color: "#1e7b34" },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-[#ffffff] p-2">
-                <div className="text-[9px] text-[#666] uppercase tracking-wide">{stat.label}</div>
-                <div className="text-[16px] font-bold text-[#1e1e1e]">{stat.value}</div>
-                <div className="text-[9px]" style={{ color: stat.color }}>{stat.sub}</div>
-              </div>
-            ))}
-          </div>
-          {tickets.length > 0 ? (
-          <table className="w-full border-collapse" data-testid="table-tickets">
-            <thead>
-              <tr className="bg-[#dce3ed]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Subject</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Customer</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Priority</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Assigned To</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.filter(t => ["new","open","in_progress","waiting"].includes(t.status)).slice(0, 5).map((t, i) => (
-                <tr key={t.id} onClick={onViewTickets} className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`} data-testid={`row-ticket-${t.id}`}>
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{t.subject}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.customerName || "—"}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.priority} /></td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.status} /></td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assigneeName || "Unassigned"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{new Date(t.updatedAt).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          ) : (
-            <div className="text-[11px] text-[#666] italic p-2">No tickets yet</div>
-          )}
+    <div className="flex-1 overflow-auto p-6" data-testid="dashboard-view">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-slate-900" data-testid="text-welcome">Welcome back</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {" — "}
+            {openTickets.length} open tickets, {customers.length} customers
+          </p>
         </div>
-      </div>
 
-      <DraggableDivider onDrag={onDrag} />
-
-      {/* Bottom panel: Quick actions */}
-      <div className="flex-1 overflow-auto bg-[#ffffff] border-t-0">
-        <div className="p-2">
-          <div className="text-[11px] font-semibold text-[#1e1e1e] mb-2">Quick Actions</div>
-          <div className="grid grid-cols-6 gap-[1px] bg-[#b8c4d4] border border-[#b8c4d4]">
-            {[
-              { icon: Building2, label: "Customers" },
-              { icon: Server, label: "Services" },
-              { icon: FileText, label: "Invoices" },
-              { icon: Boxes, label: "Inventory" },
-              { icon: HardHat, label: "SmartHands" },
-              { icon: Users, label: "Users", onClick: onManageUsers },
-            ].map((action) => (
-              <button
-                key={action.label}
-                onClick={action.onClick}
-                className="bg-[#ffffff] hover:bg-[#d4e4f7] p-2 flex flex-col items-center gap-1"
-                data-testid={`button-quick-${action.label.toLowerCase()}`}
-              >
-                <action.icon className="h-[14px] w-[14px] text-[#2563eb]" />
-                <span className="text-[10px] text-[#1e1e1e]">{action.label}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <AdminCard title="Client Manager" subtitle="Day at a Glance" icon={Building2} accentColor="blue"
+            footer={
+              <button onClick={() => onNavigate("clients")} className="text-[13px] text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1" data-testid="button-goto-clients">
+                Go to Client Manager <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            ))}
-          </div>
+            }>
+            <KpiRow items={[
+              { label: "Customers", value: customers.length },
+              { label: "Active Users", value: users.filter((u: any) => u.active).length },
+              { label: "Customer Users", value: users.filter((u: any) => u.role === "customer").length },
+            ]} />
+          </AdminCard>
+
+          <AdminCard title="Support Manager" subtitle="Day at a Glance" icon={Headset} accentColor="amber"
+            footer={
+              <button onClick={() => onNavigate("support")} className="text-[13px] text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1" data-testid="button-goto-support">
+                Go to Support Manager <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            }>
+            <KpiRow items={[
+              { label: "Open Tickets", value: openTickets.length },
+              { label: "New Today", value: newToday.length },
+              { label: "Urgent", value: urgentTickets.length, sub: urgentTickets.length > 0 ? "needs attention" : undefined, color: "#dc2626" },
+            ]} />
+          </AdminCard>
+
+          <AdminCard title="Device Manager" subtitle="Coming Soon" icon={Server} accentColor="slate"
+            footer={
+              <span className="text-[13px] text-slate-400 font-medium flex items-center gap-1">
+                Coming Soon
+              </span>
+            }>
+            <KpiRow items={[
+              { label: "Locations", value: 8 },
+              { label: "Main Hub", value: "iM Critical" },
+            ]} />
+          </AdminCard>
+
+          <AdminCard title="Billing Manager" subtitle="Day at a Glance" icon={CreditCard} accentColor="emerald"
+            footer={
+              <button onClick={() => onNavigate("sales")} className="text-[13px] text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1" data-testid="button-goto-billing">
+                Go to Billing <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            }>
+            <KpiRow items={[
+              { label: "Open Invoices", value: pendingInvoices.length },
+              { label: "Outstanding", value: `$${totalOutstanding.toLocaleString("en-US", { minimumFractionDigits: 2 })}` },
+              { label: "Past Due", value: pastDueInvoices.length, sub: pastDueInvoices.length > 0 ? "overdue" : undefined, color: "#dc2626" },
+            ]} />
+          </AdminCard>
+
+          <AdminCard title="Orders Manager" subtitle="Day at a Glance" icon={FileText} accentColor="violet"
+            footer={
+              <button onClick={() => onNavigate("orders")} className="text-[13px] text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1" data-testid="button-goto-orders">
+                Go to Orders <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            }>
+            <KpiRow items={[
+              { label: "Active Services", value: activeServices.length },
+              { label: "Provisioning", value: provisioningServices.length },
+              { label: "Total", value: services.length },
+            ]} />
+          </AdminCard>
+
+          <AdminCard title="Infrastructure" subtitle="Datacenter Locations" icon={Globe} accentColor="slate"
+            footer={
+              <span className="text-[13px] text-slate-400 font-medium flex items-center gap-1">
+                Coming Soon
+              </span>
+            }>
+            <KpiRow items={[
+              { label: "Locations", value: 8 },
+              { label: "Main Hub", value: "Miami" },
+              { label: "Region", value: "S. Florida" },
+            ]} />
+          </AdminCard>
         </div>
+
+        {openTickets.length > 0 && (
+          <div className="mt-6 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Recent Open Tickets</h3>
+              <button onClick={() => onNavigate("support")} className="text-xs text-blue-600 hover:text-blue-700 font-medium">View All</button>
+            </div>
+            <table className="w-full" data-testid="table-tickets">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Subject</th>
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Customer</th>
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Priority</th>
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Status</th>
+                  <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Assigned</th>
+                  <th className="text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2.5 px-4">Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openTickets.slice(0, 5).map((t: any, i: number) => (
+                  <tr key={t.id} onClick={() => onNavigate("support")} className={`border-b border-slate-100 cursor-pointer ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"} hover:bg-slate-50`} data-testid={`row-ticket-${t.id}`}>
+                    <td className="text-[13px] text-slate-900 py-2.5 px-4 font-medium">{t.subject}</td>
+                    <td className="text-[13px] text-slate-500 py-2.5 px-4">{t.customerName || "—"}</td>
+                    <td className="py-2.5 px-4"><StatusBadge status={t.priority} /></td>
+                    <td className="py-2.5 px-4"><StatusBadge status={t.status} showDot /></td>
+                    <td className="text-[13px] text-slate-500 py-2.5 px-4">{t.assigneeName || "Unassigned"}</td>
+                    <td className="text-[13px] text-slate-500 py-2.5 px-4 text-right">{new Date(t.updatedAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function UsersView({
-  users,
-  loading,
-  query,
-  setQuery,
-  onNewUser,
-  onEditUser,
-  onDeleteUser,
-}: {
+function UsersView({ users, loading, onNewUser, onEditUser, onDeleteUser, token }: {
   users: UserData[];
   loading: boolean;
-  query: string;
-  setQuery: (q: string) => void;
   onNewUser: () => void;
   onEditUser: (u: UserData) => void;
   onDeleteUser: (id: string) => void;
+  token: string | null;
 }) {
+  const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [topHeight, setTopHeight] = useState(300);
-  const onDrag = useCallback((delta: number) => {
-    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
-  }, []);
-
   const selectedUser = users.find((u) => u.id === selectedId);
+
+  const columns: ColumnDef<UserData>[] = [
+    { key: "name", label: "Name", sortable: true, render: (row) => <span className="font-medium text-slate-900">{row.name}</span> },
+    { key: "username", label: "Username", sortable: true },
+    { key: "email", label: "Email", sortable: true },
+    { key: "role", label: "Role", sortable: true, render: (row) => <StatusBadge status={row.role} /> },
+    { key: "permissions", label: "Permissions", render: (row) => (
+      row.role === "customer" ? (
+        <div className="flex flex-wrap gap-1" data-testid={`perms-summary-${row.id}`}>
+          {getPermSummaryBadges(row).map((b) => (
+            <span key={b} className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 rounded-full">{b}</span>
+          ))}
+          {getPermSummaryBadges(row).length === 0 && <span className="text-xs text-slate-400">none</span>}
+        </div>
+      ) : <span className="text-xs text-slate-400">all</span>
+    )},
+    { key: "companyName", label: "Company", sortable: true },
+    { key: "active", label: "Status", render: (row) => <StatusBadge status={row.active ? "active" : "suspended"} showDot /> },
+    { key: "actions", label: "Actions", align: "center", render: (row) => (
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); onEditUser(row); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-edit-user-${row.id}`}>Edit</button>
+        <button onClick={(e) => { e.stopPropagation(); onDeleteUser(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-delete-user-${row.id}`}>Delete</button>
+      </div>
+    )},
+  ];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={onNewUser} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-user">
-          <Plus className="h-[10px] w-[10px]" />New User
-        </button>
-        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
-        <span className="text-[10px] text-[#666]">{users.length} users</span>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter users..."
-            className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]"
-            data-testid="input-search-users"
-          />
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />Loading users...
         </div>
-      </div>
-
-      {/* Table */}
-      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-[11px] text-[#666]">
-            <Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...
-          </div>
-        ) : (
-          <table className="w-full border-collapse" data-testid="table-users">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-[#dce3ed]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Name</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Username</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Email</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Role</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Permissions</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Company</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u, i) => (
-                <tr
-                  key={u.id}
-                  onClick={() => setSelectedId(u.id)}
-                  className={`cursor-pointer ${selectedId === u.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
-                  data-testid={`row-user-${u.id}`}
-                >
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{u.name}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.username}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.email}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={u.role} /></td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]">
-                    {u.role === "customer" ? (
-                      <div className="flex flex-wrap gap-[2px]" data-testid={`perms-summary-${u.id}`}>
-                        {getPermSummaryBadges(u).map((b) => (
-                          <span key={b} className="inline-block px-[3px] py-0 text-[8px] font-medium bg-[#e8daef] text-[#6c3483]" style={{ lineHeight: "12px" }}>{b}</span>
-                        ))}
-                        {getPermSummaryBadges(u).length === 0 && <span className="text-[9px] text-[#999]">none</span>}
-                      </div>
-                    ) : (
-                      <span className="text-[9px] text-[#999]">all</span>
-                    )}
-                  </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.companyName || "—"}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={u.active ? "active" : "suspended"} /></td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); onEditUser(u); }} className="text-[#2563eb] hover:underline text-[10px] mr-2" data-testid={`button-edit-user-${u.id}`}>Edit</button>
-                    <button onClick={(e) => { e.stopPropagation(); onDeleteUser(u.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-user-${u.id}`}>Del</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <DraggableDivider onDrag={onDrag} />
-
-      {/* Detail panel */}
-      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
-        {selectedUser ? (
-          <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">User Details - {selectedUser.name}</div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
-              <div><span className="text-[#666]">Username:</span> <span className="text-[#1e1e1e]">{selectedUser.username}</span></div>
-              <div><span className="text-[#666]">Email:</span> <span className="text-[#1e1e1e]">{selectedUser.email}</span></div>
-              <div><span className="text-[#666]">Role:</span> <span className="text-[#1e1e1e]">{selectedUser.role}</span></div>
-              <div><span className="text-[#666]">Company:</span> <span className="text-[#1e1e1e]">{selectedUser.companyName || "—"}</span></div>
-              <div><span className="text-[#666]">Status:</span> <span className="text-[#1e1e1e]">{selectedUser.active ? "Active" : "Suspended"}</span></div>
-              <div><span className="text-[#666]">Created:</span> <span className="text-[#1e1e1e]">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
-              <div><span className="text-[#666]">Last Login:</span> <span className="text-[#1e1e1e]">{selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : "Never"}</span></div>
-            </div>
-            {selectedUser.role === "customer" && (
-              <div className="mt-2 pt-1 border-t border-[#b8c4d4]">
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(`/api/admin/users/${selectedUser.id}/send-invitation`, {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        toast({ title: "Success", description: "Invitation email sent to " + selectedUser.email });
-                      } else {
-                        toast({ title: "Error", description: data.error || "Failed to send invitation", variant: "destructive" });
-                      }
-                    } catch {
-                      toast({ title: "Error", description: "Failed to send invitation email", variant: "destructive" });
-                    }
-                  }}
-                  className="flex items-center gap-[3px] text-[10px] text-[#2563eb] hover:underline"
-                  data-testid={`button-send-invitation-${selectedUser.id}`}
-                >
-                  <Mail className="h-[10px] w-[10px]" />Send Portal Invitation
-                </button>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <AdminTable
+            data={users}
+            columns={columns}
+            onRowClick={(row) => setSelectedId(row.id)}
+            searchPlaceholder="Search users..."
+            searchKeys={["name", "username", "email", "companyName"]}
+            selectedId={selectedId}
+            getRowId={(row) => row.id}
+            rowTestIdPrefix="user"
+            actions={
+              <button onClick={onNewUser} className={btnPrimary} data-testid="button-new-user">
+                <Plus className="w-4 h-4" />New User
+              </button>
+            }
+            className="flex-1"
+          />
+          {selectedUser && (
+            <div className="border-t border-slate-200 bg-white p-5 flex-shrink-0 max-h-[220px] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">User Details — {selectedUser.name}</h3>
+                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-[11px] text-[#666] italic">Select a user to view details</div>
-        )}
-      </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Username:</span> <span className="text-slate-900 ml-1">{selectedUser.username}</span></div>
+                <div><span className="text-slate-500">Email:</span> <span className="text-slate-900 ml-1">{selectedUser.email}</span></div>
+                <div><span className="text-slate-500">Role:</span> <span className="text-slate-900 ml-1 capitalize">{selectedUser.role}</span></div>
+                <div><span className="text-slate-500">Company:</span> <span className="text-slate-900 ml-1">{selectedUser.companyName || "—"}</span></div>
+                <div><span className="text-slate-500">Status:</span> <span className="text-slate-900 ml-1">{selectedUser.active ? "Active" : "Suspended"}</span></div>
+                <div><span className="text-slate-500">Created:</span> <span className="text-slate-900 ml-1">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
+                <div><span className="text-slate-500">Last Login:</span> <span className="text-slate-900 ml-1">{selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : "Never"}</span></div>
+              </div>
+              {selectedUser.role === "customer" && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/admin/users/${selectedUser.id}/send-invitation`, {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast({ title: "Success", description: "Invitation email sent to " + selectedUser.email });
+                        } else {
+                          toast({ title: "Error", description: data.error || "Failed to send invitation", variant: "destructive" });
+                        }
+                      } catch {
+                        toast({ title: "Error", description: "Failed to send invitation email", variant: "destructive" });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium"
+                    data-testid={`button-send-invitation-${selectedUser.id}`}
+                  >
+                    <Mail className="w-4 h-4" />Send Portal Invitation
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function UserModal({
-  open,
-  onOpenChange,
-  editingUser,
-  token,
-  onSuccess,
-}: {
+function UserModal({ open, onOpenChange, editingUser, token, onSuccess }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingUser: UserData | null;
@@ -871,53 +701,28 @@ function UserModal({
   const [showPassword, setShowPassword] = useState(false);
   const [roleTemplate, setRoleTemplate] = useState("custom");
   const [customerList, setCustomerList] = useState<Array<{ id: string; name: string }>>([]);
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    name: "",
-    email: "",
-    role: "customer",
-    customerId: "",
-    active: true,
-  });
+  const [formData, setFormData] = useState({ username: "", password: "", name: "", email: "", role: "customer", customerId: "", active: true });
   const [perms, setPerms] = useState<PermissionKeys>({ ...DEFAULT_PERMS });
 
   useEffect(() => {
     if (open && token) {
       fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.ok ? r.json() : [])
-        .then(data => setCustomerList(data))
-        .catch(() => {});
+        .then(r => r.ok ? r.json() : []).then(data => setCustomerList(data)).catch(() => {});
     }
   }, [open, token]);
 
   useEffect(() => {
     if (open) {
       if (editingUser) {
-        setFormData({
-          username: editingUser.username,
-          password: "",
-          name: editingUser.name,
-          email: editingUser.email,
-          role: editingUser.role,
-          customerId: editingUser.customerId || "",
-          active: editingUser.active,
-        });
+        setFormData({ username: editingUser.username, password: "", name: editingUser.name, email: editingUser.email, role: editingUser.role, customerId: editingUser.customerId || "", active: editingUser.active });
         setPerms({
-          permPortalAccess: editingUser.permPortalAccess ?? true,
-          permBillingView: editingUser.permBillingView ?? false,
-          permBillingReceiveInvoices: editingUser.permBillingReceiveInvoices ?? false,
-          permBillingMakePayments: editingUser.permBillingMakePayments ?? false,
-          permServicesView: editingUser.permServicesView ?? false,
-          permServicesManage: editingUser.permServicesManage ?? false,
-          permTechnicalView: editingUser.permTechnicalView ?? false,
-          permTechnicalManage: editingUser.permTechnicalManage ?? false,
-          permSupportView: editingUser.permSupportView ?? false,
-          permSupportCreate: editingUser.permSupportCreate ?? false,
-          permSupportSmarthands: editingUser.permSupportSmarthands ?? false,
-          permNotifyMaintenance: editingUser.permNotifyMaintenance ?? false,
-          permNotifyBilling: editingUser.permNotifyBilling ?? false,
-          permNotifyIncidents: editingUser.permNotifyIncidents ?? false,
+          permPortalAccess: editingUser.permPortalAccess ?? true, permBillingView: editingUser.permBillingView ?? false,
+          permBillingReceiveInvoices: editingUser.permBillingReceiveInvoices ?? false, permBillingMakePayments: editingUser.permBillingMakePayments ?? false,
+          permServicesView: editingUser.permServicesView ?? false, permServicesManage: editingUser.permServicesManage ?? false,
+          permTechnicalView: editingUser.permTechnicalView ?? false, permTechnicalManage: editingUser.permTechnicalManage ?? false,
+          permSupportView: editingUser.permSupportView ?? false, permSupportCreate: editingUser.permSupportCreate ?? false,
+          permSupportSmarthands: editingUser.permSupportSmarthands ?? false, permNotifyMaintenance: editingUser.permNotifyMaintenance ?? false,
+          permNotifyBilling: editingUser.permNotifyBilling ?? false, permNotifyIncidents: editingUser.permNotifyIncidents ?? false,
           permAdminUsers: editingUser.permAdminUsers ?? false,
         });
         setRoleTemplate("custom");
@@ -944,124 +749,100 @@ function UserModal({
       const body: any = { ...formData };
       if (editingUser && !body.password) delete body.password;
       const selectedCustomer = customerList.find(c => c.id === formData.customerId);
-      if (selectedCustomer) {
-        body.companyName = selectedCustomer.name;
-      } else {
-        body.customerId = null;
-        body.companyName = null;
-      }
-      if (formData.role === "customer") {
-        Object.assign(body, perms);
-      }
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
+      if (selectedCustomer) { body.companyName = selectedCustomer.name; } else { body.customerId = null; body.companyName = null; }
+      if (formData.role === "customer") Object.assign(body, perms);
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (res.ok) {
-        toast({ title: "Success", description: editingUser ? "User updated" : "User created" });
-        onSuccess();
-      } else {
-        toast({ title: "Error", description: data.error || "Failed to save user", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to save user", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { toast({ title: "Success", description: editingUser ? "User updated" : "User created" }); onSuccess(); }
+      else toast({ title: "Error", description: data.error || "Failed to save user", variant: "destructive" });
+    } catch { toast({ title: "Error", description: "Failed to save user", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
-        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
-          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingUser ? "Edit User" : "New User"}</DialogTitle>
-          <DialogDescription className="text-[10px] text-[#666]">
-            {editingUser ? "Update user details and permissions" : "Create a new admin or customer account"}
-          </DialogDescription>
-        </div>
-        <form onSubmit={handleSubmit} className="p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editingUser ? "Edit User" : "New User"}</DialogTitle>
+          <DialogDescription>{editingUser ? "Update user details and permissions" : "Create a new admin or customer account"}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Username</label>
-              <input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required disabled={!!editingUser} data-testid="input-new-username" />
+              <label className="text-xs text-slate-500 block mb-1">Username</label>
+              <input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className={inputCls} required disabled={!!editingUser} data-testid="input-new-username" />
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Password {editingUser && <span className="text-[#999]">(blank=keep)</span>}</label>
+              <label className="text-xs text-slate-500 block mb-1">Password {editingUser && <span className="text-slate-400">(blank=keep)</span>}</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full h-[22px] px-1 pr-5 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required={!editingUser} data-testid="input-new-password" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-1 top-1/2 -translate-y-1/2 text-[#999] hover:text-[#1e1e1e]">
-                  {showPassword ? <EyeOff className="h-[12px] w-[12px]" /> : <Eye className="h-[12px] w-[12px]" />}
+                <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={inputCls} required={!editingUser} data-testid="input-new-password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Full Name</label>
-              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required data-testid="input-new-name" />
+              <label className="text-xs text-slate-500 block mb-1">Full Name</label>
+              <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required data-testid="input-new-name" />
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Email</label>
-              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]" required data-testid="input-new-email" />
+              <label className="text-xs text-slate-500 block mb-1">Email</label>
+              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className={inputCls} required data-testid="input-new-email" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">System Role</label>
+              <label className="text-xs text-slate-500 block mb-1">System Role</label>
               <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]" data-testid="select-role"><SelectValue /></SelectTrigger>
-                <SelectContent className="!rounded-none border-[#b8c4d4]">
-                  <SelectItem value="customer" className="text-[11px]">Customer</SelectItem>
-                  <SelectItem value="admin" className="text-[11px]">Admin</SelectItem>
+                <SelectTrigger className="h-9" data-testid="select-role"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Company</label>
+              <label className="text-xs text-slate-500 block mb-1">Company</label>
               <Select value={formData.customerId || "none"} onValueChange={(v) => setFormData({ ...formData, customerId: v === "none" ? "" : v })}>
-                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]" data-testid="select-company"><SelectValue placeholder="Select company" /></SelectTrigger>
-                <SelectContent className="!rounded-none border-[#b8c4d4]">
-                  <SelectItem value="none" className="text-[11px]">— None —</SelectItem>
-                  {customerList.map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
+                <SelectTrigger className="h-9" data-testid="select-company"><SelectValue placeholder="Select company" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {customerList.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <input type="checkbox" id="active" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="h-3 w-3" />
-            <label htmlFor="active" className="text-[10px] text-[#666]">Account Active</label>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="active" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+            <label htmlFor="active" className="text-sm text-slate-700">Account Active</label>
           </div>
-
           {formData.role === "customer" && (
-            <div className="border border-[#b8c4d4] bg-[#fafafa]">
-              <div className="bg-[#dce3ed] px-2 py-[3px] flex items-center justify-between border-b border-[#b8c4d4]">
-                <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] text-[#666]">Template:</span>
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+                <span className="text-sm font-semibold text-slate-900">Portal Permissions</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Template:</span>
                   <Select value={roleTemplate} onValueChange={handleTemplateChange}>
-                    <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#b8c4d4] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#b8c4d4]">
-                      {ROLE_TEMPLATES.map((t) => (
-                        <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
-                      ))}
+                    <SelectTrigger className="h-7 w-[180px] text-xs" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLE_TEMPLATES.map((t) => <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="p-2">
+              <div className="p-4">
                 <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
               </div>
-              <div className="bg-[#eef1f6] border-t border-[#b8c4d4] px-2 py-[2px] text-[9px] text-[#666]">
+              <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
                 {getActivePermCount(perms)} of 15 permissions enabled
               </div>
             </div>
           )}
-
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-user">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={loading} className={btnPrimary} data-testid="button-save-user">
               {loading ? "Saving..." : editingUser ? "Update" : "Create"}
             </button>
           </div>
@@ -1072,33 +853,17 @@ function UserModal({
 }
 
 type CompanyData = {
-  id: string;
-  name: string;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  phone: string | null;
-  email: string | null;
-  contactName: string | null;
-  notes: string | null;
-  active: boolean;
+  id: string; name: string; address: string | null; city: string | null; state: string | null;
+  zip: string | null; phone: string | null; email: string | null; contactName: string | null;
+  notes: string | null; active: boolean;
 };
 
-type CompanyUser = {
-  id: string;
-  name: string;
-  email: string;
-  username: string;
-  customerRole: string | null;
-  active: boolean;
-} & Partial<PermissionKeys>;
+type CompanyUser = { id: string; name: string; email: string; username: string; customerRole: string | null; active: boolean } & Partial<PermissionKeys>;
 
 function CustomersView({ token }: { token: string | null }) {
   const { toast } = useToast();
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedUsers, setExpandedUsers] = useState<CompanyUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -1107,10 +872,6 @@ function CustomersView({ token }: { token: string | null }) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [addToCustomerId, setAddToCustomerId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [topHeight, setTopHeight] = useState(300);
-  const onDrag = useCallback((delta: number) => {
-    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
-  }, []);
 
   useEffect(() => { loadCompanies(); }, []);
 
@@ -1119,200 +880,143 @@ function CustomersView({ token }: { token: string | null }) {
     try {
       const res = await fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) setCompanies(await res.json());
-    } catch {
-      toast({ title: "Error", description: "Failed to load customers", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast({ title: "Error", description: "Failed to load customers", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
   async function loadCompanyUsers(customerId: string) {
     setLoadingUsers(true);
     try {
       const res = await fetch(`/api/admin/customers/${customerId}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const data = await res.json();
-        setExpandedUsers(data.users || []);
-      }
-    } catch {
-      setExpandedUsers([]);
-    } finally {
-      setLoadingUsers(false);
-    }
+      if (res.ok) { const data = await res.json(); setExpandedUsers(data.users || []); }
+    } catch { setExpandedUsers([]); }
+    finally { setLoadingUsers(false); }
   }
 
   function handleSelect(id: string) {
     setSelectedId(id);
-    if (expandedId !== id) {
-      setExpandedId(id);
-      loadCompanyUsers(id);
-    }
+    if (expandedId !== id) { setExpandedId(id); loadCompanyUsers(id); }
   }
 
   async function handleDeleteCompany(id: string) {
     if (!confirm("Delete this customer and unlink all associated users?")) return;
     try {
       const res = await fetch(`/api/admin/customers/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        toast({ title: "Customer deleted" });
-        loadCompanies();
-        if (expandedId === id) { setExpandedId(null); setExpandedUsers([]); }
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to delete customer", variant: "destructive" });
-    }
+      if (res.ok) { toast({ title: "Customer deleted" }); loadCompanies(); if (expandedId === id) { setExpandedId(null); setExpandedUsers([]); } }
+    } catch { toast({ title: "Error", description: "Failed to delete customer", variant: "destructive" }); }
   }
 
   async function handleRemoveUser(customerId: string, userId: string) {
     if (!confirm("Remove this user from the customer?")) return;
     try {
       const res = await fetch(`/api/admin/customers/${customerId}/users/${userId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        toast({ title: "User removed" });
-        loadCompanyUsers(customerId);
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to remove user", variant: "destructive" });
-    }
+      if (res.ok) { toast({ title: "User removed" }); loadCompanyUsers(customerId); }
+    } catch { toast({ title: "Error", description: "Failed to remove user", variant: "destructive" }); }
   }
-
-  const filtered = companies.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.contactName || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const selectedCompany = companies.find(c => c.id === selectedId);
 
+  const columns: ColumnDef<CompanyData>[] = [
+    { key: "name", label: "Company Name", sortable: true, render: (row) => (
+      <span className="font-medium text-slate-900">
+        {row.name}
+        {!row.active && <span className="ml-2 text-xs text-red-500">[Inactive]</span>}
+      </span>
+    )},
+    { key: "contactName", label: "Contact", sortable: true },
+    { key: "email", label: "Email", sortable: true },
+    { key: "phone", label: "Phone" },
+    { key: "active", label: "Status", render: (row) => <StatusBadge status={row.active ? "active" : "suspended"} showDot /> },
+    { key: "actions", label: "Actions", align: "center", render: (row) => (
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); setEditingCompany(row); setShowCompanyModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-edit-customer-${row.id}`}>Edit</button>
+        <button onClick={(e) => { e.stopPropagation(); handleDeleteCompany(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-delete-customer-${row.id}`}>Delete</button>
+      </div>
+    )},
+  ];
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden" data-testid="customers-view">
-      {/* Toolbar */}
-      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-add-customer">
-          <Plus className="h-[10px] w-[10px]" />Add Customer
-        </button>
-        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
-        <span className="text-[10px] text-[#666]">{companies.length} customers</span>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input placeholder="Filter..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" data-testid="input-customer-search" />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-[11px] text-[#666]">Loading...</div>
-        ) : (
-          <table className="w-full border-collapse" data-testid="table-customers">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-[#dce3ed]">
-                <th className="w-[16px] py-[2px] px-1 border border-[#b8c4d4]"></th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Company Name</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Contact</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Email</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Phone</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => (
-                <tr
-                  key={c.id}
-                  onClick={() => handleSelect(c.id)}
-                  className={`cursor-pointer ${selectedId === c.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
-                  data-testid={`card-customer-${c.id}`}
-                >
-                  <td className="py-[2px] px-1 border border-[#b8c4d4] text-center">
-                    {expandedId === c.id ? <ChevronDown className="h-[10px] w-[10px] inline" /> : <ChevronRight className="h-[10px] w-[10px] inline" />}
-                  </td>
-                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#b8c4d4]">
-                    {c.name}
-                    {!c.active && <span className="ml-1 text-[9px] text-[#c42b1c]">[Inactive]</span>}
-                  </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.contactName || "—"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.email || "—"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{c.phone || "—"}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={c.active ? "active" : "suspended"} /></td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingCompany(c); setShowCompanyModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-2" data-testid={`button-edit-customer-${c.id}`}>Edit</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCompany(c.id); }} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-delete-customer-${c.id}`}>Del</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <DraggableDivider onDrag={onDrag} />
-
-      {/* Detail panel */}
-      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
-        {selectedCompany ? (
-          <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">
-              Customer Details - {selectedCompany.name}
-            </div>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
-              <div><span className="text-[#666]">Address:</span> <span className="text-[#1e1e1e]">{[selectedCompany.address, selectedCompany.city, selectedCompany.state, selectedCompany.zip].filter(Boolean).join(", ") || "—"}</span></div>
-              <div><span className="text-[#666]">Contact:</span> <span className="text-[#1e1e1e]">{selectedCompany.contactName || "—"}</span></div>
-              <div><span className="text-[#666]">Email:</span> <span className="text-[#1e1e1e]">{selectedCompany.email || "—"}</span></div>
-              <div><span className="text-[#666]">Phone:</span> <span className="text-[#1e1e1e]">{selectedCompany.phone || "—"}</span></div>
-              <div><span className="text-[#666]">Notes:</span> <span className="text-[#1e1e1e]">{selectedCompany.notes || "—"}</span></div>
-            </div>
-
-            <div className="flex items-center justify-between mb-1 border-b border-[#b8c4d4] pb-1">
-              <span className="text-[10px] font-semibold text-[#1e1e1e]">Associated Users</span>
-              <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="flex items-center gap-[2px] text-[10px] text-[#2563eb] hover:underline" data-testid={`button-add-user-${selectedCompany.id}`}>
-                <Plus className="h-[10px] w-[10px]" />Add User
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading...</div>
+      ) : (
+        <>
+          <AdminTable
+            data={companies}
+            columns={columns}
+            onRowClick={(row) => handleSelect(row.id)}
+            searchPlaceholder="Search customers..."
+            searchKeys={["name", "email", "contactName"]}
+            selectedId={selectedId}
+            getRowId={(row) => row.id}
+            rowTestIdPrefix="customer"
+            actions={
+              <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true); }} className={btnPrimary} data-testid="button-add-customer">
+                <Plus className="w-4 h-4" />Add Customer
               </button>
-            </div>
-            {loadingUsers ? (
-              <div className="text-[10px] text-[#666]">Loading users...</div>
-            ) : expandedUsers.length === 0 ? (
-              <div className="text-[10px] text-[#666] italic">No users associated.</div>
-            ) : (
-              <table className="w-full border-collapse" data-testid="table-customer-users">
-                <thead>
-                  <tr className="bg-[#dce3ed]">
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Name</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Username</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Email</th>
-                    <th className="text-left text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]">Permissions</th>
-                    <th className="text-center text-[10px] font-semibold py-[2px] px-2 border border-[#b8c4d4]"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expandedUsers.map((u, i) => (
-                    <tr key={u.id} className={i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} data-testid={`row-customer-user-${u.id}`}>
-                      <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{u.name}</td>
-                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.username}</td>
-                      <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{u.email}</td>
-                      <td className="py-[2px] px-2 border border-[#b8c4d4]">
-                        <div className="flex flex-wrap gap-[2px]">
-                          {getPermSummaryBadges(u).map((b) => (
-                            <span key={b} className="inline-block px-[3px] py-0 text-[8px] font-medium bg-[#e8daef] text-[#6c3483]" style={{ lineHeight: "12px" }}>{b}</span>
-                          ))}
-                          {getPermSummaryBadges(u).length === 0 && <span className="text-[9px] text-[#999]">none</span>}
-                        </div>
-                      </td>
-                      <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
-                        <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-[#c42b1c] hover:underline text-[10px]" data-testid={`button-remove-user-${u.id}`}>Remove</button>
-                      </td>
+            }
+            className="flex-1"
+          />
+          {selectedCompany && (
+            <div className="border-t border-slate-200 bg-white p-5 flex-shrink-0 max-h-[280px] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Customer Details — {selectedCompany.name}</h3>
+                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-[13px] mb-4">
+                <div><span className="text-slate-500">Address:</span> <span className="text-slate-900 ml-1">{[selectedCompany.address, selectedCompany.city, selectedCompany.state, selectedCompany.zip].filter(Boolean).join(", ") || "—"}</span></div>
+                <div><span className="text-slate-500">Contact:</span> <span className="text-slate-900 ml-1">{selectedCompany.contactName || "—"}</span></div>
+                <div><span className="text-slate-500">Email:</span> <span className="text-slate-900 ml-1">{selectedCompany.email || "—"}</span></div>
+                <div><span className="text-slate-500">Phone:</span> <span className="text-slate-900 ml-1">{selectedCompany.phone || "—"}</span></div>
+                <div><span className="text-slate-500">Notes:</span> <span className="text-slate-900 ml-1">{selectedCompany.notes || "—"}</span></div>
+              </div>
+              <div className="flex items-center justify-between mb-2 border-t border-slate-100 pt-3">
+                <span className="text-sm font-semibold text-slate-900">Associated Users</span>
+                <button onClick={() => { setAddToCustomerId(selectedCompany.id); setShowUserModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid={`button-add-user-${selectedCompany.id}`}>
+                  <Plus className="w-3.5 h-3.5" />Add User
+                </button>
+              </div>
+              {loadingUsers ? (
+                <div className="text-xs text-slate-500">Loading users...</div>
+              ) : expandedUsers.length === 0 ? (
+                <div className="text-xs text-slate-400 italic">No users associated.</div>
+              ) : (
+                <table className="w-full" data-testid="table-customer-users">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Name</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Username</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Email</th>
+                      <th className="text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3">Permissions</th>
+                      <th className="text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wider py-2 px-3"></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        ) : (
-          <div className="text-[11px] text-[#666] italic">Select a customer to view details</div>
-        )}
-      </div>
-
+                  </thead>
+                  <tbody>
+                    {expandedUsers.map((u, i) => (
+                      <tr key={u.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-customer-user-${u.id}`}>
+                        <td className="text-[13px] text-slate-900 py-2 px-3">{u.name}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.username}</td>
+                        <td className="text-[13px] text-slate-500 py-2 px-3">{u.email}</td>
+                        <td className="py-2 px-3">
+                          <div className="flex flex-wrap gap-1">
+                            {getPermSummaryBadges(u).map((b) => (
+                              <span key={b} className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 rounded-full">{b}</span>
+                            ))}
+                            {getPermSummaryBadges(u).length === 0 && <span className="text-xs text-slate-400">none</span>}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <button onClick={() => handleRemoveUser(selectedCompany.id, u.id)} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-remove-user-${u.id}`}>Remove</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </>
+      )}
       <CompanyModal open={showCompanyModal} onOpenChange={setShowCompanyModal} editing={editingCompany} token={token} onSuccess={() => { setShowCompanyModal(false); loadCompanies(); }} />
       <CustomerUserModal open={showUserModal} onOpenChange={setShowUserModal} customerId={addToCustomerId} token={token} onSuccess={() => { setShowUserModal(false); if (addToCustomerId) loadCompanyUsers(addToCustomerId); }} />
     </div>
@@ -1320,22 +1024,15 @@ function CustomersView({ token }: { token: string | null }) {
 }
 
 function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editing: CompanyData | null;
-  token: string | null;
-  onSuccess: () => void;
+  open: boolean; onOpenChange: (open: boolean) => void; editing: CompanyData | null; token: string | null; onSuccess: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editing) {
-      setForm({ name: editing.name, address: editing.address || "", city: editing.city || "", state: editing.state || "", zip: editing.zip || "", phone: editing.phone || "", email: editing.email || "", contactName: editing.contactName || "", notes: editing.notes || "" });
-    } else {
-      setForm({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
-    }
+    if (editing) setForm({ name: editing.name, address: editing.address || "", city: editing.city || "", state: editing.state || "", zip: editing.zip || "", phone: editing.phone || "", email: editing.email || "", contactName: editing.contactName || "", notes: editing.notes || "" });
+    else setForm({ name: "", address: "", city: "", state: "", zip: "", phone: "", email: "", contactName: "", notes: "" });
   }, [editing, open]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1345,75 +1042,42 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
     try {
       const url = editing ? `/api/admin/customers/${editing.id}` : "/api/admin/customers";
       const res = await fetch(url, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(form) });
-      if (res.ok) {
-        toast({ title: editing ? "Customer updated" : "Customer created" });
-        onSuccess();
-      } else {
-        const err = await res.json();
-        toast({ title: "Error", description: err.error || "Failed to save", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to save customer", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
+      if (res.ok) { toast({ title: editing ? "Customer updated" : "Customer created" }); onSuccess(); }
+      else { const err = await res.json(); toast({ title: "Error", description: err.error || "Failed to save", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save customer", variant: "destructive" }); }
+    finally { setSaving(false); }
   }
-
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
-        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
-          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
-          <DialogDescription className="text-[10px] text-[#666]">{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
-        </div>
-        <form onSubmit={handleSubmit} className="p-3 space-y-2">
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
+          <DialogDescription>{editing ? "Update company details." : "Create a new customer (company)."}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Company Name *</label>
+            <label className="text-xs text-slate-500 block mb-1">Company Name *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-company-name" />
           </div>
           <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Contact Name</label>
+            <label className="text-xs text-slate-500 block mb-1">Contact Name</label>
             <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={inputCls} data-testid="input-contact-name" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Email</label>
-              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-company-email" />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Phone</label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} data-testid="input-company-phone" />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-company-email" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Phone</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} data-testid="input-company-phone" /></div>
           </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Address</label>
-            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputCls} data-testid="input-company-address" />
+          <div><label className="text-xs text-slate-500 block mb-1">Address</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputCls} data-testid="input-company-address" /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">City</label><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} data-testid="input-company-city" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">State</label><input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls} data-testid="input-company-state" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">ZIP</label><input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className={inputCls} data-testid="input-company-zip" /></div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">City</label>
-              <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} data-testid="input-company-city" />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">State</label>
-              <input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls} data-testid="input-company-state" />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">ZIP</label>
-              <input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className={inputCls} data-testid="input-company-zip" />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Notes</label>
-            <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} data-testid="input-company-notes" />
-          </div>
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-customer">
-              {saving ? "Saving..." : editing ? "Update" : "Create"}
-            </button>
+          <div><label className="text-xs text-slate-500 block mb-1">Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} data-testid="input-company-notes" /></div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={saving} className={btnPrimary} data-testid="button-save-customer">{saving ? "Saving..." : editing ? "Update" : "Create"}</button>
           </div>
         </form>
       </DialogContent>
@@ -1422,11 +1086,7 @@ function CompanyModal({ open, onOpenChange, editing, token, onSuccess }: {
 }
 
 function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  customerId: string | null;
-  token: string | null;
-  onSuccess: () => void;
+  open: boolean; onOpenChange: (open: boolean) => void; customerId: string | null; token: string | null; onSuccess: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({ name: "", username: "", email: "", password: "" });
@@ -1452,89 +1112,53 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.username.trim() || !form.email.trim() || !form.password.trim()) {
-      toast({ title: "All fields are required", variant: "destructive" });
-      return;
+      toast({ title: "All fields are required", variant: "destructive" }); return;
     }
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/customers/${customerId}/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...form, ...perms }),
       });
-      if (res.ok) {
-        toast({ title: "User added" });
-        onSuccess();
-      } else {
-        const err = await res.json();
-        toast({ title: "Error", description: err.error || "Failed to add user", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to add user", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
+      if (res.ok) { toast({ title: "User added" }); onSuccess(); }
+      else { const err = await res.json(); toast({ title: "Error", description: err.error || "Failed to add user", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to add user", variant: "destructive" }); }
+    finally { setSaving(false); }
   }
-
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0 max-h-[90vh] overflow-y-auto">
-        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
-          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">Add User to Customer</DialogTitle>
-          <DialogDescription className="text-[10px] text-[#666]">Create a new user account linked to this company.</DialogDescription>
-        </div>
-        <form onSubmit={handleSubmit} className="p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Full Name *</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-user-name" />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Username *</label>
-              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={inputCls} data-testid="input-user-username" />
-            </div>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add User to Customer</DialogTitle>
+          <DialogDescription>Create a new user account linked to this company.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Full Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} data-testid="input-user-name" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Username *</label><input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={inputCls} data-testid="input-user-username" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Email *</label>
-              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-user-email" />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Password *</label>
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} data-testid="input-user-password" />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Email *</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} data-testid="input-user-email" /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Password *</label><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} data-testid="input-user-password" /></div>
           </div>
-
-          <div className="border border-[#b8c4d4] bg-[#fafafa]">
-            <div className="bg-[#dce3ed] px-2 py-[3px] flex items-center justify-between border-b border-[#b8c4d4]">
-              <span className="text-[10px] font-semibold text-[#1e1e1e]">Portal Permissions</span>
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] text-[#666]">Template:</span>
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+              <span className="text-sm font-semibold text-slate-900">Portal Permissions</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Template:</span>
                 <Select value={roleTemplate} onValueChange={handleTemplateChange}>
-                  <SelectTrigger className="h-[18px] w-[180px] text-[10px] !rounded-none border-[#b8c4d4] bg-white" data-testid="select-role-template"><SelectValue /></SelectTrigger>
-                  <SelectContent className="!rounded-none border-[#b8c4d4]">
-                    {ROLE_TEMPLATES.map((t) => (
-                      <SelectItem key={t.value} value={t.value} className="text-[10px]">{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger className="h-7 w-[180px] text-xs" data-testid="select-role-template"><SelectValue /></SelectTrigger>
+                  <SelectContent>{ROLE_TEMPLATES.map((t) => <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="p-2">
-              <PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} />
-            </div>
-            <div className="bg-[#eef1f6] border-t border-[#b8c4d4] px-2 py-[2px] text-[9px] text-[#666]">
-              {getActivePermCount(perms)} of 15 permissions enabled
-            </div>
+            <div className="p-4"><PermissionCheckboxGrid perms={perms} onChange={(p) => { setPerms(p); setRoleTemplate("custom"); }} /></div>
+            <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 text-xs text-slate-500">{getActivePermCount(perms)} of 15 permissions enabled</div>
           </div>
-
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={saving} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white" data-testid="button-save-user">
-              {saving ? "Saving..." : "Add User"}
-            </button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={saving} className={btnPrimary} data-testid="button-save-user">{saving ? "Saving..." : "Add User"}</button>
           </div>
         </form>
       </DialogContent>
@@ -1543,35 +1167,16 @@ function CustomerUserModal({ open, onOpenChange, customerId, token, onSuccess }:
 }
 
 type ServiceData = {
-  id: string;
-  userId: string;
-  name: string;
-  type: string;
-  status: string;
-  location: string;
-  details: string | null;
-  serviceOrder: string | null;
-  monthlyPrice: string;
-  startDate: string;
-  grafanaUrl?: string | null;
-  grafanaDashboardUid?: string | null;
-  grafanaPanelId?: string | null;
-  grafanaOrgId?: string | null;
-  grafanaVar?: string | null;
-  snmpHost?: string | null;
-  snmpPort?: number | null;
-  snmpCommunity?: string | null;
-  snmpVersion?: string | null;
-  snmpOidStatus?: string | null;
-  snmpOidControl?: string | null;
+  id: string; userId: string; name: string; type: string; status: string; location: string;
+  details: string | null; serviceOrder: string | null; monthlyPrice: string; startDate: string;
+  grafanaUrl?: string | null; grafanaDashboardUid?: string | null; grafanaPanelId?: string | null;
+  grafanaOrgId?: string | null; grafanaVar?: string | null;
+  snmpHost?: string | null; snmpPort?: number | null; snmpCommunity?: string | null;
+  snmpVersion?: string | null; snmpOidStatus?: string | null; snmpOidControl?: string | null;
   pduPortNumber?: number | null;
 };
 
-type CustomerOption = {
-  id: string;
-  name: string;
-  companyName?: string | null;
-};
+type CustomerOption = { id: string; name: string; companyName?: string | null };
 
 function ServicesView({ token }: { token: string | null }) {
   const { toast } = useToast();
@@ -1580,30 +1185,17 @@ function ServicesView({ token }: { token: string | null }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<ServiceData | null>(null);
-  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [topHeight, setTopHeight] = useState(300);
-  const onDrag = useCallback((delta: number) => {
-    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
-  }, []);
 
   async function loadServices() {
     setLoading(true);
-    try {
-      const res = await fetch("/api/services", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setServices(await res.json());
-    } catch {
-      toast({ title: "Error", description: "Failed to load services", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    try { const res = await fetch("/api/services", { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setServices(await res.json()); }
+    catch { toast({ title: "Error", description: "Failed to load services", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
   async function loadCustomers() {
-    try {
-      const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setCustomers(await res.json());
-    } catch {}
+    try { const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setCustomers(await res.json()); } catch {}
   }
 
   useEffect(() => { loadServices(); loadCustomers(); }, []);
@@ -1612,179 +1204,117 @@ function ServicesView({ token }: { token: string | null }) {
     if (!confirm("Are you sure you want to delete this service?")) return;
     try {
       const res = await fetch(`/api/admin/services/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        toast({ title: "Success", description: "Service deleted" });
-        loadServices();
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to delete service", variant: "destructive" });
-    }
+      if (res.ok) { toast({ title: "Success", description: "Service deleted" }); loadServices(); }
+    } catch { toast({ title: "Error", description: "Failed to delete service", variant: "destructive" }); }
   }
-
-  const filteredServices = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return services;
-    return services.filter((s) => [s.name, s.type, s.location].some((v) => v?.toLowerCase().includes(q)));
-  }, [query, services]);
 
   const selectedService = services.find(s => s.id === selectedId);
 
+  const columns: ColumnDef<ServiceData>[] = [
+    { key: "name", label: "Service", sortable: true, render: (row) => (
+      <div>
+        <span className="font-medium text-slate-900">{row.name}</span>
+        {row.details && <div className="text-xs text-slate-500 mt-0.5">{row.details}</div>}
+      </div>
+    )},
+    { key: "type", label: "Type", sortable: true },
+    { key: "location", label: "Location", sortable: true },
+    { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} showDot /> },
+    { key: "monthlyPrice", label: "Monthly", align: "right", sortable: true, render: (row) => <span className="font-medium text-slate-900">${Number(row.monthlyPrice).toFixed(2)}</span> },
+    { key: "monitoring", label: "Monitoring", render: (row) => <span className="text-slate-500">{row.grafanaUrl ? "Grafana" : row.snmpHost ? "SNMP/PDU" : "—"}</span> },
+    { key: "actions", label: "Actions", align: "center", render: (row) => (
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={(e) => { e.stopPropagation(); setEditingService(row); setShowModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Edit</button>
+        <button onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium">Delete</button>
+      </div>
+    )},
+  ];
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={() => { setEditingService(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-service">
-          <Plus className="h-[10px] w-[10px]" />New Service
-        </button>
-        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
-        <span className="text-[10px] text-[#666]">{services.length} services</span>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-[11px] text-[#666]"><Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...</div>
-        ) : (
-          <table className="w-full border-collapse" data-testid="table-services">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-[#dce3ed]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Service</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Type</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Location</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Monthly</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Monitoring</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredServices.map((s, i) => (
-                <tr
-                  key={s.id}
-                  onClick={() => setSelectedId(s.id)}
-                  className={`cursor-pointer ${selectedId === s.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
-                  data-testid={`row-service-${s.id}`}
-                >
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">
-                    <div>{s.name}</div>
-                    {s.details && <div className="text-[9px] text-[#666]">{s.details}</div>}
-                  </td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{s.type}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{s.location}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={s.status} /></td>
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] text-right font-medium">${Number(s.monthlyPrice).toFixed(2)}</td>
-                  <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">
-                    {s.grafanaUrl ? "Grafana" : s.snmpHost ? "SNMP/PDU" : "—"}
-                  </td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingService(s); setShowModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-2">Edit</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <DraggableDivider onDrag={onDrag} />
-
-      {/* Detail panel */}
-      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
-        {selectedService ? (
-          <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">Service Details - {selectedService.name}</div>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px] mb-2">
-              <div><span className="text-[#666]">Type:</span> <span className="text-[#1e1e1e]">{selectedService.type}</span></div>
-              <div><span className="text-[#666]">Location:</span> <span className="text-[#1e1e1e]">{selectedService.location}</span></div>
-              <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedService.status} /></div>
-              <div><span className="text-[#666]">Monthly:</span> <span className="text-[#1e1e1e]">${Number(selectedService.monthlyPrice).toFixed(2)}</span></div>
-              <div><span className="text-[#666]">Start Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedService.startDate).toLocaleDateString()}</span></div>
-              <div><span className="text-[#666]">Details:</span> <span className="text-[#1e1e1e]">{selectedService.details || "—"}</span></div>
-              <div><span className="text-[#666]">Service Order:</span> <span className="text-[#1e1e1e]">{selectedService.serviceOrder || "—"}</span></div>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading...</div>
+      ) : (
+        <>
+          <AdminTable
+            data={services}
+            columns={columns}
+            onRowClick={(row) => setSelectedId(row.id)}
+            searchPlaceholder="Search services..."
+            searchKeys={["name", "type", "location"]}
+            selectedId={selectedId}
+            getRowId={(row) => row.id}
+            rowTestIdPrefix="service"
+            actions={
+              <button onClick={() => { setEditingService(null); setShowModal(true); }} className={btnPrimary} data-testid="button-new-service">
+                <Plus className="w-4 h-4" />New Service
+              </button>
+            }
+            className="flex-1"
+          />
+          {selectedService && (
+            <div className="border-t border-slate-200 bg-white p-5 flex-shrink-0 max-h-[250px] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Service Details — {selectedService.name}</h3>
+                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Type:</span> <span className="text-slate-900 ml-1">{selectedService.type}</span></div>
+                <div><span className="text-slate-500">Location:</span> <span className="text-slate-900 ml-1">{selectedService.location}</span></div>
+                <div><span className="text-slate-500">Status:</span> <StatusBadge status={selectedService.status} showDot /></div>
+                <div><span className="text-slate-500">Monthly:</span> <span className="text-slate-900 ml-1">${Number(selectedService.monthlyPrice).toFixed(2)}</span></div>
+                <div><span className="text-slate-500">Start Date:</span> <span className="text-slate-900 ml-1">{new Date(selectedService.startDate).toLocaleDateString()}</span></div>
+                <div><span className="text-slate-500">Details:</span> <span className="text-slate-900 ml-1">{selectedService.details || "—"}</span></div>
+                <div><span className="text-slate-500">Service Order:</span> <span className="text-slate-900 ml-1">{selectedService.serviceOrder || "—"}</span></div>
+              </div>
+              {selectedService.grafanaUrl && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  <h4 className="text-xs font-semibold text-slate-700 mb-2">Grafana Configuration</h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                    <div><span className="text-slate-500">URL:</span> <span className="text-slate-900 ml-1">{selectedService.grafanaUrl}</span></div>
+                    <div><span className="text-slate-500">Dashboard UID:</span> <span className="text-slate-900 ml-1">{selectedService.grafanaDashboardUid || "—"}</span></div>
+                    <div><span className="text-slate-500">Panel ID:</span> <span className="text-slate-900 ml-1">{selectedService.grafanaPanelId || "—"}</span></div>
+                    <div><span className="text-slate-500">Org ID:</span> <span className="text-slate-900 ml-1">{selectedService.grafanaOrgId || "—"}</span></div>
+                    <div><span className="text-slate-500">Variable:</span> <span className="text-slate-900 ml-1">{selectedService.grafanaVar || "—"}</span></div>
+                  </div>
+                </div>
+              )}
+              {selectedService.snmpHost && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  <h4 className="text-xs font-semibold text-slate-700 mb-2">SNMP/PDU Configuration</h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                    <div><span className="text-slate-500">Host:</span> <span className="text-slate-900 ml-1">{selectedService.snmpHost}</span></div>
+                    <div><span className="text-slate-500">Port:</span> <span className="text-slate-900 ml-1">{selectedService.snmpPort || 161}</span></div>
+                    <div><span className="text-slate-500">Community:</span> <span className="text-slate-900 ml-1">{selectedService.snmpCommunity || "—"}</span></div>
+                    <div><span className="text-slate-500">Version:</span> <span className="text-slate-900 ml-1">{selectedService.snmpVersion || "—"}</span></div>
+                    <div><span className="text-slate-500">Status OID:</span> <span className="text-slate-900 ml-1">{selectedService.snmpOidStatus || "—"}</span></div>
+                    <div><span className="text-slate-500">Control OID:</span> <span className="text-slate-900 ml-1">{selectedService.snmpOidControl || "—"}</span></div>
+                    <div><span className="text-slate-500">PDU Port #:</span> <span className="text-slate-900 ml-1">{selectedService.pduPortNumber ?? "—"}</span></div>
+                  </div>
+                </div>
+              )}
             </div>
-            {selectedService.grafanaUrl && (
-              <div className="mb-2">
-                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-1">Grafana Configuration</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
-                  <div><span className="text-[#666]">URL:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaUrl}</span></div>
-                  <div><span className="text-[#666]">Dashboard UID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaDashboardUid || "—"}</span></div>
-                  <div><span className="text-[#666]">Panel ID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaPanelId || "—"}</span></div>
-                  <div><span className="text-[#666]">Org ID:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaOrgId || "—"}</span></div>
-                  <div><span className="text-[#666]">Variable:</span> <span className="text-[#1e1e1e]">{selectedService.grafanaVar || "—"}</span></div>
-                </div>
-              </div>
-            )}
-            {selectedService.snmpHost && (
-              <div>
-                <div className="text-[10px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-1">SNMP/PDU Configuration</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-[2px] text-[11px]">
-                  <div><span className="text-[#666]">Host:</span> <span className="text-[#1e1e1e]">{selectedService.snmpHost}</span></div>
-                  <div><span className="text-[#666]">Port:</span> <span className="text-[#1e1e1e]">{selectedService.snmpPort || 161}</span></div>
-                  <div><span className="text-[#666]">Community:</span> <span className="text-[#1e1e1e]">{selectedService.snmpCommunity || "—"}</span></div>
-                  <div><span className="text-[#666]">Version:</span> <span className="text-[#1e1e1e]">{selectedService.snmpVersion || "—"}</span></div>
-                  <div><span className="text-[#666]">Status OID:</span> <span className="text-[#1e1e1e]">{selectedService.snmpOidStatus || "—"}</span></div>
-                  <div><span className="text-[#666]">Control OID:</span> <span className="text-[#1e1e1e]">{selectedService.snmpOidControl || "—"}</span></div>
-                  <div><span className="text-[#666]">PDU Port #:</span> <span className="text-[#1e1e1e]">{selectedService.pduPortNumber ?? "—"}</span></div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-[11px] text-[#666] italic">Select a service to view details</div>
-        )}
-      </div>
-
-      <ServiceModal
-        open={showModal}
-        onOpenChange={setShowModal}
-        editingService={editingService}
-        customers={customers}
-        token={token}
-        onSuccess={() => { setShowModal(false); loadServices(); }}
-      />
+          )}
+        </>
+      )}
+      <ServiceModal open={showModal} onOpenChange={setShowModal} editingService={editingService} customers={customers} token={token} onSuccess={() => { setShowModal(false); loadServices(); }} />
     </div>
   );
 }
 
 function ServiceModal({ open, onOpenChange, editingService, customers, token, onSuccess }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editingService: ServiceData | null;
-  customers: CustomerOption[];
-  token: string | null;
-  onSuccess: () => void;
+  open: boolean; onOpenChange: (open: boolean) => void; editingService: ServiceData | null;
+  customers: CustomerOption[]; token: string | null; onSuccess: () => void;
 }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "grafana" | "snmp">("general");
   const [formData, setFormData] = useState({
-    userId: "",
-    name: "",
-    type: "Colocation",
-    status: "active",
-    location: "iM Critical Miami",
-    details: "",
-    serviceOrder: "",
-    monthlyPrice: "",
-    startDate: new Date().toISOString().split("T")[0],
-    grafanaUrl: "",
-    grafanaDashboardUid: "",
-    grafanaPanelId: "",
-    grafanaOrgId: "",
-    grafanaVar: "",
-    snmpHost: "",
-    snmpPort: "161",
-    snmpCommunity: "",
-    snmpVersion: "v2c",
-    snmpOidStatus: "",
-    snmpOidControl: "",
-    pduPortNumber: "",
+    userId: "", name: "", type: "Colocation", status: "active", location: "iM Critical Miami",
+    details: "", serviceOrder: "", monthlyPrice: "", startDate: new Date().toISOString().split("T")[0],
+    grafanaUrl: "", grafanaDashboardUid: "", grafanaPanelId: "", grafanaOrgId: "", grafanaVar: "",
+    snmpHost: "", snmpPort: "161", snmpCommunity: "", snmpVersion: "v2c",
+    snmpOidStatus: "", snmpOidControl: "", pduPortNumber: "",
   });
 
   useEffect(() => {
@@ -1792,51 +1322,25 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
       setActiveTab("general");
       if (editingService) {
         setFormData({
-          userId: editingService.userId,
-          name: editingService.name,
-          type: editingService.type,
-          status: editingService.status,
-          location: editingService.location,
-          details: editingService.details || "",
-          serviceOrder: editingService.serviceOrder || "",
-          monthlyPrice: editingService.monthlyPrice,
-          startDate: new Date(editingService.startDate).toISOString().split("T")[0],
-          grafanaUrl: editingService.grafanaUrl || "",
-          grafanaDashboardUid: editingService.grafanaDashboardUid || "",
-          grafanaPanelId: editingService.grafanaPanelId || "",
-          grafanaOrgId: editingService.grafanaOrgId || "",
+          userId: editingService.userId, name: editingService.name, type: editingService.type,
+          status: editingService.status, location: editingService.location,
+          details: editingService.details || "", serviceOrder: editingService.serviceOrder || "",
+          monthlyPrice: editingService.monthlyPrice, startDate: new Date(editingService.startDate).toISOString().split("T")[0],
+          grafanaUrl: editingService.grafanaUrl || "", grafanaDashboardUid: editingService.grafanaDashboardUid || "",
+          grafanaPanelId: editingService.grafanaPanelId || "", grafanaOrgId: editingService.grafanaOrgId || "",
           grafanaVar: editingService.grafanaVar || "",
-          snmpHost: editingService.snmpHost || "",
-          snmpPort: String(editingService.snmpPort || 161),
-          snmpCommunity: editingService.snmpCommunity || "",
-          snmpVersion: editingService.snmpVersion || "v2c",
-          snmpOidStatus: editingService.snmpOidStatus || "",
-          snmpOidControl: editingService.snmpOidControl || "",
+          snmpHost: editingService.snmpHost || "", snmpPort: String(editingService.snmpPort || 161),
+          snmpCommunity: editingService.snmpCommunity || "", snmpVersion: editingService.snmpVersion || "v2c",
+          snmpOidStatus: editingService.snmpOidStatus || "", snmpOidControl: editingService.snmpOidControl || "",
           pduPortNumber: editingService.pduPortNumber != null ? String(editingService.pduPortNumber) : "",
         });
       } else {
         setFormData({
-          userId: customers[0]?.id || "",
-          name: "",
-          type: "Colocation",
-          status: "active",
-          location: "iM Critical Miami",
-          details: "",
-          serviceOrder: "",
-          monthlyPrice: "",
-          startDate: new Date().toISOString().split("T")[0],
-          grafanaUrl: "",
-          grafanaDashboardUid: "",
-          grafanaPanelId: "",
-          grafanaOrgId: "",
-          grafanaVar: "",
-          snmpHost: "",
-          snmpPort: "161",
-          snmpCommunity: "",
-          snmpVersion: "v2c",
-          snmpOidStatus: "",
-          snmpOidControl: "",
-          pduPortNumber: "",
+          userId: customers[0]?.id || "", name: "", type: "Colocation", status: "active", location: "iM Critical Miami",
+          details: "", serviceOrder: "", monthlyPrice: "", startDate: new Date().toISOString().split("T")[0],
+          grafanaUrl: "", grafanaDashboardUid: "", grafanaPanelId: "", grafanaOrgId: "", grafanaVar: "",
+          snmpHost: "", snmpPort: "161", snmpCommunity: "", snmpVersion: "v2c",
+          snmpOidStatus: "", snmpOidControl: "", pduPortNumber: "",
         });
       }
     }
@@ -1849,233 +1353,125 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
       const url = editingService ? `/api/admin/services/${editingService.id}` : "/api/admin/services";
       const method = editingService ? "PUT" : "POST";
       const body: any = {
-        ...formData,
-        startDate: new Date(formData.startDate),
-        serviceOrder: formData.serviceOrder || null,
+        ...formData, startDate: new Date(formData.startDate), serviceOrder: formData.serviceOrder || null,
         snmpPort: formData.snmpPort ? parseInt(formData.snmpPort) : null,
         pduPortNumber: formData.pduPortNumber ? parseInt(formData.pduPortNumber) : null,
-        grafanaUrl: formData.grafanaUrl || null,
-        grafanaDashboardUid: formData.grafanaDashboardUid || null,
-        grafanaPanelId: formData.grafanaPanelId || null,
-        grafanaOrgId: formData.grafanaOrgId || null,
-        grafanaVar: formData.grafanaVar || null,
-        snmpHost: formData.snmpHost || null,
-        snmpCommunity: formData.snmpCommunity || null,
-        snmpVersion: formData.snmpVersion || null,
-        snmpOidStatus: formData.snmpOidStatus || null,
-        snmpOidControl: formData.snmpOidControl || null,
+        grafanaUrl: formData.grafanaUrl || null, grafanaDashboardUid: formData.grafanaDashboardUid || null,
+        grafanaPanelId: formData.grafanaPanelId || null, grafanaOrgId: formData.grafanaOrgId || null,
+        grafanaVar: formData.grafanaVar || null, snmpHost: formData.snmpHost || null,
+        snmpCommunity: formData.snmpCommunity || null, snmpVersion: formData.snmpVersion || null,
+        snmpOidStatus: formData.snmpOidStatus || null, snmpOidControl: formData.snmpOidControl || null,
       };
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        toast({ title: "Success", description: editingService ? "Service updated" : "Service created" });
-        onSuccess();
-      } else {
-        const data = await res.json();
-        toast({ title: "Error", description: data.error || "Failed to save service", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to save service", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      if (res.ok) { toast({ title: "Success", description: editingService ? "Service updated" : "Service created" }); onSuccess(); }
+      else { const data = await res.json(); toast({ title: "Error", description: data.error || "Failed to save service", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save service", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
-  const locations = [
-    "iM Critical Miami", "Equinix Miami", "Digital Realty Miami",
-    "365 Data Centers FLL", "EdgeConneX Miami", "QTS MIA1", "CoreSite MI1", "South Reach Networks",
-  ];
+  const locations = ["iM Critical Miami", "Equinix Miami", "Digital Realty Miami", "365 Data Centers FLL", "EdgeConneX Miami", "QTS MIA1", "CoreSite MI1", "South Reach Networks"];
   const serviceTypes = ["Colocation", "Internet", "Network", "Cross-Connect", "SmartHands", "DDoS Protection"];
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
-        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
-          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingService ? "Edit Service" : "New Service"}</DialogTitle>
-          <DialogDescription className="text-[10px] text-[#666]">
-            {editingService ? "Update service details" : "Create a new customer service"}
-          </DialogDescription>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex bg-[#ececec] border-b border-[#b8c4d4]">
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{editingService ? "Edit Service" : "New Service"}</DialogTitle>
+          <DialogDescription>{editingService ? "Update service details" : "Create a new customer service"}</DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-1 border-b border-slate-200 mb-3">
           {(["general", "grafana", "snmp"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-[4px] text-[11px] border-r border-[#b8c4d4] ${
-                activeTab === tab ? "bg-[#ffffff] font-medium text-[#1e1e1e]" : "text-[#666] hover:bg-[#eef1f6]"
-              }`}
-            >
+            <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
               {tab === "general" ? "General" : tab === "grafana" ? "Grafana" : "SNMP/PDU"}
             </button>
           ))}
         </div>
-
-        <form onSubmit={handleSubmit} className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="space-y-3 max-h-[400px] overflow-y-auto">
           {activeTab === "general" && (
             <>
               <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
+                <label className="text-xs text-slate-500 block mb-1">Customer</label>
                 <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                  <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent className="!rounded-none border-[#b8c4d4]">
-                    {customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>{customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
-                {customers.length > 0 && customers.filter(c => c.id).length === 0 && (
-                  <p className="text-[9px] text-[#c42b1c] mt-[2px]">No companies have users yet. Create a user for a company first.</p>
-                )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Service Name</label>
-                  <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required placeholder="e.g., Cabinet C12 (42U)" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Type</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Service Name</label><input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required placeholder="e.g., Cabinet C12 (42U)" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Type</label>
                   <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#b8c4d4]">
-                      {serviceTypes.map((t) => <SelectItem key={t} value={t} className="text-[11px]">{t}</SelectItem>)}
-                    </SelectContent>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{serviceTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Location</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Location</label>
                   <Select value={formData.location} onValueChange={(v) => setFormData({ ...formData, location: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#b8c4d4]">
-                      {locations.map((l) => <SelectItem key={l} value={l} className="text-[11px]">{l}</SelectItem>)}
-                    </SelectContent>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{locations.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
+                <div><label className="text-xs text-slate-500 block mb-1">Status</label>
                   <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#b8c4d4]">
-                      <SelectItem value="active" className="text-[11px]">Active</SelectItem>
-                      <SelectItem value="provisioning" className="text-[11px]">Provisioning</SelectItem>
-                      <SelectItem value="suspended" className="text-[11px]">Suspended</SelectItem>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="provisioning">Provisioning</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Details</label>
-                  <input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className={inputCls} placeholder="e.g., 2kW, 2x 20A circuits" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Service Order #</label>
-                  <input value={formData.serviceOrder} onChange={(e) => setFormData({ ...formData, serviceOrder: e.target.value })} className={inputCls} placeholder="e.g., SO-2024-001" data-testid="input-service-order" />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Details</label><input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} className={inputCls} placeholder="e.g., 2kW, 2x 20A circuits" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Service Order #</label><input value={formData.serviceOrder} onChange={(e) => setFormData({ ...formData, serviceOrder: e.target.value })} className={inputCls} placeholder="e.g., SO-2024-001" data-testid="input-service-order" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Monthly Price ($)</label>
-                  <input type="number" step="0.01" value={formData.monthlyPrice} onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })} className={inputCls} required />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Start Date</label>
-                  <input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className={inputCls} required />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Monthly Price ($)</label><input type="number" step="0.01" value={formData.monthlyPrice} onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })} className={inputCls} required /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Start Date</label><input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className={inputCls} required /></div>
               </div>
             </>
           )}
-
           {activeTab === "grafana" && (
             <>
-              <div className="text-[10px] text-[#666] bg-[#eef1f6] border border-[#b8c4d4] p-2 mb-1">
-                Configure Grafana panel embedding for network traffic monitoring. The customer portal will display the specified panel as an iframe.
+              <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 p-3 rounded-md">Configure Grafana panel embedding for network traffic monitoring.</div>
+              <div><label className="text-xs text-slate-500 block mb-1">Grafana URL</label><input value={formData.grafanaUrl} onChange={(e) => setFormData({ ...formData, grafanaUrl: e.target.value })} className={inputCls} placeholder="https://grafana.911dc.us" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Dashboard UID</label><input value={formData.grafanaDashboardUid} onChange={(e) => setFormData({ ...formData, grafanaDashboardUid: e.target.value })} className={inputCls} /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Panel ID</label><input value={formData.grafanaPanelId} onChange={(e) => setFormData({ ...formData, grafanaPanelId: e.target.value })} className={inputCls} /></div>
               </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Grafana URL</label>
-                <input value={formData.grafanaUrl} onChange={(e) => setFormData({ ...formData, grafanaUrl: e.target.value })} className={inputCls} placeholder="https://grafana.911dc.us" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Dashboard UID</label>
-                  <input value={formData.grafanaDashboardUid} onChange={(e) => setFormData({ ...formData, grafanaDashboardUid: e.target.value })} className={inputCls} placeholder="e.g., abc123xyz" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Panel ID</label>
-                  <input value={formData.grafanaPanelId} onChange={(e) => setFormData({ ...formData, grafanaPanelId: e.target.value })} className={inputCls} placeholder="e.g., 2" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Org ID</label>
-                  <input value={formData.grafanaOrgId} onChange={(e) => setFormData({ ...formData, grafanaOrgId: e.target.value })} className={inputCls} placeholder="Optional (e.g., 1)" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Host Variable</label>
-                  <input value={formData.grafanaVar} onChange={(e) => setFormData({ ...formData, grafanaVar: e.target.value })} className={inputCls} placeholder="e.g., hostname or host ID" />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Org ID</label><input value={formData.grafanaOrgId} onChange={(e) => setFormData({ ...formData, grafanaOrgId: e.target.value })} className={inputCls} /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Host Variable</label><input value={formData.grafanaVar} onChange={(e) => setFormData({ ...formData, grafanaVar: e.target.value })} className={inputCls} /></div>
               </div>
             </>
           )}
-
           {activeTab === "snmp" && (
             <>
-              <div className="text-[10px] text-[#666] bg-[#eef1f6] border border-[#b8c4d4] p-2 mb-1">
-                Configure SNMP for PDU port management. Requires read/write community string for reboot capability.
+              <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 p-3 rounded-md">Configure SNMP for PDU port management.</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">SNMP Host</label><input value={formData.snmpHost} onChange={(e) => setFormData({ ...formData, snmpHost: e.target.value })} className={inputCls} placeholder="IP or hostname" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">SNMP Port</label><input type="number" value={formData.snmpPort} onChange={(e) => setFormData({ ...formData, snmpPort: e.target.value })} className={inputCls} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Host</label>
-                  <input value={formData.snmpHost} onChange={(e) => setFormData({ ...formData, snmpHost: e.target.value })} className={inputCls} placeholder="IP or hostname" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Port</label>
-                  <input type="number" value={formData.snmpPort} onChange={(e) => setFormData({ ...formData, snmpPort: e.target.value })} className={inputCls} placeholder="161" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Community String</label>
-                  <input value={formData.snmpCommunity} onChange={(e) => setFormData({ ...formData, snmpCommunity: e.target.value })} className={inputCls} placeholder="e.g., private" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">SNMP Version</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Community String</label><input value={formData.snmpCommunity} onChange={(e) => setFormData({ ...formData, snmpCommunity: e.target.value })} className={inputCls} /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">SNMP Version</label>
                   <Select value={formData.snmpVersion} onValueChange={(v) => setFormData({ ...formData, snmpVersion: v })}>
-                    <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
-                    <SelectContent className="!rounded-none border-[#b8c4d4]">
-                      <SelectItem value="v1" className="text-[11px]">v1</SelectItem>
-                      <SelectItem value="v2c" className="text-[11px]">v2c</SelectItem>
-                      <SelectItem value="v3" className="text-[11px]">v3</SelectItem>
-                    </SelectContent>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="v1">v1</SelectItem><SelectItem value="v2c">v2c</SelectItem><SelectItem value="v3">v3</SelectItem></SelectContent>
                   </Select>
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Status OID (read port state)</label>
-                <input value={formData.snmpOidStatus} onChange={(e) => setFormData({ ...formData, snmpOidStatus: e.target.value })} className={inputCls} placeholder="e.g., 1.3.6.1.4.1.318.1.1.12.3.3.1.1.4" />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Control OID (set port state)</label>
-                <input value={formData.snmpOidControl} onChange={(e) => setFormData({ ...formData, snmpOidControl: e.target.value })} className={inputCls} placeholder="e.g., 1.3.6.1.4.1.318.1.1.12.3.3.1.1.4" />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">PDU Port Number</label>
-                <input type="number" value={formData.pduPortNumber} onChange={(e) => setFormData({ ...formData, pduPortNumber: e.target.value })} className={inputCls} placeholder="Outlet number assigned to customer" />
-              </div>
+              <div><label className="text-xs text-slate-500 block mb-1">Status OID</label><input value={formData.snmpOidStatus} onChange={(e) => setFormData({ ...formData, snmpOidStatus: e.target.value })} className={inputCls} /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Control OID</label><input value={formData.snmpOidControl} onChange={(e) => setFormData({ ...formData, snmpOidControl: e.target.value })} className={inputCls} /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">PDU Port Number</label><input type="number" value={formData.pduPortNumber} onChange={(e) => setFormData({ ...formData, pduPortNumber: e.target.value })} className={inputCls} /></div>
             </>
           )}
-
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
-              {loading ? "Saving..." : editingService ? "Update" : "Create"}
-            </button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={loading} className={btnPrimary}>{loading ? "Saving..." : editingService ? "Update" : "Create"}</button>
           </div>
         </form>
       </DialogContent>
@@ -2084,17 +1480,9 @@ function ServiceModal({ open, onOpenChange, editingService, customers, token, on
 }
 
 type InvoiceData = {
-  id: string;
-  userId: string;
-  invoiceNumber: string;
-  status: string;
-  issueDate: string;
-  dueDate: string;
-  subtotal: string;
-  tax: string;
-  total: string;
-  customerName?: string;
-  customerId?: string | null;
+  id: string; userId: string; invoiceNumber: string; status: string;
+  issueDate: string; dueDate: string; subtotal: string; tax: string; total: string;
+  customerName?: string; customerId?: string | null;
 };
 
 function InvoicesView({ token }: { token: string | null }) {
@@ -2104,13 +1492,8 @@ function InvoicesView({ token }: { token: string | null }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null);
-  const [query, setQuery] = useState("");
   const [billingRunning, setBillingRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [topHeight, setTopHeight] = useState(300);
-  const onDrag = useCallback((delta: number) => {
-    setTopHeight((h) => Math.max(100, Math.min(600, h + delta)));
-  }, []);
 
   async function handleRunBilling() {
     if (!confirm("This will generate invoices for all customers with active services for this month. Continue?")) return;
@@ -2119,59 +1502,33 @@ function InvoicesView({ token }: { token: string | null }) {
       const res = await fetch("/api/admin/billing/run", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (res.ok) {
-        toast({
-          title: "Billing Complete",
-          description: `${data.generated} invoice(s) generated, ${data.skipped} skipped${data.errors.length > 0 ? `, ${data.errors.length} error(s)` : ""}`,
-        });
+        toast({ title: "Billing Complete", description: `${data.generated} invoice(s) generated, ${data.skipped} skipped${data.errors.length > 0 ? `, ${data.errors.length} error(s)` : ""}` });
         loadInvoices();
-      } else {
-        toast({ title: "Error", description: data.error || "Failed to run billing", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to run billing cycle", variant: "destructive" });
-    } finally {
-      setBillingRunning(false);
-    }
+      } else toast({ title: "Error", description: data.error || "Failed to run billing", variant: "destructive" });
+    } catch { toast({ title: "Error", description: "Failed to run billing cycle", variant: "destructive" }); }
+    finally { setBillingRunning(false); }
   }
 
   async function handleDownloadPdf(invoiceId: string, invoiceNumber: string) {
     try {
       const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `invoice-${invoiceNumber}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to download PDF", variant: "destructive" });
-    }
+        const blob = await res.blob(); const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `invoice-${invoiceNumber}.pdf`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      } else toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+    } catch { toast({ title: "Error", description: "Failed to download PDF", variant: "destructive" }); }
   }
 
   async function loadInvoices() {
     setLoading(true);
-    try {
-      const res = await fetch("/api/invoices", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setInvoices(await res.json());
-    } catch {
-      toast({ title: "Error", description: "Failed to load invoices", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    try { const res = await fetch("/api/invoices", { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setInvoices(await res.json()); }
+    catch { toast({ title: "Error", description: "Failed to load invoices", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
   async function loadCustomers() {
-    try {
-      const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setCustomers(await res.json());
-    } catch {}
+    try { const res = await fetch("/api/admin/customer-users", { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setCustomers(await res.json()); } catch {}
   }
 
   useEffect(() => { loadInvoices(); loadCustomers(); }, []);
@@ -2180,168 +1537,91 @@ function InvoicesView({ token }: { token: string | null }) {
     if (!confirm("Are you sure you want to delete this invoice?")) return;
     try {
       const res = await fetch(`/api/admin/invoices/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        toast({ title: "Success", description: "Invoice deleted" });
-        loadInvoices();
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" });
-    }
+      if (res.ok) { toast({ title: "Success", description: "Invoice deleted" }); loadInvoices(); }
+    } catch { toast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" }); }
   }
 
   async function handleApprove(inv: InvoiceData) {
     try {
-      const res = await fetch(`/api/admin/invoices/${inv.id}/approve`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        toast({ title: "Success", description: "Invoice approved and set to pending" });
-        loadInvoices();
-      } else {
-        const data = await res.json();
-        toast({ title: "Error", description: data.error || "Failed to approve invoice", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to approve invoice", variant: "destructive" });
-    }
+      const res = await fetch(`/api/admin/invoices/${inv.id}/approve`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { toast({ title: "Success", description: "Invoice approved and set to pending" }); loadInvoices(); }
+      else { const data = await res.json(); toast({ title: "Error", description: data.error || "Failed to approve invoice", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to approve invoice", variant: "destructive" }); }
   }
-
-  const filteredInvoices = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return invoices;
-    return invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q) || (inv.customerName || "").toLowerCase().includes(q));
-  }, [query, invoices]);
 
   const selectedInvoice = invoices.find(inv => inv.id === selectedId);
 
+  const columns: ColumnDef<InvoiceData>[] = [
+    { key: "invoiceNumber", label: "Invoice #", sortable: true, render: (row) => <span className="font-medium text-slate-900">{row.invoiceNumber}</span> },
+    { key: "customerName", label: "Customer", sortable: true },
+    { key: "issueDate", label: "Issue Date", sortable: true, render: (row) => <span>{new Date(row.issueDate).toLocaleDateString()}</span> },
+    { key: "dueDate", label: "Due Date", sortable: true, render: (row) => <span>{new Date(row.dueDate).toLocaleDateString()}</span> },
+    { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} showDot /> },
+    { key: "total", label: "Total", align: "right", sortable: true, render: (row) => <span className="font-semibold text-slate-900">${Number(row.total).toFixed(2)}</span> },
+    { key: "actions", label: "Actions", align: "center", render: (row) => (
+      <div className="flex items-center justify-center gap-2">
+        {row.status === "draft" && <button onClick={(e) => { e.stopPropagation(); handleApprove(row); }} className="text-emerald-600 hover:text-emerald-700 text-xs font-medium" data-testid={`button-approve-invoice-${row.id}`}>Approve</button>}
+        <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(row.id, row.invoiceNumber); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-download-pdf-${row.id}`}>PDF</button>
+        <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(row); setShowModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium">Edit</button>
+        <button onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium">Delete</button>
+      </div>
+    )},
+  ];
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
-        <button onClick={handleRunBilling} disabled={billingRunning} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff] disabled:opacity-50" data-testid="button-run-billing">
-          {billingRunning ? <Loader2 className="h-[10px] w-[10px] animate-spin" /> : <CreditCard className="h-[10px] w-[10px]" />}Run Billing
-        </button>
-        <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className="flex items-center gap-[3px] text-[10px] text-[#1e1e1e] hover:bg-[#dce3ed] px-1 py-[1px] border border-[#b8c4d4] bg-[#ffffff]" data-testid="button-new-invoice">
-          <Plus className="h-[10px] w-[10px]" />New Invoice
-        </button>
-        <div className="h-[14px] w-[1px] bg-[#b8c4d4]" />
-        <span className="text-[10px] text-[#666]">{invoices.length} invoices</span>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-1 top-1/2 -translate-y-1/2 h-[10px] w-[10px] text-[#999]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter..." className="h-[18px] w-[150px] pl-4 pr-1 text-[10px] bg-[#ffffff] border border-[#b8c4d4] outline-none focus:border-[#2563eb]" />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div style={{ height: topHeight }} className="flex-shrink-0 overflow-auto bg-[#ffffff]">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-[11px] text-[#666]"><Loader2 className="h-4 w-4 animate-spin mr-1" />Loading...</div>
-        ) : (
-          <table className="w-full border-collapse" data-testid="table-invoices">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-[#dce3ed]">
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Invoice #</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Customer</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Issue Date</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Due Date</th>
-                <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Status</th>
-                <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Total</th>
-                <th className="text-center text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.map((inv, i) => (
-                <tr
-                  key={inv.id}
-                  onClick={() => setSelectedId(inv.id)}
-                  className={`cursor-pointer ${selectedId === inv.id ? "bg-[#cce4f7]" : i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7]`}
-                  data-testid={`invoice-${inv.id}`}
-                >
-                  <td className="text-[11px] text-[#1e1e1e] font-medium py-[2px] px-2 border border-[#b8c4d4]">{inv.invoiceNumber}</td>
-                  <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">{inv.customerName || "—"}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.issueDate).toLocaleDateString()}</td>
-                  <td className="text-[11px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{new Date(inv.dueDate).toLocaleDateString()}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={inv.status} /></td>
-                  <td className="text-[11px] text-[#1e1e1e] font-semibold py-[2px] px-2 border border-[#b8c4d4] text-right">${Number(inv.total).toFixed(2)}</td>
-                  <td className="py-[2px] px-2 border border-[#b8c4d4] text-center">
-                    {inv.status === "draft" && (
-                      <button onClick={(e) => { e.stopPropagation(); handleApprove(inv); }} className="text-[#1e7b34] hover:underline text-[10px] mr-1 font-medium" data-testid={`button-approve-invoice-${inv.id}`}>Approve</button>
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(inv.id, inv.invoiceNumber); }} className="text-[#2563eb] hover:underline text-[10px] mr-1" data-testid={`button-download-pdf-${inv.id}`} title="Download PDF">PDF</button>
-                    <button onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); setShowModal(true); }} className="text-[#2563eb] hover:underline text-[10px] mr-1">Edit</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="text-[#c42b1c] hover:underline text-[10px]">Del</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <DraggableDivider onDrag={onDrag} />
-
-      {/* Detail panel */}
-      <div className="flex-1 overflow-auto bg-[#ffffff] p-2">
-        {selectedInvoice ? (
-          <div>
-            <div className="text-[11px] font-semibold text-[#1e1e1e] mb-1 border-b border-[#b8c4d4] pb-1">Invoice Details - {selectedInvoice.invoiceNumber}</div>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-[2px] text-[11px]">
-              <div><span className="text-[#666]">Customer:</span> <span className="text-[#1e1e1e] font-medium">{selectedInvoice.customerName || "—"}</span></div>
-              <div><span className="text-[#666]">Status:</span> <StatusBadge status={selectedInvoice.status} /></div>
-              <div><span className="text-[#666]">Issue Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</span></div>
-              <div><span className="text-[#666]">Due Date:</span> <span className="text-[#1e1e1e]">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</span></div>
-              <div><span className="text-[#666]">Subtotal:</span> <span className="text-[#1e1e1e]">${Number(selectedInvoice.subtotal).toFixed(2)}</span></div>
-              <div><span className="text-[#666]">Tax:</span> <span className="text-[#1e1e1e]">${Number(selectedInvoice.tax).toFixed(2)}</span></div>
-              <div><span className="text-[#666]">Total:</span> <span className="text-[#1e1e1e] font-semibold">${Number(selectedInvoice.total).toFixed(2)}</span></div>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading...</div>
+      ) : (
+        <>
+          <AdminTable
+            data={invoices}
+            columns={columns}
+            onRowClick={(row) => setSelectedId(row.id)}
+            searchPlaceholder="Search invoices..."
+            searchKeys={["invoiceNumber", "customerName"]}
+            selectedId={selectedId}
+            getRowId={(row) => row.id}
+            rowTestIdPrefix="invoice"
+            actions={
+              <div className="flex items-center gap-2">
+                <button onClick={handleRunBilling} disabled={billingRunning} className={btnSecondary} data-testid="button-run-billing">
+                  {billingRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}Run Billing
+                </button>
+                <button onClick={() => { setEditingInvoice(null); setShowModal(true); }} className={btnPrimary} data-testid="button-new-invoice">
+                  <Plus className="w-4 h-4" />New Invoice
+                </button>
+              </div>
+            }
+            className="flex-1"
+          />
+          {selectedInvoice && (
+            <div className="border-t border-slate-200 bg-white p-5 flex-shrink-0 max-h-[200px] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Invoice Details — {selectedInvoice.invoiceNumber}</h3>
+                <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
+                <div><span className="text-slate-500">Customer:</span> <span className="text-slate-900 ml-1 font-medium">{selectedInvoice.customerName || "—"}</span></div>
+                <div><span className="text-slate-500">Status:</span> <StatusBadge status={selectedInvoice.status} showDot /></div>
+                <div><span className="text-slate-500">Issue Date:</span> <span className="text-slate-900 ml-1">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</span></div>
+                <div><span className="text-slate-500">Due Date:</span> <span className="text-slate-900 ml-1">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</span></div>
+                <div><span className="text-slate-500">Subtotal:</span> <span className="text-slate-900 ml-1">${Number(selectedInvoice.subtotal).toFixed(2)}</span></div>
+                <div><span className="text-slate-500">Tax:</span> <span className="text-slate-900 ml-1">${Number(selectedInvoice.tax).toFixed(2)}</span></div>
+                <div><span className="text-slate-500">Total:</span> <span className="text-slate-900 ml-1 font-semibold">${Number(selectedInvoice.total).toFixed(2)}</span></div>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-[11px] text-[#666] italic">Select an invoice to view details</div>
-        )}
-      </div>
-
-      <InvoiceModal
-        open={showModal}
-        onOpenChange={setShowModal}
-        editingInvoice={editingInvoice}
-        customers={customers}
-        token={token}
-        onSuccess={() => { setShowModal(false); loadInvoices(); }}
-      />
+          )}
+        </>
+      )}
+      <InvoiceModal open={showModal} onOpenChange={setShowModal} editingInvoice={editingInvoice} customers={customers} token={token} onSuccess={() => { setShowModal(false); loadInvoices(); }} />
     </div>
   );
 }
 
-type BillingSettingsData = {
-  id?: string;
-  invoicePrefix: string;
-  nextInvoiceNumber: number;
-  paymentTerms: string;
-  billingEmailSubject: string;
-  billingEmailTemplate: string;
-  invitationEmailSubject: string;
-  invitationEmailTemplate: string;
-};
-
-const BILLING_PLACEHOLDERS = [
-  { var: "{{customerName}}", desc: "Customer company name" },
-  { var: "{{invoiceNumber}}", desc: "Invoice number" },
-  { var: "{{totalAmount}}", desc: "Invoice total" },
-  { var: "{{dueDate}}", desc: "Payment due date" },
-  { var: "{{issueDate}}", desc: "Invoice issue date" },
-  { var: "{{itemCount}}", desc: "Number of line items" },
-];
-
-const INVITATION_PLACEHOLDERS = [
-  { var: "{{userName}}", desc: "User full name" },
-  { var: "{{userEmail}}", desc: "User email address" },
-  { var: "{{companyName}}", desc: "Company name" },
-  { var: "{{portalUrl}}", desc: "Portal login URL" },
-];
-
-function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: { token: string | null; tickets: any[]; filter: string; deptFilter: string; userId: string; onRefresh: () => void }) {
+function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: {
+  token: string | null; tickets: any[]; filter: string; deptFilter: string; userId: string; onRefresh: () => void;
+}) {
   const { toast } = useToast();
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [ticketDetail, setTicketDetail] = useState<any | null>(null);
@@ -2354,22 +1634,20 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
   const [creating, setCreating] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [updatingField, setUpdatingField] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
 
   useEffect(() => {
     fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
+    fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : []).then(users => setAdminUsers(users.filter((u: any) => u.role === "admin"))).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    setTicketDetail(null);
-    setSelectedTicket(null);
-  }, [filter, deptFilter]);
+  useEffect(() => { setTicketDetail(null); setSelectedTicket(null); }, [filter, deptFilter]);
 
   const filteredTickets = useMemo(() => {
     let result = tickets;
-    if (deptFilter && deptFilter !== "all") {
-      result = result.filter(t => t.category === deptFilter);
-    }
+    if (deptFilter && deptFilter !== "all") result = result.filter(t => t.category === deptFilter);
     if (filter === "all") return result;
     if (filter === "mine") return result.filter(t => String(t.assignedTo) === String(userId));
     if (filter === "unassigned") return result.filter(t => !t.assignedTo);
@@ -2389,15 +1667,10 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
     setSending(true);
     try {
       const res = await fetch(`/api/tickets/${ticketDetail.id}/replies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ body: replyBody, isInternal: replyInternal }),
       });
-      if (res.ok) {
-        setReplyBody(""); setReplyInternal(false);
-        loadTicketDetail(ticketDetail.id); onRefresh();
-        toast({ title: replyInternal ? "Internal note added" : "Reply sent" });
-      }
+      if (res.ok) { setReplyBody(""); setReplyInternal(false); loadTicketDetail(ticketDetail.id); onRefresh(); toast({ title: replyInternal ? "Internal note added" : "Reply sent" }); }
     } catch {} finally { setSending(false); }
   }
 
@@ -2408,8 +1681,7 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
       const body: any = {};
       body[field] = field === "assignedTo" ? (value === "unassigned" ? null : parseInt(value)) : value;
       const res = await fetch(`/api/tickets/${ticketDetail.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
       if (res.ok) { loadTicketDetail(ticketDetail.id); onRefresh(); toast({ title: `Ticket ${field} updated` }); }
@@ -2421,260 +1693,207 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
     setCreating(true);
     try {
       const res = await fetch("/api/tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(newTicket),
       });
-      if (res.ok) {
-        setShowNewModal(false); setNewTicket({ subject: "", body: "", category: "general", priority: "normal", customerId: "" });
-        onRefresh(); toast({ title: "Ticket created" });
-      }
+      if (res.ok) { setShowNewModal(false); setNewTicket({ subject: "", body: "", category: "general", priority: "normal", customerId: "" }); onRefresh(); toast({ title: "Ticket created" }); }
     } catch {} finally { setCreating(false); }
   }
-
-  const [adminUsers, setAdminUsers] = useState<any[]>([]);
-  useEffect(() => {
-    fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : []).then(users => setAdminUsers(users.filter((u: any) => u.role === "admin"))).catch(() => {});
-  }, []);
 
   if (ticketDetail) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="h-[28px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0">
-          <button onClick={() => { setTicketDetail(null); setSelectedTicket(null); }} className="text-[10px] text-[#2563eb] hover:underline mr-2" data-testid="button-back-tickets">&larr; Back to Queue</button>
-          <span className="text-[11px] font-semibold text-[#1e1e1e]">Ticket #{ticketDetail.id}: {ticketDetail.subject}</span>
+        <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0 gap-3">
+          <button onClick={() => { setTicketDetail(null); setSelectedTicket(null); }} className="text-sm text-blue-600 hover:text-blue-700 font-medium" data-testid="button-back-tickets">&larr; Back to Queue</button>
+          <div className="h-5 w-px bg-slate-200" />
+          <span className="text-sm font-semibold text-slate-900">Ticket #{ticketDetail.id}: {ticketDetail.subject}</span>
           <div className="flex-1" />
           <StatusBadge status={ticketDetail.priority} />
-          <span className="mx-1" />
-          <StatusBadge status={ticketDetail.status} />
+          <StatusBadge status={ticketDetail.status} showDot />
         </div>
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-auto p-2">
-              <div className="bg-[#ffffff] border border-[#b8c4d4] p-3 mb-2">
-                <div className="text-[10px] text-[#666] mb-1">
-                  Opened by {ticketDetail.creatorName || "Unknown"} ({ticketDetail.customerName || "Unknown"}) &middot; {new Date(ticketDetail.createdAt).toLocaleString()}
+            <div className="flex-1 overflow-auto p-5">
+              <div className="bg-white border border-slate-200 rounded-lg p-4 mb-3 shadow-sm">
+                <div className="text-xs text-slate-500 mb-2">
+                  Opened by <span className="font-medium text-slate-700">{ticketDetail.creatorName || "Unknown"}</span> ({ticketDetail.customerName || "Unknown"}) &middot; {new Date(ticketDetail.createdAt).toLocaleString()}
                 </div>
-                <div className="text-[11px] text-[#1e1e1e] whitespace-pre-wrap">{ticketDetail.body}</div>
+                <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{ticketDetail.body}</div>
               </div>
               {ticketDetail.replies?.map((reply: any) => (
-                <div key={reply.id} className={`border p-3 mb-1 ${reply.isInternal ? "bg-[#fff9e6] border-[#e8c840]" : "bg-[#ffffff] border-[#b8c4d4]"}`}>
-                  <div className="flex items-center gap-1 mb-1">
-                    <span className="text-[10px] font-semibold text-[#1e1e1e]">{reply.authorName || "Unknown"}</span>
-                    {reply.isInternal && <span className="text-[9px] bg-[#e8c840] text-[#5a4600] px-[3px] font-medium">INTERNAL NOTE</span>}
-                    {reply.authorRole === "admin" && <span className="text-[9px] bg-[#2563eb] text-white px-[3px]">Staff</span>}
-                    <span className="text-[9px] text-[#888]">{new Date(reply.createdAt).toLocaleString()}</span>
+                <div key={reply.id} className={`border rounded-lg p-4 mb-2 shadow-sm ${reply.isInternal ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-slate-900">{reply.authorName || "Unknown"}</span>
+                    {reply.isInternal && <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">INTERNAL NOTE</span>}
+                    {reply.authorRole === "admin" && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-medium">Staff</span>}
+                    <span className="text-xs text-slate-400">{new Date(reply.createdAt).toLocaleString()}</span>
                   </div>
-                  <div className="text-[11px] text-[#1e1e1e] whitespace-pre-wrap">{reply.body}</div>
+                  <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{reply.body}</div>
                 </div>
               ))}
             </div>
-            <div className="border-t border-[#b8c4d4] p-2 bg-[#f0f2f5] flex-shrink-0">
+            <div className="border-t border-slate-200 p-4 bg-slate-50 flex-shrink-0">
               <textarea
                 value={replyBody}
                 onChange={(e) => setReplyBody(e.target.value)}
                 placeholder={replyInternal ? "Add internal note (not visible to customer)..." : "Type your reply..."}
-                className={`w-full h-[60px] text-[11px] p-2 border outline-none resize-none ${replyInternal ? "bg-[#fff9e6] border-[#e8c840]" : "bg-[#ffffff] border-[#b8c4d4]"} focus:border-[#2563eb]`}
+                className={`w-full h-20 text-[13px] p-3 border rounded-md outline-none resize-none ${replyInternal ? "bg-amber-50 border-amber-200 focus:border-amber-400" : "bg-white border-slate-200 focus:border-blue-400"} focus:ring-1 focus:ring-blue-100`}
                 data-testid="input-ticket-reply"
               />
-              <div className="flex items-center gap-2 mt-1">
-                <label className="flex items-center gap-1 text-[10px] text-[#666] cursor-pointer">
-                  <input type="checkbox" checked={replyInternal} onChange={(e) => setReplyInternal(e.target.checked)} className="accent-[#e8c840]" />
+              <div className="flex items-center gap-3 mt-2">
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={replyInternal} onChange={(e) => setReplyInternal(e.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" />
                   Internal Note
                 </label>
                 <div className="flex-1" />
-                <button
-                  onClick={handleReply}
-                  disabled={!replyBody.trim() || sending}
-                  className="flex items-center gap-1 px-3 py-[3px] bg-[#2563eb] text-white text-[10px] font-medium hover:bg-[#1d4ed8] disabled:opacity-50"
-                  data-testid="button-send-reply"
-                >
-                  <Send className="h-[10px] w-[10px]" />
+                <button onClick={handleReply} disabled={!replyBody.trim() || sending} className={btnPrimary} data-testid="button-send-reply">
+                  <Send className="w-4 h-4" />
                   {sending ? "Sending..." : replyInternal ? "Add Note" : "Send Reply"}
                 </button>
               </div>
             </div>
           </div>
-          <div className="w-[180px] bg-[#f0f2f5] border-l border-[#b8c4d4] p-2 overflow-auto flex-shrink-0">
-            <div className="text-[10px] font-semibold text-[#1e1e1e] mb-2">Ticket Properties</div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Status</div>
-              <select
-                value={ticketDetail.status}
-                onChange={(e) => handleUpdateTicket("status", e.target.value)}
-                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
-                data-testid="select-ticket-status"
-              >
-                {["new", "open", "in_progress", "waiting", "resolved", "closed"].map(s => (
-                  <option key={s} value={s}>{s.replace("_", " ")}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Priority</div>
-              <select
-                value={ticketDetail.priority}
-                onChange={(e) => handleUpdateTicket("priority", e.target.value)}
-                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
-                data-testid="select-ticket-priority"
-              >
-                {["low", "normal", "high", "urgent"].map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Assigned To</div>
-              <select
-                value={ticketDetail.assignedTo || "unassigned"}
-                onChange={(e) => handleUpdateTicket("assignedTo", e.target.value)}
-                className="w-full text-[10px] px-1 py-[2px] border border-[#b8c4d4] bg-[#ffffff] outline-none"
-                data-testid="select-ticket-assignee"
-              >
-                <option value="unassigned">Unassigned</option>
-                {adminUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name || u.username}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Category</div>
-              <div className="text-[10px] text-[#1e1e1e] capitalize">{ticketDetail.category?.replace("_", " ") || "—"}</div>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Customer</div>
-              <div className="text-[10px] text-[#1e1e1e]">{ticketDetail.customerName || "—"}</div>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Created</div>
-              <div className="text-[10px] text-[#666]">{new Date(ticketDetail.createdAt).toLocaleString()}</div>
-            </div>
-            <div className="mb-2">
-              <div className="text-[9px] text-[#666] uppercase mb-[2px]">Updated</div>
-              <div className="text-[10px] text-[#666]">{new Date(ticketDetail.updatedAt).toLocaleString()}</div>
-            </div>
-            {ticketDetail.closedAt && (
-              <div className="mb-2">
-                <div className="text-[9px] text-[#666] uppercase mb-[2px]">Closed</div>
-                <div className="text-[10px] text-[#666]">{new Date(ticketDetail.closedAt).toLocaleString()}</div>
+          <div className="w-56 bg-white border-l border-slate-200 p-4 overflow-auto flex-shrink-0">
+            <h4 className="text-sm font-semibold text-slate-900 mb-4">Properties</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Status</label>
+                <select value={ticketDetail.status} onChange={(e) => handleUpdateTicket("status", e.target.value)}
+                  className="w-full text-sm px-2.5 py-1.5 border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400" data-testid="select-ticket-status">
+                  {["new", "open", "in_progress", "waiting", "resolved", "closed"].map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                </select>
               </div>
-            )}
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Priority</label>
+                <select value={ticketDetail.priority} onChange={(e) => handleUpdateTicket("priority", e.target.value)}
+                  className="w-full text-sm px-2.5 py-1.5 border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400" data-testid="select-ticket-priority">
+                  {["low", "normal", "high", "urgent"].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Assigned To</label>
+                <select value={ticketDetail.assignedTo || "unassigned"} onChange={(e) => handleUpdateTicket("assignedTo", e.target.value)}
+                  className="w-full text-sm px-2.5 py-1.5 border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400" data-testid="select-ticket-assignee">
+                  <option value="unassigned">Unassigned</option>
+                  {adminUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Category</label>
+                <div className="text-sm text-slate-700 capitalize">{ticketDetail.category?.replace("_", " ") || "—"}</div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Customer</label>
+                <div className="text-sm text-slate-700">{ticketDetail.customerName || "—"}</div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Created</label>
+                <div className="text-xs text-slate-500">{new Date(ticketDetail.createdAt).toLocaleString()}</div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Updated</label>
+                <div className="text-xs text-slate-500">{new Date(ticketDetail.updatedAt).toLocaleString()}</div>
+              </div>
+              {ticketDetail.closedAt && (
+                <div>
+                  <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Closed</label>
+                  <div className="text-xs text-slate-500">{new Date(ticketDetail.closedAt).toLocaleString()}</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  const ticketColumns: ColumnDef<any>[] = [
+    { key: "id", label: "#", width: "60px", sortable: true, render: (row) => <span className="text-slate-500">{row.id}</span> },
+    { key: "subject", label: "Subject", sortable: true, render: (row) => <span className="font-medium text-slate-900">{row.subject}</span> },
+    { key: "customerName", label: "Customer", sortable: true, render: (row) => <span>{row.customerName || "—"}</span> },
+    { key: "category", label: "Category", sortable: true, render: (row) => <span className="capitalize">{row.category?.replace("_", " ") || "—"}</span> },
+    { key: "priority", label: "Priority", render: (row) => <StatusBadge status={row.priority} /> },
+    { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} showDot /> },
+    { key: "assigneeName", label: "Owner", sortable: true, render: (row) => <span>{row.assigneeName || "Unassigned"}</span> },
+    { key: "updatedAt", label: "Updated", align: "right", sortable: true, render: (row) => <span className="text-slate-500">{new Date(row.updatedAt).toLocaleDateString()}</span> },
+  ];
+
+  const queueTitle = deptFilter !== "all"
+    ? `${deptFilter === "smart_hands" ? "SmartHands" : deptFilter.charAt(0).toUpperCase() + deptFilter.slice(1)} Queue`
+    : "All Queues";
+  const filterSuffix = filter !== "all"
+    ? ` — ${filter === "mine" ? "My Tickets" : filter === "unassigned" ? "Unassigned" : filter.replace("_", " ")}`
+    : "";
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="h-[28px] bg-[#f0f2f5] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0">
-        <span className="text-[11px] font-semibold text-[#1e1e1e]">
-          {deptFilter !== "all" ? `${deptFilter === "smart_hands" ? "SmartHands" : deptFilter.charAt(0).toUpperCase() + deptFilter.slice(1)} Queue` : "All Queues"}
-          {filter !== "all" ? ` — ${filter === "mine" ? "My Tickets" : filter === "unassigned" ? "Unassigned" : filter.replace("_", " ")}` : ""}
-          {` (${filteredTickets.length})`}
-        </span>
-        <div className="flex-1" />
-        <button onClick={() => setShowNewModal(true)} className="flex items-center gap-1 px-2 py-[2px] bg-[#2563eb] text-white text-[10px] font-medium hover:bg-[#1d4ed8]" data-testid="button-new-ticket">
-          <Plus className="h-[10px] w-[10px]" />
-          New Ticket
-        </button>
-      </div>
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse" data-testid="table-admin-tickets">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-[#dce3ed]">
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[40px]">#</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4]">Subject</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[120px]">Customer</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[70px]">Category</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[60px]">Priority</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[70px]">Status</th>
-              <th className="text-left text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[90px]">Assigned To</th>
-              <th className="text-right text-[10px] font-semibold text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] w-[80px]">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTickets.length === 0 && (
-              <tr><td colSpan={8} className="text-center text-[11px] text-[#666] py-4 italic">No tickets match this filter</td></tr>
-            )}
-            {filteredTickets.map((t, i) => (
-              <tr
-                key={t.id}
-                onClick={() => loadTicketDetail(t.id)}
-                className={`${i % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f0f2f7]"} hover:bg-[#d4e4f7] cursor-pointer`}
-                data-testid={`row-admin-ticket-${t.id}`}
-              >
-                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.id}</td>
-                <td className="text-[11px] text-[#1e1e1e] py-[2px] px-2 border border-[#b8c4d4] font-medium">{t.subject}</td>
-                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.customerName || "—"}</td>
-                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] capitalize">{t.category?.replace("_", " ") || "—"}</td>
-                <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.priority} /></td>
-                <td className="py-[2px] px-2 border border-[#b8c4d4]"><StatusBadge status={t.status} /></td>
-                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4]">{t.assigneeName || "Unassigned"}</td>
-                <td className="text-[10px] text-[#666] py-[2px] px-2 border border-[#b8c4d4] text-right">{new Date(t.updatedAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <AdminTable
+        data={filteredTickets}
+        columns={ticketColumns}
+        onRowClick={(row) => loadTicketDetail(row.id)}
+        searchPlaceholder="Search tickets..."
+        searchKeys={["subject", "customerName", "assigneeName"]}
+        getRowId={(row) => row.id}
+        rowTestIdPrefix="ticket"
+        emptyMessage="No tickets match this filter"
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-700">{queueTitle}{filterSuffix} ({filteredTickets.length})</span>
+            <button onClick={() => setShowNewModal(true)} className={btnPrimary} data-testid="button-new-ticket">
+              <Plus className="w-4 h-4" />New Ticket
+            </button>
+          </div>
+        }
+        className="flex-1"
+      />
 
       <Dialog open={showNewModal} onOpenChange={setShowNewModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[13px]">New Support Ticket</DialogTitle>
-            <DialogDescription className="text-[10px]">Create a ticket on behalf of a customer</DialogDescription>
+            <DialogTitle>New Support Ticket</DialogTitle>
+            <DialogDescription>Create a ticket on behalf of a customer</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
+              <label className="text-xs text-slate-500 block mb-1">Customer</label>
               <select value={newTicket.customerId} onChange={(e) => setNewTicket(p => ({ ...p, customerId: e.target.value }))}
-                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-customer">
+                className={inputCls} data-testid="select-new-ticket-customer">
                 <option value="">Select customer...</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
+              <label className="text-xs text-slate-500 block mb-1">Subject</label>
               <input value={newTicket.subject} onChange={(e) => setNewTicket(p => ({ ...p, subject: e.target.value }))}
-                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="input-new-ticket-subject" />
+                className={inputCls} data-testid="input-new-ticket-subject" />
             </div>
             <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Description</label>
+              <label className="text-xs text-slate-500 block mb-1">Description</label>
               <textarea value={newTicket.body} onChange={(e) => setNewTicket(p => ({ ...p, body: e.target.value }))}
-                className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none h-[80px] resize-none" data-testid="input-new-ticket-body" />
+                className="w-full text-[13px] px-3 py-2 border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 h-24 resize-none" data-testid="input-new-ticket-body" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <div className="flex-1">
-                <label className="text-[10px] text-[#666] block mb-[2px]">Category</label>
+                <label className="text-xs text-slate-500 block mb-1">Category</label>
                 <select value={newTicket.category} onChange={(e) => setNewTicket(p => ({ ...p, category: e.target.value }))}
-                  className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-category">
-                  <option value="support">Support</option>
-                  <option value="sales">Sales</option>
-                  <option value="billing">Billing</option>
-                  <option value="provisioning">Provisioning</option>
-                  <option value="smart_hands">SmartHands</option>
-                  <option value="abuse">Abuse</option>
+                  className={inputCls} data-testid="select-new-ticket-category">
+                  <option value="support">Support</option><option value="sales">Sales</option>
+                  <option value="billing">Billing</option><option value="provisioning">Provisioning</option>
+                  <option value="smart_hands">SmartHands</option><option value="abuse">Abuse</option>
                   <option value="general">General</option>
                 </select>
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-[#666] block mb-[2px]">Priority</label>
+                <label className="text-xs text-slate-500 block mb-1">Priority</label>
                 <select value={newTicket.priority} onChange={(e) => setNewTicket(p => ({ ...p, priority: e.target.value }))}
-                  className="w-full text-[11px] px-2 py-1 border border-[#b8c4d4] outline-none" data-testid="select-new-ticket-priority">
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
+                  className={inputCls} data-testid="select-new-ticket-priority">
+                  <option value="low">Low</option><option value="normal">Normal</option>
+                  <option value="high">High</option><option value="urgent">Urgent</option>
                 </select>
               </div>
             </div>
-            <button
-              onClick={handleCreateTicket}
-              disabled={!newTicket.subject.trim() || !newTicket.customerId || creating}
-              className="w-full py-1 bg-[#2563eb] text-white text-[11px] font-medium hover:bg-[#1d4ed8] disabled:opacity-50"
-              data-testid="button-create-ticket"
-            >
+            <button onClick={handleCreateTicket} disabled={!newTicket.subject.trim() || !newTicket.customerId || creating}
+              className={`w-full ${btnPrimary} justify-center`} data-testid="button-create-ticket">
               {creating ? "Creating..." : "Create Ticket"}
             </button>
           </div>
@@ -2684,19 +1903,37 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
   );
 }
 
+type BillingSettingsData = {
+  id?: string; invoicePrefix: string; nextInvoiceNumber: number; paymentTerms: string;
+  billingEmailSubject: string; billingEmailTemplate: string;
+  invitationEmailSubject: string; invitationEmailTemplate: string;
+};
+
+const BILLING_PLACEHOLDERS = [
+  { var: "{{customerName}}", desc: "Customer company name" },
+  { var: "{{invoiceNumber}}", desc: "Invoice number" },
+  { var: "{{totalAmount}}", desc: "Invoice total" },
+  { var: "{{dueDate}}", desc: "Payment due date" },
+  { var: "{{issueDate}}", desc: "Invoice issue date" },
+  { var: "{{itemCount}}", desc: "Number of line items" },
+];
+
+const INVITATION_PLACEHOLDERS = [
+  { var: "{{userName}}", desc: "User full name" },
+  { var: "{{userEmail}}", desc: "User email address" },
+  { var: "{{companyName}}", desc: "Company name" },
+  { var: "{{portalUrl}}", desc: "Portal login URL" },
+];
+
 function SettingsView({ token }: { token: string | null }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"billing" | "email">("billing");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<BillingSettingsData>({
-    invoicePrefix: "INV",
-    nextInvoiceNumber: 1,
-    paymentTerms: "Net 30",
-    billingEmailSubject: "",
-    billingEmailTemplate: "",
-    invitationEmailSubject: "",
-    invitationEmailTemplate: "",
+    invoicePrefix: "INV", nextInvoiceNumber: 1, paymentTerms: "Net 30",
+    billingEmailSubject: "", billingEmailTemplate: "",
+    invitationEmailSubject: "", invitationEmailTemplate: "",
   });
   const [previewType, setPreviewType] = useState<"billing" | "invitation" | null>(null);
 
@@ -2704,15 +1941,9 @@ function SettingsView({ token }: { token: string | null }) {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/billing-settings", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to load settings", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) setSettings(await res.json());
+    } catch { toast({ title: "Error", description: "Failed to load settings", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { loadSettings(); }, []);
@@ -2721,234 +1952,131 @@ function SettingsView({ token }: { token: string | null }) {
     setSaving(true);
     try {
       const res = await fetch("/api/admin/billing-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          invoicePrefix: settings.invoicePrefix,
-          nextInvoiceNumber: settings.nextInvoiceNumber,
-          paymentTerms: settings.paymentTerms,
-          billingEmailSubject: settings.billingEmailSubject,
-          billingEmailTemplate: settings.billingEmailTemplate,
-          invitationEmailSubject: settings.invitationEmailSubject,
+          invoicePrefix: settings.invoicePrefix, nextInvoiceNumber: settings.nextInvoiceNumber,
+          paymentTerms: settings.paymentTerms, billingEmailSubject: settings.billingEmailSubject,
+          billingEmailTemplate: settings.billingEmailTemplate, invitationEmailSubject: settings.invitationEmailSubject,
           invitationEmailTemplate: settings.invitationEmailTemplate,
         }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setSettings(updated);
-        toast({ title: "Settings saved" });
-      } else {
-        const err = await res.json();
-        toast({ title: "Error", description: err.error || "Failed to save settings", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
+      if (res.ok) { const updated = await res.json(); setSettings(updated); toast({ title: "Settings saved" }); }
+      else { const err = await res.json(); toast({ title: "Error", description: err.error || "Failed to save settings", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save settings", variant: "destructive" }); }
+    finally { setSaving(false); }
   }
 
   function renderPreview(template: string, type: "billing" | "invitation") {
     let result = template;
     if (type === "billing") {
-      result = result.replace(/\{\{customerName\}\}/g, "Acme Corp")
-        .replace(/\{\{invoiceNumber\}\}/g, `${settings.invoicePrefix}-001`)
-        .replace(/\{\{totalAmount\}\}/g, "1,250.00")
-        .replace(/\{\{dueDate\}\}/g, "01/15/2025")
-        .replace(/\{\{issueDate\}\}/g, "12/15/2024")
-        .replace(/\{\{itemCount\}\}/g, "3");
+      result = result.replace(/\{\{customerName\}\}/g, "Acme Corp").replace(/\{\{invoiceNumber\}\}/g, `${settings.invoicePrefix}-001`)
+        .replace(/\{\{totalAmount\}\}/g, "1,250.00").replace(/\{\{dueDate\}\}/g, "01/15/2025")
+        .replace(/\{\{issueDate\}\}/g, "12/15/2024").replace(/\{\{itemCount\}\}/g, "3");
     } else {
-      result = result.replace(/\{\{userName\}\}/g, "John Smith")
-        .replace(/\{\{userEmail\}\}/g, "john@acme.com")
-        .replace(/\{\{companyName\}\}/g, "Acme Corp")
-        .replace(/\{\{portalUrl\}\}/g, "https://portal.911dc.us");
+      result = result.replace(/\{\{userName\}\}/g, "John Smith").replace(/\{\{userEmail\}\}/g, "john@acme.com")
+        .replace(/\{\{companyName\}\}/g, "Acme Corp").replace(/\{\{portalUrl\}\}/g, "https://portal.911dc.us");
     }
     return result;
   }
 
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
-
   if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-[11px] text-[#666]" data-testid="settings-view">
-        <Loader2 className="h-4 w-4 animate-spin mr-1" />Loading settings...
-      </div>
-    );
+    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm" data-testid="settings-view"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading settings...</div>;
   }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" data-testid="settings-view">
-      <div className="h-[24px] bg-[#eef1f6] border-b border-[#b8c4d4] flex items-center px-2 flex-shrink-0 gap-2">
-        <button
-          onClick={() => setActiveTab("billing")}
-          className={`px-2 h-[18px] text-[10px] border border-b-0 ${activeTab === "billing" ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4]" : "bg-[#dce3ed] text-[#666] border-[#b8c4d4] hover:bg-[#c8d3e3]"}`}
-          data-testid="tab-billing-settings"
-        >
-          Billing
-        </button>
-        <button
-          onClick={() => setActiveTab("email")}
-          className={`px-2 h-[18px] text-[10px] border border-b-0 ${activeTab === "email" ? "bg-[#ffffff] text-[#1e1e1e] font-medium border-[#b8c4d4]" : "bg-[#dce3ed] text-[#666] border-[#b8c4d4] hover:bg-[#c8d3e3]"}`}
-          data-testid="tab-email-templates"
-        >
-          Email Templates
-        </button>
+      <div className="bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0">
+        <div className="flex gap-1">
+          <button onClick={() => setActiveTab("billing")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "billing" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            data-testid="tab-billing-settings">Billing</button>
+          <button onClick={() => setActiveTab("email")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            data-testid="tab-email-templates">Email Templates</button>
+        </div>
         <div className="flex-1" />
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-[3px] text-[10px] text-white bg-[#2563eb] hover:bg-[#1d4ed8] px-2 py-[1px] border border-[#2563eb] disabled:opacity-50"
-          data-testid="button-save-settings"
-        >
-          {saving ? <Loader2 className="h-[10px] w-[10px] animate-spin" /> : <Save className="h-[10px] w-[10px]" />}
-          Save Settings
+        <button onClick={handleSave} disabled={saving} className={btnPrimary} data-testid="button-save-settings">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Save Settings
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto bg-[#ffffff] p-3">
+      <div className="flex-1 overflow-auto p-6">
         {activeTab === "billing" && (
-          <div className="max-w-lg space-y-3" data-testid="billing-settings-panel">
-            <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1">Invoice Configuration</div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Invoice Prefix</label>
-                <input
-                  value={settings.invoicePrefix}
-                  onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })}
-                  className={inputCls}
-                  data-testid="input-invoice-prefix"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Next Invoice Number</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={settings.nextInvoiceNumber}
-                  onChange={(e) => setSettings({ ...settings, nextInvoiceNumber: parseInt(e.target.value) || 1 })}
-                  className={inputCls}
-                  data-testid="input-next-invoice-number"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#666] block mb-[2px]">Payment Terms</label>
-                <input
-                  value={settings.paymentTerms}
-                  onChange={(e) => setSettings({ ...settings, paymentTerms: e.target.value })}
-                  className={inputCls}
-                  data-testid="input-payment-terms"
-                />
-              </div>
+          <div className="max-w-xl space-y-4" data-testid="billing-settings-panel">
+            <h3 className="text-base font-semibold text-slate-900">Invoice Configuration</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div><label className="text-xs text-slate-500 block mb-1">Invoice Prefix</label>
+                <input value={settings.invoicePrefix} onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })} className={inputCls} data-testid="input-invoice-prefix" /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Next Invoice Number</label>
+                <input type="number" min={1} value={settings.nextInvoiceNumber} onChange={(e) => setSettings({ ...settings, nextInvoiceNumber: parseInt(e.target.value) || 1 })} className={inputCls} data-testid="input-next-invoice-number" /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Payment Terms</label>
+                <input value={settings.paymentTerms} onChange={(e) => setSettings({ ...settings, paymentTerms: e.target.value })} className={inputCls} data-testid="input-payment-terms" /></div>
             </div>
-            <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2 text-[10px] text-[#666]">
-              <span className="font-semibold text-[#1e1e1e]">Preview:</span> Next invoice will be numbered <span className="font-mono font-semibold text-[#1e1e1e]">{settings.invoicePrefix}-{String(settings.nextInvoiceNumber).padStart(3, "0")}</span>
+            <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm text-slate-600">
+              <span className="font-semibold text-slate-900">Preview:</span> Next invoice will be numbered <code className="font-mono font-semibold text-blue-600">{settings.invoicePrefix}-{String(settings.nextInvoiceNumber).padStart(3, "0")}</code>
             </div>
           </div>
         )}
-
         {activeTab === "email" && (
-          <div className="space-y-4" data-testid="email-templates-panel">
+          <div className="max-w-2xl space-y-6" data-testid="email-templates-panel">
             <div>
-              <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-2 flex items-center justify-between">
-                <span>Billing Email Template</span>
-                <button
-                  onClick={() => setPreviewType(previewType === "billing" ? null : "billing")}
-                  className="text-[10px] text-[#2563eb] hover:underline flex items-center gap-1"
-                  data-testid="button-preview-billing-email"
-                >
-                  <Eye className="h-[10px] w-[10px]" />
-                  {previewType === "billing" ? "Hide Preview" : "Preview"}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-slate-900">Billing Email Template</h3>
+                <button onClick={() => setPreviewType(previewType === "billing" ? null : "billing")}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="button-preview-billing-email">
+                  <Eye className="w-4 h-4" />{previewType === "billing" ? "Hide Preview" : "Preview"}
                 </button>
               </div>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
-                  <input
-                    value={settings.billingEmailSubject}
-                    onChange={(e) => setSettings({ ...settings, billingEmailSubject: e.target.value })}
-                    className={inputCls}
-                    data-testid="input-billing-email-subject"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Body Template</label>
-                  <textarea
-                    value={settings.billingEmailTemplate}
-                    onChange={(e) => setSettings({ ...settings, billingEmailTemplate: e.target.value })}
-                    rows={8}
-                    className="w-full px-1 py-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb] font-mono resize-y"
-                    data-testid="textarea-billing-email-template"
-                  />
-                </div>
-                <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2">
-                  <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Available Placeholders</div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-[2px]">
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Subject</label>
+                  <input value={settings.billingEmailSubject} onChange={(e) => setSettings({ ...settings, billingEmailSubject: e.target.value })} className={inputCls} data-testid="input-billing-email-subject" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Body Template</label>
+                  <textarea value={settings.billingEmailTemplate} onChange={(e) => setSettings({ ...settings, billingEmailTemplate: e.target.value })} rows={8}
+                    className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 font-mono resize-y" data-testid="textarea-billing-email-template" /></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {BILLING_PLACEHOLDERS.map((p) => (
-                      <span key={p.var} className="text-[10px]">
-                        <code className="font-mono text-[#2563eb] bg-[#e8f0fe] px-[3px]">{p.var}</code>
-                        <span className="text-[#666] ml-1">{p.desc}</span>
-                      </span>
+                      <span key={p.var} className="text-sm"><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{p.var}</code> <span className="text-slate-500">{p.desc}</span></span>
                     ))}
                   </div>
                 </div>
                 {previewType === "billing" && (
-                  <div className="border border-[#b8c4d4] bg-[#fafafa] p-2" data-testid="preview-billing-email">
-                    <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Preview (sample data)</div>
-                    <div className="text-[10px] text-[#1e1e1e] font-medium mb-1">Subject: {renderPreview(settings.billingEmailSubject, "billing")}</div>
-                    <pre className="text-[10px] text-[#1e1e1e] whitespace-pre-wrap font-sans">{renderPreview(settings.billingEmailTemplate, "billing")}</pre>
+                  <div className="border border-slate-200 bg-white rounded-md p-4" data-testid="preview-billing-email">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Preview (sample data)</div>
+                    <div className="text-sm text-slate-900 font-medium mb-1">Subject: {renderPreview(settings.billingEmailSubject, "billing")}</div>
+                    <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{renderPreview(settings.billingEmailTemplate, "billing")}</pre>
                   </div>
                 )}
               </div>
             </div>
-
             <div>
-              <div className="text-[12px] font-semibold text-[#1e1e1e] border-b border-[#b8c4d4] pb-1 mb-2 flex items-center justify-between">
-                <span>Invitation Email Template</span>
-                <button
-                  onClick={() => setPreviewType(previewType === "invitation" ? null : "invitation")}
-                  className="text-[10px] text-[#2563eb] hover:underline flex items-center gap-1"
-                  data-testid="button-preview-invitation-email"
-                >
-                  <Eye className="h-[10px] w-[10px]" />
-                  {previewType === "invitation" ? "Hide Preview" : "Preview"}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-slate-900">Invitation Email Template</h3>
+                <button onClick={() => setPreviewType(previewType === "invitation" ? null : "invitation")}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="button-preview-invitation-email">
+                  <Eye className="w-4 h-4" />{previewType === "invitation" ? "Hide Preview" : "Preview"}
                 </button>
               </div>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Subject</label>
-                  <input
-                    value={settings.invitationEmailSubject}
-                    onChange={(e) => setSettings({ ...settings, invitationEmailSubject: e.target.value })}
-                    className={inputCls}
-                    data-testid="input-invitation-email-subject"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#666] block mb-[2px]">Body Template</label>
-                  <textarea
-                    value={settings.invitationEmailTemplate}
-                    onChange={(e) => setSettings({ ...settings, invitationEmailTemplate: e.target.value })}
-                    rows={8}
-                    className="w-full px-1 py-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb] font-mono resize-y"
-                    data-testid="textarea-invitation-email-template"
-                  />
-                </div>
-                <div className="bg-[#f0f2f7] border border-[#b8c4d4] p-2">
-                  <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Available Placeholders</div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-[2px]">
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Subject</label>
+                  <input value={settings.invitationEmailSubject} onChange={(e) => setSettings({ ...settings, invitationEmailSubject: e.target.value })} className={inputCls} data-testid="input-invitation-email-subject" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Body Template</label>
+                  <textarea value={settings.invitationEmailTemplate} onChange={(e) => setSettings({ ...settings, invitationEmailTemplate: e.target.value })} rows={8}
+                    className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 font-mono resize-y" data-testid="textarea-invitation-email-template" /></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {INVITATION_PLACEHOLDERS.map((p) => (
-                      <span key={p.var} className="text-[10px]">
-                        <code className="font-mono text-[#2563eb] bg-[#e8f0fe] px-[3px]">{p.var}</code>
-                        <span className="text-[#666] ml-1">{p.desc}</span>
-                      </span>
+                      <span key={p.var} className="text-sm"><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{p.var}</code> <span className="text-slate-500">{p.desc}</span></span>
                     ))}
                   </div>
                 </div>
                 {previewType === "invitation" && (
-                  <div className="border border-[#b8c4d4] bg-[#fafafa] p-2" data-testid="preview-invitation-email">
-                    <div className="text-[9px] font-semibold text-[#666] uppercase tracking-wider mb-1">Preview (sample data)</div>
-                    <div className="text-[10px] text-[#1e1e1e] font-medium mb-1">Subject: {renderPreview(settings.invitationEmailSubject, "invitation")}</div>
-                    <pre className="text-[10px] text-[#1e1e1e] whitespace-pre-wrap font-sans">{renderPreview(settings.invitationEmailTemplate, "invitation")}</pre>
+                  <div className="border border-slate-200 bg-white rounded-md p-4" data-testid="preview-invitation-email">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Preview (sample data)</div>
+                    <div className="text-sm text-slate-900 font-medium mb-1">Subject: {renderPreview(settings.invitationEmailSubject, "invitation")}</div>
+                    <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{renderPreview(settings.invitationEmailTemplate, "invitation")}</pre>
                   </div>
                 )}
               </div>
@@ -2961,50 +2089,33 @@ function SettingsView({ token }: { token: string | null }) {
 }
 
 function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, onSuccess }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editingInvoice: InvoiceData | null;
-  customers: CustomerOption[];
-  token: string | null;
-  onSuccess: () => void;
+  open: boolean; onOpenChange: (open: boolean) => void; editingInvoice: InvoiceData | null;
+  customers: CustomerOption[]; token: string | null; onSuccess: () => void;
 }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    userId: "",
-    invoiceNumber: "",
-    status: "draft",
+    userId: "", invoiceNumber: "", status: "draft",
     issueDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    subtotal: "",
-    tax: "0",
-    total: "",
+    subtotal: "", tax: "0", total: "",
   });
 
   useEffect(() => {
     if (open) {
       if (editingInvoice) {
         setFormData({
-          userId: editingInvoice.userId,
-          invoiceNumber: editingInvoice.invoiceNumber,
-          status: editingInvoice.status,
+          userId: editingInvoice.userId, invoiceNumber: editingInvoice.invoiceNumber, status: editingInvoice.status,
           issueDate: new Date(editingInvoice.issueDate).toISOString().split("T")[0],
           dueDate: new Date(editingInvoice.dueDate).toISOString().split("T")[0],
-          subtotal: editingInvoice.subtotal,
-          tax: editingInvoice.tax,
-          total: editingInvoice.total,
+          subtotal: editingInvoice.subtotal, tax: editingInvoice.tax, total: editingInvoice.total,
         });
       } else {
-        const nextNum = `INV-${Date.now().toString().slice(-6)}`;
         setFormData({
-          userId: customers[0]?.id || "",
-          invoiceNumber: nextNum,
-          status: "draft",
+          userId: customers[0]?.id || "", invoiceNumber: `INV-${Date.now().toString().slice(-6)}`, status: "draft",
           issueDate: new Date().toISOString().split("T")[0],
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          subtotal: "",
-          tax: "0",
-          total: "",
+          subtotal: "", tax: "0", total: "",
         });
       }
     }
@@ -3023,93 +2134,55 @@ function InvoiceModal({ open, onOpenChange, editingInvoice, customers, token, on
       const url = editingInvoice ? `/api/admin/invoices/${editingInvoice.id}` : "/api/admin/invoices";
       const method = editingInvoice ? "PUT" : "POST";
       const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...formData, issueDate: new Date(formData.issueDate), dueDate: new Date(formData.dueDate) }),
       });
-      if (res.ok) {
-        toast({ title: "Success", description: editingInvoice ? "Invoice updated" : "Invoice created" });
-        onSuccess();
-      } else {
-        const data = await res.json();
-        toast({ title: "Error", description: data.error || "Failed to save invoice", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Failed to save invoice", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { toast({ title: "Success", description: editingInvoice ? "Invoice updated" : "Invoice created" }); onSuccess(); }
+      else { const data = await res.json(); toast({ title: "Error", description: data.error || "Failed to save invoice", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save invoice", variant: "destructive" }); }
+    finally { setLoading(false); }
   }
-
-  const inputCls = "w-full h-[22px] px-1 text-[11px] border border-[#b8c4d4] bg-[#ffffff] outline-none focus:border-[#2563eb]";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg !rounded-none !border !border-[#b8c4d4] !shadow-none !p-0">
-        <div className="bg-[#eef1f6] border-b border-[#b8c4d4] px-3 py-[6px]">
-          <DialogTitle className="text-[12px] font-semibold text-[#1e1e1e]">{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
-          <DialogDescription className="text-[10px] text-[#666]">
-            {editingInvoice ? "Update invoice details" : "Create a new customer invoice"}
-          </DialogDescription>
-        </div>
-        <form onSubmit={handleSubmit} className="p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Customer</label>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          <DialogDescription>{editingInvoice ? "Update invoice details" : "Create a new customer invoice"}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Customer</label>
               <Select value={formData.userId} onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent className="!rounded-none border-[#b8c4d4]">
-                  {customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>)}
-                </SelectContent>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <SelectContent>{customers.filter(c => c.id).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Invoice Number</label>
-              <input value={formData.invoiceNumber} onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })} className={inputCls} required />
-            </div>
+            <div><label className="text-xs text-slate-500 block mb-1">Invoice Number</label>
+              <input value={formData.invoiceNumber} onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })} className={inputCls} required /></div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Issue Date</label>
-              <input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className={inputCls} required />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Due Date</label>
-              <input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className={inputCls} required />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Issue Date</label><input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className={inputCls} required /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Due Date</label><input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className={inputCls} required /></div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Subtotal ($)</label>
-              <input type="number" step="0.01" value={formData.subtotal} onChange={(e) => setFormData({ ...formData, subtotal: e.target.value })} className={inputCls} required />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Tax ($)</label>
-              <input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#666] block mb-[2px]">Total ($)</label>
-              <input value={formData.total} className={`${inputCls} bg-[#eef1f6]`} readOnly />
-            </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className="text-xs text-slate-500 block mb-1">Subtotal ($)</label><input type="number" step="0.01" value={formData.subtotal} onChange={(e) => setFormData({ ...formData, subtotal: e.target.value })} className={inputCls} required /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Tax ($)</label><input type="number" step="0.01" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className={inputCls} /></div>
+            <div><label className="text-xs text-slate-500 block mb-1">Total ($)</label><input value={formData.total} className={`${inputCls} bg-slate-50`} readOnly /></div>
           </div>
-          <div>
-            <label className="text-[10px] text-[#666] block mb-[2px]">Status</label>
+          <div><label className="text-xs text-slate-500 block mb-1">Status</label>
             <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-              <SelectTrigger className="h-[22px] text-[11px] !rounded-none border-[#b8c4d4]"><SelectValue /></SelectTrigger>
-              <SelectContent className="!rounded-none border-[#b8c4d4]">
-                <SelectItem value="draft" className="text-[11px]">Draft</SelectItem>
-                <SelectItem value="pending" className="text-[11px]">Pending</SelectItem>
-                <SelectItem value="open" className="text-[11px]">Open</SelectItem>
-                <SelectItem value="paid" className="text-[11px]">Paid</SelectItem>
-                <SelectItem value="past_due" className="text-[11px]">Past Due</SelectItem>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem><SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="open">Open</SelectItem><SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="past_due">Past Due</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-1 pt-1 border-t border-[#b8c4d4]">
-            <button type="button" onClick={() => onOpenChange(false)} className="px-3 h-[22px] text-[11px] border border-[#b8c4d4] bg-[#dce3ed] hover:bg-[#c8d3e3] text-[#1e1e1e]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-3 h-[22px] text-[11px] border border-[#2563eb] bg-[#2563eb] hover:bg-[#1d4ed8] text-white">
-              {loading ? "Saving..." : editingInvoice ? "Update" : "Create"}
-            </button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={loading} className={btnPrimary}>{loading ? "Saving..." : editingInvoice ? "Update" : "Create"}</button>
           </div>
         </form>
       </DialogContent>

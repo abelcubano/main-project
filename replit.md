@@ -149,17 +149,24 @@ The database schema is shared between frontend and backend through the `shared/`
 - **Customer portal**: Time range selector (6h, 24h, 7d, 30d), auto-constructs iframe src from config
 
 ### Admin Portal UI Style
-- **Design**: Native desktop application aesthetic (pgAdmin/SSMS/Ubersmith-inspired dark navy)
-- **Navigation**: Ubersmith-style section buttons in menu bar: Clients, Support, Devices, Orders, Sales, Settings — each section activates contextual tab bar and sidebar
+- **Design**: Modern Ubersmith-inspired SaaS platform with clean, professional aesthetic
+- **Component Library**: 4 reusable admin components in `client/src/components/admin/`:
+  - `AdminLayout.tsx` — App shell: 48px dark navy top nav (#0f172a), 220px collapsible sidebar (#1e293b), breadcrumb bar, responsive mobile menu
+  - `AdminCard.tsx` — Card component with accent-colored top border, KpiRow for metric display
+  - `AdminTable.tsx` — Data table with search, sortable columns, alternating rows, pagination footer, domain-specific row test IDs
+  - `StatusBadge.tsx` — Colored pill badges for statuses, priorities, and roles
+- **Navigation**: Top nav section buttons (Clients, Support, Devices, Orders, Sales, Settings) with active highlight. Contextual sidebar per section with collapsible groups and badge counts.
   - **Clients**: Customers list, Users list
-  - **Support**: Ticket queue with filters (All, New, Open, In Progress, Waiting, Resolved, My Tickets, Unassigned), ticket detail with reply thread and internal notes
+  - **Support**: Ticket queue with department filters, status filters, assignment filters — ticket detail with reply thread and internal notes
   - **Devices**: Placeholder for future device management
   - **Orders**: Services list
   - **Sales**: Invoices list
   - **Settings**: Billing config, email templates
-- **Layout**: Menu bar (22px), tab bar (26px), breadcrumb (18px), tree sidebar (140px), draggable split panels, status bar (18px)
-- **Colors**: Menu bar #1b2a4a, tab bar #243656, sidebar #2c3e5a, sidebar text #c8d6e5, active nav #3b82f6, breadcrumb #f0f2f5, content bg #eef1f6, panels #ffffff, table headers #dce3ed, borders #b8c4d4, text #1e1e1e, accent #2563eb, hover rows #d4e4f7, alt rows #f0f2f7, status bar #1b2a4a
-- **Density**: 10-12px fonts, 18-22px table rows, 1px borders, no rounded corners/shadows, alternating row colors
+- **Dashboard**: 6 manager cards (Client, Support, Device, Billing, Orders, Infrastructure) with real KPI data and navigation CTAs. Recent open tickets table.
+- **Layout**: Top nav (48px), breadcrumb bar (32px), sidebar (220px collapsible to 48px), content area (slate-100 bg)
+- **Colors**: Top nav #0f172a, sidebar #1e293b, content bg slate-100, cards white with subtle shadows, active nav blue-600, text slate-900/700/500, accent blue-600
+- **Typography**: 13-14px body text, 11px table headers (uppercase tracking), clean spacing with Tailwind utility classes
+- **Responsive**: Mobile hamburger menu for section switching, sidebar collapse button in top nav on small screens, cards stack on mobile
 
 ### Ticketing System
 - **Tables**: tickets + ticket_replies (UUID primary keys)
