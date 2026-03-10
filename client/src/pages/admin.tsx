@@ -364,25 +364,37 @@ export default function AdminPage() {
           { icon: Building2, label: "All Customers", id: "customers", active: currentView === "customers", onClick: () => setCurrentView("customers") },
           { icon: Users, label: "All Users", id: "users", active: currentView === "users", badge: allUsers.length || undefined, onClick: () => setCurrentView("users") },
         ]}];
-      case "support":
+      case "support": {
+        const statuses = [
+          { key: "new", label: "New" },
+          { key: "open", label: "Open" },
+          { key: "in_progress", label: "In Progress" },
+          { key: "waiting", label: "Waiting" },
+          { key: "resolved", label: "Resolved" },
+        ];
+        function statusSubItems(deptKey: string) {
+          const deptTickets = deptKey === "all" ? allTickets : allTickets.filter(t => t.category === deptKey);
+          return statuses.map(s => ({
+            label: s.label,
+            id: `dept-${deptKey}-status-${s.key}`,
+            badge: deptTickets.filter(t => t.status === s.key).length || undefined,
+            active: ticketDeptFilter === deptKey && ticketQueueFilter === s.key,
+            onClick: () => { setTicketDeptFilter(deptKey); setTicketQueueFilter(s.key); setCurrentView("tickets"); },
+          }));
+        }
         return [
           { title: "Queues", items: ticketDepts.map(d => ({
             icon: d.icon, label: d.label, id: `dept-${d.key}`, badge: deptCount(d.key) || undefined,
             active: ticketDeptFilter === d.key && !["new","open","in_progress","waiting","resolved","mine","unassigned"].includes(ticketQueueFilter),
             onClick: () => { setTicketDeptFilter(d.key); setTicketQueueFilter("all"); setCurrentView("tickets"); },
+            subItems: statusSubItems(d.key),
           }))},
-          { title: "Status", collapsible: true, items: [
-            { icon: Bell, label: "New", id: "filter-new", badge: allTickets.filter(t => t.status === "new").length || undefined, active: ticketQueueFilter === "new", onClick: () => { setTicketQueueFilter("new"); setCurrentView("tickets"); } },
-            { icon: Activity, label: "Open", id: "filter-open", badge: allTickets.filter(t => t.status === "open").length || undefined, active: ticketQueueFilter === "open", onClick: () => { setTicketQueueFilter("open"); setCurrentView("tickets"); } },
-            { icon: Loader2, label: "In Progress", id: "filter-in-progress", badge: allTickets.filter(t => t.status === "in_progress").length || undefined, active: ticketQueueFilter === "in_progress", onClick: () => { setTicketQueueFilter("in_progress"); setCurrentView("tickets"); } },
-            { icon: Bell, label: "Waiting", id: "filter-waiting", badge: allTickets.filter(t => t.status === "waiting").length || undefined, active: ticketQueueFilter === "waiting", onClick: () => { setTicketQueueFilter("waiting"); setCurrentView("tickets"); } },
-            { icon: Shield, label: "Resolved", id: "filter-resolved", active: ticketQueueFilter === "resolved", onClick: () => { setTicketQueueFilter("resolved"); setCurrentView("tickets"); } },
-          ]},
           { title: "Assignment", collapsible: true, items: [
             { icon: Users, label: "My Tickets", id: "filter-mine", active: ticketQueueFilter === "mine", onClick: () => { setTicketQueueFilter("mine"); setCurrentView("tickets"); } },
             { icon: HardHat, label: "Unassigned", id: "filter-unassigned", badge: allTickets.filter(t => !t.assignedTo).length || undefined, active: ticketQueueFilter === "unassigned", onClick: () => { setTicketQueueFilter("unassigned"); setCurrentView("tickets"); } },
           ]},
         ];
+      }
       case "devices":
         return [{ title: "Devices", items: [
           { icon: Server, label: "All Devices", id: "devices", active: currentView === "devices", badge: allDevices.length || undefined, onClick: () => setCurrentView("devices") },

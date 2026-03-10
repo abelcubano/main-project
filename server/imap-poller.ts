@@ -193,13 +193,6 @@ async function processEmail(parsed: any, settings: BillingSettings) {
     }
   }
 
-  const user = await findActiveUserByEmail(fromAddress);
-  if (!user) {
-    log(`Email from unknown/inactive address ${fromAddress}: "${subject}" — skipping`);
-    if (messageId) await markProcessed(messageId);
-    return;
-  }
-
   const body = cleanReplyBody(textBody);
   if (!body.trim()) {
     log(`Empty body from ${fromAddress}: "${subject}" — skipping`);
@@ -212,29 +205,55 @@ async function processEmail(parsed: any, settings: BillingSettings) {
     .replace(/\[(?:Ticket|New Ticket)\s*#\d+\]\s*/gi, "")
     .trim() || "(No Subject)";
 
+  const user = await findActiveUserByEmail(fromAddress);
+  const senderName = parsed.from?.value?.[0]?.name || fromAddress;
+
+  let ticketUserId: string;
+  let ticketCustomerId: string | null = null;
+  let ticketCategory: string;
+  let ticketBody: string;
+
+  if (user) {
+    ticketUserId = user.id;
+    ticketCustomerId = user.customerId || null;
+    ticketCategory = "support";
+    ticketBody = body;
+  } else {
+    const allAdminUsers = await storage.getAllUsers();
+    const fallbackAdmin = allAdminUsers.find(u => u.role === "admin" && u.active !== false);
+    if (!fallbackAdmin) {
+      log(`No admin user available to assign ticket from unknown sender ${fromAddress} — skipping`);
+      if (messageId) await markProcessed(messageId);
+      return;
+    }
+    ticketUserId = fallbackAdmin.id;
+    ticketCategory = "general";
+    ticketBody = `From: ${senderName} <${fromAddress}>\n\n${body}`;
+  }
+
   const ticket = await storage.createTicket({
-    userId: user.id,
-    customerId: user.customerId || null,
+    userId: ticketUserId,
+    customerId: ticketCustomerId,
     subject: cleanSubject,
-    body,
-    category: "support",
+    body: ticketBody,
+    category: ticketCategory,
     priority: "normal",
   });
 
   if (messageId) await markProcessed(messageId);
 
-  log(`Created ticket #${ticket.ticketNumber} from ${fromAddress}: "${cleanSubject}"`);
+  log(`Created ticket #${ticket.ticketNumber} from ${fromAddress}: "${cleanSubject}"${user ? "" : " (unknown sender → General queue)"}`);
 
   try {
     const supportAddr = settings.supportEmailAddress || "info@911dc.us";
-    const customer = user.customerId ? await storage.getCustomer(user.customerId) : null;
+    const customer = ticketCustomerId ? await storage.getCustomer(ticketCustomerId) : null;
     await sendTicketNotificationEmail({
       recipientEmail: supportAddr,
       ticketNumber: ticket.ticketNumber,
       subject: ticket.subject,
-      replyBody: body,
-      replyAuthor: user.name || fromAddress,
-      customerName: customer?.name || user.companyName || "Unknown",
+      replyBody: ticketBody,
+      replyAuthor: user?.name || senderName,
+      customerName: customer?.name || user?.companyName || "Unknown",
       isNewTicket: true,
     }, settings);
   } catch (err: any) {

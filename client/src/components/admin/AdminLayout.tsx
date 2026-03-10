@@ -39,6 +39,14 @@ const sectionLabels: Record<AdminSection, string> = {
   settings: "Settings",
 };
 
+export type SidebarSubItem = {
+  label: string;
+  id: string;
+  badge?: number;
+  active?: boolean;
+  onClick?: () => void;
+};
+
 export type SidebarItem = {
   icon: LucideIcon;
   label: string;
@@ -46,6 +54,8 @@ export type SidebarItem = {
   badge?: number;
   active?: boolean;
   onClick?: () => void;
+  subItems?: SidebarSubItem[];
+  expanded?: boolean;
 };
 
 export type SidebarGroup = {
@@ -254,32 +264,62 @@ export function AdminLayout({
                   )}
                   {!isCollapsed && group.items.map(item => {
                     const Icon = item.icon;
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = item.expanded || item.active || item.subItems?.some(s => s.active);
                     return (
-                      <button
-                        key={item.id}
-                        onClick={item.onClick}
-                        className={cn(
-                          "w-full flex items-center gap-2 text-[13px] transition-colors",
-                          sidebarCollapsed ? "px-3 py-2 justify-center" : "px-4 py-[6px]",
-                          item.active
-                            ? "bg-blue-600/20 text-blue-400 font-medium border-r-2 border-blue-500"
-                            : "text-slate-400 hover:text-white hover:bg-white/5"
+                      <div key={item.id}>
+                        <button
+                          onClick={item.onClick}
+                          className={cn(
+                            "w-full flex items-center gap-2 text-[13px] transition-colors",
+                            sidebarCollapsed ? "px-3 py-2 justify-center" : "px-4 py-[6px]",
+                            item.active
+                              ? "bg-blue-600/20 text-blue-400 font-medium border-r-2 border-blue-500"
+                              : "text-slate-400 hover:text-white hover:bg-white/5"
+                          )}
+                          data-testid={`nav-${item.id}`}
+                          title={sidebarCollapsed ? item.label : undefined}
+                        >
+                          <Icon className="w-4 h-4 flex-shrink-0" />
+                          {!sidebarCollapsed && (
+                            <>
+                              <span className="flex-1 truncate text-left">{item.label}</span>
+                              {item.badge != null && item.badge > 0 && (
+                                <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-px rounded-full font-medium">
+                                  {item.badge}
+                                </span>
+                              )}
+                              {hasSubItems && (
+                                <ChevronRight className={cn("w-3 h-3 text-slate-500 transition-transform", isExpanded && "rotate-90")} />
+                              )}
+                            </>
+                          )}
+                        </button>
+                        {hasSubItems && isExpanded && !sidebarCollapsed && (
+                          <div className="ml-4 border-l border-slate-700/50">
+                            {item.subItems!.map(sub => (
+                              <button
+                                key={sub.id}
+                                onClick={sub.onClick}
+                                className={cn(
+                                  "w-full flex items-center gap-2 text-[12px] pl-4 pr-4 py-[4px] transition-colors",
+                                  sub.active
+                                    ? "text-blue-400 font-medium"
+                                    : "text-slate-500 hover:text-slate-300"
+                                )}
+                                data-testid={`nav-${sub.id}`}
+                              >
+                                <span className="flex-1 truncate text-left">{sub.label}</span>
+                                {sub.badge != null && sub.badge > 0 && (
+                                  <span className="text-[10px] bg-slate-700/80 text-slate-400 px-1.5 py-px rounded-full font-medium">
+                                    {sub.badge}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         )}
-                        data-testid={`nav-${item.id}`}
-                        title={sidebarCollapsed ? item.label : undefined}
-                      >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        {!sidebarCollapsed && (
-                          <>
-                            <span className="flex-1 truncate text-left">{item.label}</span>
-                            {item.badge != null && item.badge > 0 && (
-                              <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-px rounded-full font-medium">
-                                {item.badge}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
