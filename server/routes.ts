@@ -1,5 +1,40 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import https from "https";
+
+const tlsTolerantAgent = new https.Agent({ rejectUnauthorized: false });
+
+async function fetchTolerant(url: string, options: RequestInit & { headers?: Record<string, string> } = {}): Promise<Response> {
+  if (url.startsWith("https://")) {
+    const urlObj = new URL(url);
+    return new Promise((resolve, reject) => {
+      const reqOptions: https.RequestOptions = {
+        hostname: urlObj.hostname,
+        port: urlObj.port || 443,
+        path: urlObj.pathname + urlObj.search,
+        method: options.method || "GET",
+        headers: options.headers || {},
+        agent: tlsTolerantAgent,
+      };
+      const req = https.request(reqOptions, (res) => {
+        let body = "";
+        res.on("data", (chunk) => body += chunk);
+        res.on("end", () => {
+          resolve({
+            ok: res.statusCode! >= 200 && res.statusCode! < 300,
+            status: res.statusCode!,
+            json: async () => JSON.parse(body),
+            text: async () => body,
+          } as unknown as Response);
+        });
+      });
+      req.on("error", reject);
+      if (options.body) req.write(options.body);
+      req.end();
+    });
+  }
+  return fetch(url, options);
+}
 import { JSDOM } from "jsdom";
 import createDOMPurify from "dompurify";
 import { storage } from "./storage";
@@ -1922,7 +1957,7 @@ export async function registerRoutes(
       const settings = await storage.getBillingSettings();
       if (!settings.grafanaUrl) return res.json({ success: false, message: "Grafana URL not configured" });
       const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/health`;
-      const response = await fetch(url, {
+      const response = await fetchTolerant(url, {
         headers: settings.grafanaApiKey ? { Authorization: `Bearer ${settings.grafanaApiKey}` } : {},
       });
       if (response.ok) {
@@ -1942,7 +1977,7 @@ export async function registerRoutes(
       const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/search?type=dash-db`;
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (settings.grafanaApiKey) headers["Authorization"] = `Bearer ${settings.grafanaApiKey}`;
-      const response = await fetch(url, { headers });
+      const response = await fetchTolerant(url, { headers });
       if (!response.ok) return res.json([]);
       const dashboards = await response.json();
       res.json((dashboards as any[]).map((d: any) => ({
@@ -1965,7 +2000,7 @@ export async function registerRoutes(
       const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/dashboards/uid/${uid}`;
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (settings.grafanaApiKey) headers["Authorization"] = `Bearer ${settings.grafanaApiKey}`;
-      const response = await fetch(url, { headers });
+      const response = await fetchTolerant(url, { headers });
       if (!response.ok) return res.json([]);
       const data = await response.json() as any;
       const panels = (data.dashboard?.panels || []).map((p: any) => ({
