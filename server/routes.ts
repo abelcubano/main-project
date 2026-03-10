@@ -22,7 +22,7 @@ import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema
 import { getPduPortStatus, rebootPduPort } from "./snmp";
 import { startImapPoller, stopImapPoller, pollMailbox } from "./imap-poller";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
-import { searchZabbixHosts, getZabbixPortStatuses, getZabbixPowerData, testZabbixConnection, isZabbixConfigured } from "./zabbix";
+import { searchZabbixHosts, getZabbixPortStatuses, getZabbixPowerData, testZabbixConnection, isZabbixConfigured, getZabbixAllHosts, getZabbixHostItems, getZabbixItemValues } from "./zabbix";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -1877,20 +1877,106 @@ export async function registerRoutes(
   });
 
   // Zabbix API routes
-  app.get("/api/admin/zabbix/hosts", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+  app.get("/api/admin/zabbix/hosts", requireAuth, requireAdmin, async (req, res) => {
     try {
       const query = (req.query.search as string) || "";
-      if (!query) return res.json([]);
-      const hosts = await searchZabbixHosts(query);
+      if (query) {
+        const hosts = await searchZabbixHosts(query);
+        return res.json(hosts);
+      }
+      const hosts = await getZabbixAllHosts();
       res.json(hosts);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to search Zabbix hosts" });
+      res.status(500).json({ error: "Failed to fetch Zabbix hosts" });
     }
   });
 
   app.get("/api/admin/zabbix/test", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
     const result = await testZabbixConnection();
     res.json(result);
+  });
+
+  app.get("/api/admin/zabbix/host/:hostId/items", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const hostId = Array.isArray(req.params.hostId) ? req.params.hostId[0] : req.params.hostId;
+      const items = await getZabbixHostItems(hostId);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch Zabbix items" });
+    }
+  });
+
+  app.get("/api/admin/zabbix/items", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const ids = typeof req.query.ids === "string" ? req.query.ids.split(",").filter(Boolean) : [];
+      if (ids.length === 0) return res.json([]);
+      const items = await getZabbixItemValues(ids);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch Zabbix item values" });
+    }
+  });
+
+  app.get("/api/admin/grafana/test", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      if (!settings.grafanaUrl) return res.json({ success: false, message: "Grafana URL not configured" });
+      const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/health`;
+      const response = await fetch(url, {
+        headers: settings.grafanaApiKey ? { Authorization: `Bearer ${settings.grafanaApiKey}` } : {},
+      });
+      if (response.ok) {
+        res.json({ success: true, message: "Connected to Grafana" });
+      } else {
+        res.json({ success: false, message: `Grafana responded with status ${response.status}` });
+      }
+    } catch (error: any) {
+      res.json({ success: false, message: `Failed to connect: ${error.message}` });
+    }
+  });
+
+  app.get("/api/admin/grafana/dashboards", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      if (!settings.grafanaUrl) return res.json([]);
+      const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/search?type=dash-db`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (settings.grafanaApiKey) headers["Authorization"] = `Bearer ${settings.grafanaApiKey}`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) return res.json([]);
+      const dashboards = await response.json();
+      res.json((dashboards as any[]).map((d: any) => ({
+        uid: d.uid,
+        title: d.title,
+        url: d.url,
+        type: d.type,
+        tags: d.tags || [],
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch dashboards" });
+    }
+  });
+
+  app.get("/api/admin/grafana/dashboard/:uid/panels", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      if (!settings.grafanaUrl) return res.json([]);
+      const uid = Array.isArray(req.params.uid) ? req.params.uid[0] : req.params.uid;
+      const url = `${settings.grafanaUrl.replace(/\/$/, "")}/api/dashboards/uid/${uid}`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (settings.grafanaApiKey) headers["Authorization"] = `Bearer ${settings.grafanaApiKey}`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) return res.json([]);
+      const data = await response.json() as any;
+      const panels = (data.dashboard?.panels || []).map((p: any) => ({
+        id: p.id,
+        title: p.title || `Panel ${p.id}`,
+        type: p.type,
+      }));
+      res.json(panels);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch panels" });
+    }
   });
 
   app.get("/api/admin/zabbix/host/:hostId/ports", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
@@ -1913,7 +1999,6 @@ export async function registerRoutes(
     }
   });
 
-  // Customer portal: device port status and power (from Zabbix) - by device ID
   app.get("/api/devices/:id/port-status", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -1922,9 +2007,23 @@ export async function registerRoutes(
       if (req.user.role !== "admin" && device.customerId !== req.user.customerId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      if (!device.zabbixHostId) return res.json([]);
+      if (!device.zabbixHostId) return res.json({ items: [], mode: "none" });
+      if (device.zabbixItems) {
+        try {
+          const configured = JSON.parse(device.zabbixItems);
+          if (Array.isArray(configured) && configured.length > 0) {
+            const itemIds = configured.map((i: any) => i.itemId);
+            const values = await getZabbixItemValues(itemIds);
+            const enriched = values.map((v: any) => {
+              const cfg = configured.find((c: any) => c.itemId === v.itemId);
+              return { ...v, type: cfg?.type || "other", label: cfg?.label || v.name };
+            });
+            return res.json({ items: enriched, mode: "selected" });
+          }
+        } catch {}
+      }
       const portStatuses = await getZabbixPortStatuses(device.zabbixHostId);
-      res.json(portStatuses);
+      res.json({ items: portStatuses, mode: "all" });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch port status" });
     }
@@ -1946,20 +2045,48 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/portal/config", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      res.json({ grafanaUrl: settings?.grafanaUrl || null });
+    } catch { res.json({ grafanaUrl: null }); }
+  });
+
   // Customer portal: service-scoped monitoring (resolves service → devices with Zabbix)
   app.get("/api/services/:id/port-status", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const allDevices = await storage.getAllDevices();
-      const serviceDevices = allDevices.filter(d => d.serviceId === serviceId && d.zabbixHostId);
+      let serviceDevices = allDevices.filter(d => d.serviceId === serviceId && d.zabbixHostId);
       if (req.user.role !== "admin") {
-        const customerDevices = serviceDevices.filter(d => d.customerId === req.user.customerId);
-        if (customerDevices.length === 0) return res.json([]);
-        const results = await Promise.all(customerDevices.map(d => getZabbixPortStatuses(d.zabbixHostId!)));
-        return res.json(results.flat());
+        serviceDevices = serviceDevices.filter(d => d.customerId === req.user.customerId);
       }
-      const results = await Promise.all(serviceDevices.map(d => getZabbixPortStatuses(d.zabbixHostId!)));
-      res.json(results.flat());
+      if (serviceDevices.length === 0) return res.json({ items: [], mode: "none" });
+
+      const allItems: any[] = [];
+      for (const device of serviceDevices) {
+        if (device.zabbixItems) {
+          try {
+            const configured = JSON.parse(device.zabbixItems);
+            if (Array.isArray(configured) && configured.length > 0) {
+              const itemIds = configured.map((i: any) => i.itemId);
+              const values = await getZabbixItemValues(itemIds);
+              const enriched = values.map((v: any) => {
+                const cfg = configured.find((c: any) => c.itemId === v.itemId);
+                return { ...v, type: cfg?.type || "other", label: cfg?.label || v.name, deviceName: device.name };
+              });
+              allItems.push(...enriched);
+              continue;
+            }
+          } catch {}
+        }
+        const portStatuses = await getZabbixPortStatuses(device.zabbixHostId!);
+        allItems.push(...portStatuses.map((p: any) => ({ ...p, deviceName: device.name })));
+      }
+      const hasConfiguredItems = serviceDevices.some(d => {
+        try { const items = JSON.parse(d.zabbixItems || "[]"); return Array.isArray(items) && items.length > 0; } catch { return false; }
+      });
+      res.json({ items: allItems, mode: hasConfiguredItems ? "selected" : "all" });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch port status" });
     }

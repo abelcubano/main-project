@@ -187,6 +187,8 @@ export const billingSettings = pgTable("billing_settings", {
   ticketFromAddresses: text("ticket_from_addresses").notNull().default("[]"),
   zabbixUrl: text("zabbix_url"),
   zabbixApiToken: text("zabbix_api_token"),
+  grafanaUrl: text("grafana_url"),
+  grafanaApiKey: text("grafana_api_key"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -344,6 +346,7 @@ export const devices = pgTable("devices", {
   grafanaPowerDashboardUid: text("grafana_power_dashboard_uid"),
   grafanaPowerPanelId: text("grafana_power_panel_id"),
   zabbixHostId: text("zabbix_host_id"),
+  zabbixItems: text("zabbix_items"),
   tags: text("tags"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

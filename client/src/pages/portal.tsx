@@ -140,10 +140,11 @@ function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: typeof L
 
 type PortalView = "dashboard" | "services" | "network" | "invoices" | "tickets" | "settings";
 
-function GrafanaPanel({ service }: { service: Service }) {
+function GrafanaPanel({ service, globalGrafanaUrl }: { service: Service; globalGrafanaUrl?: string }) {
   const [timeRange, setTimeRange] = useState("24h");
 
-  if (!service.grafanaUrl || !service.grafanaDashboardUid || !service.grafanaPanelId) {
+  const grafanaBaseUrl = globalGrafanaUrl || service.grafanaUrl;
+  if (!grafanaBaseUrl || !service.grafanaDashboardUid || !service.grafanaPanelId) {
     return null;
   }
 
@@ -155,7 +156,7 @@ function GrafanaPanel({ service }: { service: Service }) {
   };
 
   const range = timeRanges[timeRange];
-  let src = `${service.grafanaUrl}/d-solo/${service.grafanaDashboardUid}?panelId=${service.grafanaPanelId}&from=${range.from}&to=${range.to}&theme=light`;
+  let src = `${grafanaBaseUrl}/d-solo/${service.grafanaDashboardUid}?panelId=${service.grafanaPanelId}&from=${range.from}&to=${range.to}&theme=light`;
   if (service.grafanaOrgId) src += `&orgId=${service.grafanaOrgId}`;
   if (service.grafanaVar) src += `&var-host=${encodeURIComponent(service.grafanaVar)}`;
 
@@ -191,6 +192,7 @@ function GrafanaPanel({ service }: { service: Service }) {
           frameBorder="0"
           className="block"
           title={`Traffic graph for ${service.name}`}
+          allow="fullscreen"
           data-testid={`iframe-grafana-${service.id}`}
         />
       </div>
@@ -331,7 +333,7 @@ function PduControls({ service, token, canManage }: { service: Service; token: s
 }
 
 function DeviceMonitoringWidgets({ serviceId, token }: { serviceId: string; token: string | null }) {
-  const [portStatus, setPortStatus] = useState<any[]>([]);
+  const [monitoringItems, setMonitoringItems] = useState<any[]>([]);
   const [powerData, setPowerData] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -339,35 +341,101 @@ function DeviceMonitoringWidgets({ serviceId, token }: { serviceId: string; toke
     if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch(`/api/services/${serviceId}/port-status`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`/api/services/${serviceId}/port-status`, { headers: h }).then(r => r.ok ? r.json() : { items: [], mode: "none" }).catch(() => ({ items: [], mode: "none" })),
       fetch(`/api/services/${serviceId}/power`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([ports, power]) => {
-      setPortStatus(ports);
+    ]).then(([portsData, power]) => {
+      const items = portsData.items || (Array.isArray(portsData) ? portsData : []);
+      setMonitoringItems(items);
       setPowerData(power);
       setLoaded(true);
     });
   }, [serviceId, token]);
 
   if (!loaded) return null;
-  if (portStatus.length === 0 && !powerData) return null;
+  if (monitoringItems.length === 0 && !powerData) return null;
+
+  const statusItems = monitoringItems.filter((i: any) => i.type === "status");
+  const speedItems = monitoringItems.filter((i: any) => i.type === "speed");
+  const powerItems = monitoringItems.filter((i: any) => i.type === "power");
+  const otherItems = monitoringItems.filter((i: any) => !i.type || i.type === "other" || i.type === "vlan");
+  const legacyItems = monitoringItems.filter((i: any) => i.status && !i.type);
 
   return (
     <>
-      {portStatus.length > 0 && (
+      {monitoringItems.length > 0 && (
         <div className="mt-3" data-testid={`port-status-${serviceId}`}>
           <div className="flex items-center gap-1.5 mb-2">
             <Cable className="h-3.5 w-3.5 text-blue-600" />
-            <span className="text-xs font-semibold text-slate-900">Port Status</span>
+            <span className="text-xs font-semibold text-slate-900">Monitoring Data</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            {portStatus.map((ps: any) => (
-              <div key={ps.itemId || ps.name} className="flex items-center gap-1.5 p-1.5 rounded border border-slate-100 bg-slate-50/50">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-[11px] text-slate-700 truncate flex-1">{ps.name?.replace(/^.*:\s*/, "") || "Port"}</span>
-                <span className={`text-[9px] font-bold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
+          {statusItems.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[9px] font-semibold text-slate-400 uppercase mb-1">Port Status</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {statusItems.map((ps: any) => {
+                  const isUp = ps.lastValue === "1" || ps.status === "up";
+                  return (
+                    <div key={ps.itemId || ps.name} className="flex items-center gap-1.5 p-1.5 rounded border border-slate-100 bg-slate-50/50">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isUp ? "bg-green-500" : "bg-red-500"}`} />
+                      <span className="text-[11px] text-slate-700 truncate flex-1">{(ps.label || ps.name || "Port").replace(/^.*:\s*/, "")}</span>
+                      <span className={`text-[9px] font-bold uppercase ${isUp ? "text-green-600" : "text-red-600"}`}>{isUp ? "UP" : "DOWN"}</span>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          {speedItems.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[9px] font-semibold text-slate-400 uppercase mb-1">Speed / Bandwidth</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {speedItems.map((ps: any) => (
+                  <div key={ps.itemId} className="p-1.5 rounded border border-slate-100 bg-slate-50/50">
+                    <span className="text-[11px] text-slate-700 block truncate">{(ps.label || ps.name || "").replace(/^.*:\s*/, "")}</span>
+                    <span className="text-[10px] font-semibold text-blue-600">{ps.lastValue} {ps.units || ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {powerItems.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[9px] font-semibold text-slate-400 uppercase mb-1">Power</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {powerItems.map((ps: any) => (
+                  <div key={ps.itemId} className="text-center p-2 bg-yellow-50 rounded border border-yellow-100">
+                    <div className="text-base font-bold text-yellow-700">{ps.lastValue}</div>
+                    <div className="text-[9px] text-yellow-600">{ps.units || ""}</div>
+                    <div className="text-[9px] text-slate-500 truncate">{ps.label || ps.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {otherItems.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[9px] font-semibold text-slate-400 uppercase mb-1">Other Metrics</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {otherItems.map((ps: any) => (
+                  <div key={ps.itemId} className="p-1.5 rounded border border-slate-100 bg-slate-50/50">
+                    <span className="text-[11px] text-slate-700 block truncate">{ps.label || ps.name}</span>
+                    <span className="text-[10px] font-medium text-slate-600">{ps.lastValue} {ps.units || ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {legacyItems.length > 0 && statusItems.length === 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {legacyItems.map((ps: any) => (
+                <div key={ps.itemId || ps.name} className="flex items-center gap-1.5 p-1.5 rounded border border-slate-100 bg-slate-50/50">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
+                  <span className="text-[11px] text-slate-700 truncate flex-1">{ps.name?.replace(/^.*:\s*/, "") || "Port"}</span>
+                  <span className={`text-[9px] font-bold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {powerData && (powerData.watts || powerData.amps || powerData.volts) && (
@@ -416,6 +484,14 @@ export default function PortalPage() {
   const [replyText, setReplyText] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [globalGrafanaUrl, setGlobalGrafanaUrl] = useState("");
+  useEffect(() => {
+    if (token) {
+      fetch("/api/portal/config", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : {}).then(d => { if (d.grafanaUrl) setGlobalGrafanaUrl(d.grafanaUrl); }).catch(() => {});
+    }
+  }, [token]);
 
   const isAdmin = user?.role === "admin";
   const hasPortalAccess = isAdmin || user?.permPortalAccess !== false;
@@ -735,7 +811,7 @@ export default function PortalPage() {
                       <span className="text-[10px] text-slate-500">{s.location}</span>
                     </div>
                     <div className="p-4 space-y-3">
-                      <GrafanaPanel service={s} />
+                      <GrafanaPanel service={s} globalGrafanaUrl={globalGrafanaUrl} />
                       <DeviceMonitoringWidgets serviceId={s.id} token={token} />
                       <PduControls service={s} token={token} canManage={canManageTechnical} />
                     </div>

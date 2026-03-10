@@ -43,8 +43,10 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  BarChart3,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -2252,6 +2254,8 @@ type BillingSettingsData = {
   ticketAckSubjectCustomer?: string; ticketAckTemplateCustomer?: string;
   ticketAckSubjectUnknown?: string; ticketAckTemplateUnknown?: string;
   ticketFromAddresses?: string;
+  zabbixUrl?: string; zabbixApiToken?: string;
+  grafanaUrl?: string; grafanaApiKey?: string;
 };
 
 const BILLING_PLACEHOLDERS = [
@@ -2307,6 +2311,13 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
   const [zabbixSearchQuery, setZabbixSearchQuery] = useState("");
   const [zabbixSearchResults, setZabbixSearchResults] = useState<any[]>([]);
   const [zabbixTesting, setZabbixTesting] = useState(false);
+  const [zabbixHosts, setZabbixHosts] = useState<any[]>([]);
+  const [zabbixHostsLoading, setZabbixHostsLoading] = useState(false);
+  const [expandedZabbixHost, setExpandedZabbixHost] = useState<string | null>(null);
+  const [zabbixHostItems, setZabbixHostItems] = useState<Record<string, any[]>>({});
+  const [grafanaTesting, setGrafanaTesting] = useState(false);
+  const [grafanaDashboards, setGrafanaDashboards] = useState<any[]>([]);
+  const [grafanaDashboardsLoading, setGrafanaDashboardsLoading] = useState(false);
   const [fromAddressList, setFromAddressList] = useState<{ label: string; email: string }[]>([]);
   const [newFromLabel, setNewFromLabel] = useState("");
   const [newFromEmail, setNewFromEmail] = useState("");
@@ -2377,10 +2388,54 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
     try {
       const res = await fetch("/api/admin/zabbix/test", { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (res.ok) toast({ title: "Zabbix Connected", description: data.message || "Connection successful" });
-      else toast({ title: "Zabbix Connection Failed", description: data.error || "Check your configuration", variant: "destructive" });
+      if (data.success) toast({ title: "Zabbix Connected", description: data.message || "Connection successful" });
+      else toast({ title: "Zabbix Connection Failed", description: data.message || "Check your configuration", variant: "destructive" });
     } catch { toast({ title: "Error", variant: "destructive" }); }
     finally { setZabbixTesting(false); }
+  }
+
+  async function browseZabbixHosts() {
+    setZabbixHostsLoading(true);
+    try {
+      const res = await fetch("/api/admin/zabbix/hosts", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setZabbixHosts(await res.json());
+      else toast({ title: "Failed to fetch hosts", variant: "destructive" });
+    } catch { toast({ title: "Error fetching hosts", variant: "destructive" }); }
+    finally { setZabbixHostsLoading(false); }
+  }
+
+  async function browseZabbixItems(hostId: string) {
+    if (expandedZabbixHost === hostId) { setExpandedZabbixHost(null); return; }
+    setExpandedZabbixHost(hostId);
+    if (zabbixHostItems[hostId]) return;
+    try {
+      const res = await fetch(`/api/admin/zabbix/host/${hostId}/items`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const items = await res.json();
+        setZabbixHostItems(prev => ({ ...prev, [hostId]: items }));
+      }
+    } catch {}
+  }
+
+  async function testGrafanaConnection() {
+    setGrafanaTesting(true);
+    try {
+      const res = await fetch("/api/admin/grafana/test", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) toast({ title: "Grafana Connected", description: data.message });
+      else toast({ title: "Grafana Connection Failed", description: data.message, variant: "destructive" });
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setGrafanaTesting(false); }
+  }
+
+  async function fetchGrafanaDashboards() {
+    setGrafanaDashboardsLoading(true);
+    try {
+      const res = await fetch("/api/admin/grafana/dashboards", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setGrafanaDashboards(await res.json());
+      else toast({ title: "Failed to fetch dashboards", variant: "destructive" });
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setGrafanaDashboardsLoading(false); }
   }
 
   async function loadSettings() {
@@ -2888,20 +2943,95 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
           </div>
         )}
         {activeTab === "integrations" && (
-          <div className="max-w-xl space-y-6" data-testid="integrations-panel">
+          <div className="max-w-2xl space-y-6" data-testid="integrations-panel">
             <div>
               <h3 className="text-base font-semibold text-slate-900 mb-1">Zabbix Monitoring</h3>
-              <p className="text-xs text-slate-500 mb-3">Connect to your Zabbix server for real-time switch port status and power consumption monitoring.</p>
+              <p className="text-xs text-slate-500 mb-3">Connect to your Zabbix server for real-time monitoring data.</p>
               <div className="space-y-3">
                 <div><label className="text-xs text-slate-500 block mb-1">Zabbix API URL</label>
-                  <input value={(settings as any).zabbixUrl || ""} onChange={(e) => setSettings({ ...settings, zabbixUrl: e.target.value } as any)} placeholder="https://zabbix.example.com/api_jsonrpc.php" className={inputCls} data-testid="input-zabbix-url" /></div>
+                  <input value={settings.zabbixUrl || ""} onChange={(e) => setSettings({ ...settings, zabbixUrl: e.target.value })} placeholder="https://zabbix.example.com/api_jsonrpc.php" className={inputCls} data-testid="input-zabbix-url" /></div>
                 <div><label className="text-xs text-slate-500 block mb-1">API Token</label>
-                  <input type="password" value={(settings as any).zabbixApiToken || ""} onChange={(e) => setSettings({ ...settings, zabbixApiToken: e.target.value } as any)} placeholder="Enter Zabbix API token" className={inputCls} data-testid="input-zabbix-token" /></div>
-                <button type="button" onClick={testZabbixConnection} disabled={zabbixTesting} className={btnSecondary} data-testid="button-test-zabbix">
-                  {zabbixTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}Test Zabbix Connection
-                </button>
+                  <input type="password" value={settings.zabbixApiToken || ""} onChange={(e) => setSettings({ ...settings, zabbixApiToken: e.target.value })} placeholder="Enter Zabbix API token" className={inputCls} data-testid="input-zabbix-token" /></div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={testZabbixConnection} disabled={zabbixTesting} className={btnSecondary} data-testid="button-test-zabbix">
+                    {zabbixTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}Test Connection
+                  </button>
+                  <button type="button" onClick={browseZabbixHosts} disabled={zabbixHostsLoading} className={btnSecondary} data-testid="button-browse-zabbix-hosts">
+                    {zabbixHostsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}Browse Hosts
+                  </button>
+                </div>
+                {zabbixHosts.length > 0 && (
+                  <div className="border border-slate-200 rounded-md overflow-hidden">
+                    <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-600">Zabbix Hosts ({zabbixHosts.length})</div>
+                    <div className="max-h-72 overflow-auto divide-y divide-slate-100">
+                      {zabbixHosts.map((host: any) => (
+                        <div key={host.hostid}>
+                          <div className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-slate-50" onClick={() => browseZabbixItems(host.hostid)} data-testid={`zabbix-host-${host.hostid}`}>
+                            <div>
+                              <span className="text-xs font-medium text-slate-900">{host.name}</span>
+                              <span className="text-[10px] text-slate-400 ml-2">ID: {host.hostid}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${host.status === "0" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                {host.status === "0" ? "Enabled" : "Disabled"}
+                              </span>
+                              {expandedZabbixHost === host.hostid ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            </div>
+                          </div>
+                          {expandedZabbixHost === host.hostid && zabbixHostItems[host.hostid] && (
+                            <div className="bg-slate-50/50 px-3 py-2 border-t border-slate-100">
+                              <div className="text-[10px] text-slate-500 mb-1">{zabbixHostItems[host.hostid].length} items</div>
+                              <div className="max-h-48 overflow-auto space-y-0.5">
+                                {zabbixHostItems[host.hostid].map((item: any) => (
+                                  <div key={item.itemId} className="flex items-center justify-between text-[11px] px-2 py-1 bg-white rounded border border-slate-100">
+                                    <span className="text-slate-700 truncate flex-1 mr-2">{item.name}</span>
+                                    <span className="text-slate-400 text-[10px] whitespace-nowrap">{item.lastValue} {item.units}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-1">Grafana Monitoring</h3>
+              <p className="text-xs text-slate-500 mb-3">Connect to your Grafana server for embedded dashboard panels and graphs.</p>
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Grafana URL</label>
+                  <input value={settings.grafanaUrl || ""} onChange={(e) => setSettings({ ...settings, grafanaUrl: e.target.value })} placeholder="https://grafana.911dc.us" className={inputCls} data-testid="input-grafana-url" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">API Key (optional, for browsing dashboards)</label>
+                  <input type="password" value={settings.grafanaApiKey || ""} onChange={(e) => setSettings({ ...settings, grafanaApiKey: e.target.value })} placeholder="Enter Grafana API key" className={inputCls} data-testid="input-grafana-api-key" /></div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={testGrafanaConnection} disabled={grafanaTesting} className={btnSecondary} data-testid="button-test-grafana">
+                    {grafanaTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}Test Connection
+                  </button>
+                  <button type="button" onClick={fetchGrafanaDashboards} disabled={grafanaDashboardsLoading} className={btnSecondary} data-testid="button-fetch-dashboards">
+                    {grafanaDashboardsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}Fetch Dashboards
+                  </button>
+                </div>
+                {grafanaDashboards.length > 0 && (
+                  <div className="border border-slate-200 rounded-md overflow-hidden">
+                    <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-600">Grafana Dashboards ({grafanaDashboards.length})</div>
+                    <div className="max-h-48 overflow-auto divide-y divide-slate-100">
+                      {grafanaDashboards.map((d: any) => (
+                        <div key={d.uid} className="px-3 py-2 flex items-center justify-between" data-testid={`grafana-dashboard-${d.uid}`}>
+                          <span className="text-xs font-medium text-slate-900">{d.title}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{d.uid}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-xs text-slate-600">
-                  <strong>Note:</strong> After configuring the Zabbix URL and token, click "Save Settings" above, then use "Test Zabbix Connection" to verify the connection. Once configured, you can link Zabbix hosts to infrastructure equipment and devices for real-time monitoring.
+                  <strong>Note:</strong> Save settings first, then test the connection. Dashboards listed here can be assigned to devices for embedded graph display.
                 </div>
               </div>
             </div>
@@ -2931,11 +3061,13 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
   const [availablePorts, setAvailablePorts] = useState<any[]>([]);
   const [portStatuses, setPortStatuses] = useState<any[]>([]);
   const [powerData, setPowerData] = useState<any>(null);
+  const [globalGrafanaUrl, setGlobalGrafanaUrl] = useState("");
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     fetch("/api/admin/customers", { headers: h }).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
     fetch("/api/services", { headers: h }).then(r => r.ok ? r.json() : []).then(setServices).catch(() => {});
+    fetch("/api/admin/billing-settings", { headers: h }).then(r => r.ok ? r.json() : null).then(s => { if (s?.grafanaUrl) setGlobalGrafanaUrl(s.grafanaUrl); }).catch(() => {});
   }, [token]);
 
   async function loadAvailablePorts() {
@@ -2949,12 +3081,11 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
     if (!device?.zabbixHostId) { setPortStatuses([]); setPowerData(null); return; }
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const [ports, power] = await Promise.all([
-        fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/ports`, { headers: h }).then(r => r.ok ? r.json() : []),
-        fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/power`, { headers: h }).then(r => r.ok ? r.json() : null),
-      ]);
-      setPortStatuses(ports);
-      setPowerData(power);
+      const portsRes = await fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/ports`, { headers: h });
+      const portsData = portsRes.ok ? await portsRes.json() : { items: [], mode: "none" };
+      setPortStatuses(portsData.items || portsData || []);
+      const powerRes = await fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/power`, { headers: h });
+      setPowerData(powerRes.ok ? await powerRes.json() : null);
     } catch { setPortStatuses([]); setPowerData(null); }
   }
 
@@ -3203,29 +3334,102 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
                 </div>
               </div>
             )}
-            {deviceDetail.grafanaUrl && (
+            {(globalGrafanaUrl || deviceDetail.grafanaUrl) && deviceDetail.grafanaDashboardUid && (
               <div className="bg-white border border-slate-200 rounded-lg shadow-sm col-span-full">
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Activity className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold text-slate-900">Network Traffic</span></div>
                 <div className="p-1">
                   <iframe
-                    src={`${deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPanelId || 1}&from=now-24h&to=now`}
+                    src={`${globalGrafanaUrl || deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPanelId || 1}&from=now-24h&to=now&theme=light${deviceDetail.grafanaVar ? `&var-host=${deviceDetail.grafanaVar}` : ""}`}
                     className="w-full h-[300px] border-0 rounded"
                     title="Network Traffic"
+                    allow="fullscreen"
                   />
                 </div>
               </div>
             )}
             {portStatuses.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="widget-port-status">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Cable className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">Switch Port Status (Zabbix)</span></div>
-                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {portStatuses.map((ps: any) => (
-                    <div key={ps.itemId} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-slate-50/50">
-                      <div className={`w-2.5 h-2.5 rounded-full ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
-                      <span className="text-[12px] text-slate-700 truncate flex-1" title={ps.name}>{ps.name.replace(/^.*:\s*/, "")}</span>
-                      <span className={`text-[10px] font-semibold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
-                    </div>
-                  ))}
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Cable className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">Monitoring Data (Zabbix)</span></div>
+                <div className="p-4 space-y-3">
+                  {(() => {
+                    const statusItems = portStatuses.filter((ps: any) => ps.type === "status");
+                    const speedItems = portStatuses.filter((ps: any) => ps.type === "speed");
+                    const powerItems = portStatuses.filter((ps: any) => ps.type === "power");
+                    const otherItems = portStatuses.filter((ps: any) => !ps.type || ps.type === "other" || ps.type === "vlan");
+                    const legacyItems = portStatuses.filter((ps: any) => ps.status && !ps.type);
+                    return (
+                      <>
+                        {statusItems.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-500 uppercase mb-1.5">Port Status</div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {statusItems.map((ps: any) => {
+                                const isUp = ps.lastValue === "1" || ps.status === "up";
+                                return (
+                                  <div key={ps.itemId} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-slate-50/50">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${isUp ? "bg-green-500" : "bg-red-500"}`} />
+                                    <span className="text-[12px] text-slate-700 truncate flex-1" title={ps.label || ps.name}>{(ps.label || ps.name || "").replace(/^.*:\s*/, "")}</span>
+                                    <span className={`text-[10px] font-semibold uppercase ${isUp ? "text-green-600" : "text-red-600"}`}>{isUp ? "UP" : "DOWN"}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {speedItems.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-500 uppercase mb-1.5">Speed / Bandwidth</div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {speedItems.map((ps: any) => (
+                                <div key={ps.itemId} className="p-2 rounded border border-slate-100 bg-slate-50/50">
+                                  <span className="text-[12px] text-slate-700 block truncate" title={ps.label || ps.name}>{(ps.label || ps.name || "").replace(/^.*:\s*/, "")}</span>
+                                  <span className="text-[11px] font-semibold text-blue-600">{ps.lastValue} {ps.units || ""}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {powerItems.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-500 uppercase mb-1.5">Power</div>
+                            <div className="grid grid-cols-3 gap-3">
+                              {powerItems.map((ps: any) => (
+                                <div key={ps.itemId} className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                                  <div className="text-xl font-bold text-yellow-700">{ps.lastValue}</div>
+                                  <div className="text-xs text-yellow-600">{ps.units || ""}</div>
+                                  <div className="text-[10px] text-slate-500 mt-1 truncate">{ps.label || ps.name}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {otherItems.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-slate-500 uppercase mb-1.5">Other Metrics</div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {otherItems.map((ps: any) => (
+                                <div key={ps.itemId} className="p-2 rounded border border-slate-100 bg-slate-50/50">
+                                  <span className="text-[12px] text-slate-700 block truncate">{ps.label || ps.name}</span>
+                                  <span className="text-[11px] font-medium text-slate-600">{ps.lastValue} {ps.units || ""}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {legacyItems.length > 0 && statusItems.length === 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {legacyItems.map((ps: any) => (
+                              <div key={ps.itemId} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-slate-50/50">
+                                <div className={`w-2.5 h-2.5 rounded-full ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
+                                <span className="text-[12px] text-slate-700 truncate flex-1" title={ps.name}>{ps.name.replace(/^.*:\s*/, "")}</span>
+                                <span className={`text-[10px] font-semibold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -3255,12 +3459,13 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
                     </div>
                   )}
                 </div>
-                {deviceDetail.grafanaUrl && deviceDetail.grafanaPowerDashboardUid && (
+                {(globalGrafanaUrl || deviceDetail.grafanaUrl) && deviceDetail.grafanaPowerDashboardUid && (
                   <div className="p-1 border-t border-slate-100">
                     <iframe
-                      src={`${deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaPowerDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPowerPanelId || 1}&from=now-24h&to=now`}
+                      src={`${globalGrafanaUrl || deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaPowerDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPowerPanelId || 1}&from=now-24h&to=now&theme=light${deviceDetail.grafanaVar ? `&var-host=${deviceDetail.grafanaVar}` : ""}`}
                       className="w-full h-[250px] border-0 rounded"
                       title="Power Consumption Graph"
+                      allow="fullscreen"
                     />
                   </div>
                 )}
@@ -3320,9 +3525,18 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
   const [form, setForm] = useState({
     name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "",
     facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "",
-    tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "",
+    tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "", grafanaVar: "",
   });
   const [deviceZabbixSearch, setDeviceZabbixSearch] = useState<any[]>([]);
+  const [deviceZabbixHosts, setDeviceZabbixHosts] = useState<any[]>([]);
+  const [deviceZabbixHostsLoading, setDeviceZabbixHostsLoading] = useState(false);
+  const [deviceZabbixItems, setDeviceZabbixItems] = useState<any[]>([]);
+  const [deviceZabbixItemsLoading, setDeviceZabbixItemsLoading] = useState(false);
+  const [selectedZabbixItems, setSelectedZabbixItems] = useState<any[]>([]);
+  const [deviceGrafanaDashboards, setDeviceGrafanaDashboards] = useState<any[]>([]);
+  const [deviceGrafanaDashboardsLoading, setDeviceGrafanaDashboardsLoading] = useState(false);
+  const [deviceGrafanaPanels, setDeviceGrafanaPanels] = useState<any[]>([]);
+  const [deviceGrafanaPanelsLoading, setDeviceGrafanaPanelsLoading] = useState(false);
 
   useEffect(() => {
     if (editing) {
@@ -3333,13 +3547,89 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
         cage: editing.cage || "", row: editing.row || "", rack: editing.rack || "", rackPosition: editing.rackPosition || "",
         rackUnits: editing.rackUnits?.toString() || "", tags: editing.tags || "", notes: editing.notes || "",
         zabbixHostId: editing.zabbixHostId || "", grafanaPowerDashboardUid: editing.grafanaPowerDashboardUid || "",
-        grafanaPowerPanelId: editing.grafanaPowerPanelId || "",
+        grafanaPowerPanelId: editing.grafanaPowerPanelId || "", grafanaVar: editing.grafanaVar || "",
       });
+      try {
+        const items = JSON.parse(editing.zabbixItems || "[]");
+        setSelectedZabbixItems(Array.isArray(items) ? items : []);
+      } catch { setSelectedZabbixItems([]); }
     } else {
-      setForm({ name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "", facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "", tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "" });
+      setForm({ name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "", facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "", tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "", grafanaVar: "" });
+      setSelectedZabbixItems([]);
     }
     setDeviceZabbixSearch([]);
+    setDeviceZabbixItems([]);
+    setDeviceGrafanaPanels([]);
   }, [editing, open]);
+
+  useEffect(() => {
+    if (open && deviceZabbixHosts.length === 0) {
+      loadDeviceZabbixHosts();
+    }
+    if (open && deviceGrafanaDashboards.length === 0) {
+      loadDeviceGrafanaDashboards();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (form.zabbixHostId && open) loadDeviceZabbixItemsForHost(form.zabbixHostId);
+  }, [form.zabbixHostId, open]);
+
+  useEffect(() => {
+    if (form.grafanaPowerDashboardUid && open) loadGrafanaPanels(form.grafanaPowerDashboardUid);
+  }, [form.grafanaPowerDashboardUid, open]);
+
+  async function loadDeviceZabbixHosts() {
+    setDeviceZabbixHostsLoading(true);
+    try {
+      const res = await fetch("/api/admin/zabbix/hosts", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setDeviceZabbixHosts(await res.json());
+    } catch {}
+    finally { setDeviceZabbixHostsLoading(false); }
+  }
+
+  async function loadDeviceZabbixItemsForHost(hostId: string) {
+    setDeviceZabbixItemsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/zabbix/host/${hostId}/items`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setDeviceZabbixItems(await res.json());
+    } catch {}
+    finally { setDeviceZabbixItemsLoading(false); }
+  }
+
+  async function loadDeviceGrafanaDashboards() {
+    setDeviceGrafanaDashboardsLoading(true);
+    try {
+      const res = await fetch("/api/admin/grafana/dashboards", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setDeviceGrafanaDashboards(await res.json());
+    } catch {}
+    finally { setDeviceGrafanaDashboardsLoading(false); }
+  }
+
+  async function loadGrafanaPanels(dashboardUid: string) {
+    setDeviceGrafanaPanelsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/grafana/dashboard/${dashboardUid}/panels`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setDeviceGrafanaPanels(await res.json());
+    } catch {}
+    finally { setDeviceGrafanaPanelsLoading(false); }
+  }
+
+  function toggleZabbixItem(item: any) {
+    setSelectedZabbixItems(prev => {
+      const exists = prev.find((i: any) => i.itemId === item.itemId);
+      if (exists) return prev.filter((i: any) => i.itemId !== item.itemId);
+      return [...prev, { itemId: item.itemId, name: item.name, type: "other", label: item.name }];
+    });
+  }
+
+  function updateItemType(itemId: string, type: string) {
+    setSelectedZabbixItems(prev => prev.map((i: any) => i.itemId === itemId ? { ...i, type } : i));
+  }
+
+  function updateItemLabel(itemId: string, label: string) {
+    setSelectedZabbixItems(prev => prev.map((i: any) => i.itemId === itemId ? { ...i, label } : i));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -3350,6 +3640,8 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
       if (!body.customerId) body.customerId = null;
       if (!body.serviceId) body.serviceId = null;
       if (!body.parentDeviceId) body.parentDeviceId = null;
+      body.zabbixItems = selectedZabbixItems.length > 0 ? JSON.stringify(selectedZabbixItems) : null;
+      if (!body.grafanaVar) body.grafanaVar = null;
       const url = editing ? `/api/admin/devices/${editing.id}` : "/api/admin/devices";
       const res = await fetch(url, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
       if (res.ok) { toast({ title: editing ? "Device updated" : "Device created" }); onSuccess(); }
@@ -3418,27 +3710,71 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
           <div><label className="text-xs text-slate-500 block mb-1">Tags (comma-separated)</label><input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className={inputCls} /></div>
           <div><label className="text-xs text-slate-500 block mb-1">Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} /></div>
           <div className="border-t border-slate-100 pt-3">
-            <span className="text-xs font-semibold text-slate-700 block mb-2">Monitoring</span>
-            <div><label className="text-xs text-slate-500 block mb-1">Zabbix Host ID</label>
-              <div className="relative">
-                <input value={form.zabbixHostId} onChange={async (e) => { setForm({ ...form, zabbixHostId: e.target.value }); if (e.target.value.length >= 2) { try { const res = await fetch(`/api/admin/zabbix/hosts?search=${encodeURIComponent(e.target.value)}`, { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setDeviceZabbixSearch(await res.json()); } catch {} } else { setDeviceZabbixSearch([]); } }} placeholder="Search or enter Zabbix host ID..." className={inputCls} data-testid="input-device-zabbix" />
-                {deviceZabbixSearch.length > 0 && form.zabbixHostId && (
-                  <div className="absolute z-10 top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-auto">
-                    {deviceZabbixSearch.map((h: any) => (
-                      <button key={h.hostid} type="button" onClick={() => { setForm({ ...form, zabbixHostId: h.hostid }); setDeviceZabbixSearch([]); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                        <span className="font-medium text-slate-900">{h.host}</span> <span className="text-slate-400 ml-1">({h.hostid})</span>
+            <span className="text-xs font-semibold text-slate-700 block mb-2">Zabbix Monitoring</span>
+            <div><label className="text-xs text-slate-500 block mb-1">Zabbix Host</label>
+              <select value={form.zabbixHostId} onChange={(e) => { setForm({ ...form, zabbixHostId: e.target.value }); setSelectedZabbixItems([]); }} className={inputCls} data-testid="select-device-zabbix-host">
+                <option value="">— None —</option>
+                {deviceZabbixHosts.map((h: any) => <option key={h.hostid} value={h.hostid}>{h.name} ({h.hostid})</option>)}
+              </select>
+              {deviceZabbixHostsLoading && <span className="text-[10px] text-slate-400">Loading hosts...</span>}
+            </div>
+            {form.zabbixHostId && (
+              <div className="mt-2">
+                <label className="text-xs text-slate-500 block mb-1">Monitoring Items {deviceZabbixItemsLoading && "(loading...)"}</label>
+                {selectedZabbixItems.length > 0 && (
+                  <div className="mb-2 space-y-1">
+                    <div className="text-[10px] font-semibold text-slate-600">Selected ({selectedZabbixItems.length})</div>
+                    {selectedZabbixItems.map((si: any) => (
+                      <div key={si.itemId} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                        <button type="button" onClick={() => toggleZabbixItem(si)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                        <input value={si.label} onChange={(e) => updateItemLabel(si.itemId, e.target.value)} className="flex-1 text-[11px] bg-transparent border-none outline-none text-slate-700 min-w-0" />
+                        <select value={si.type} onChange={(e) => updateItemType(si.itemId, e.target.value)} className="text-[10px] bg-white border border-slate-200 rounded px-1 py-0.5">
+                          <option value="status">Status</option>
+                          <option value="speed">Speed</option>
+                          <option value="vlan">VLAN</option>
+                          <option value="power">Power</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {deviceZabbixItems.length > 0 && (
+                  <div className="border border-slate-200 rounded max-h-40 overflow-auto">
+                    {deviceZabbixItems.filter((zi: any) => !selectedZabbixItems.find((s: any) => s.itemId === zi.itemId)).map((zi: any) => (
+                      <button key={zi.itemId} type="button" onClick={() => toggleZabbixItem(zi)} className="w-full text-left px-2 py-1 text-[11px] hover:bg-slate-50 border-b border-slate-50 last:border-0 flex items-center gap-2" data-testid={`zabbix-item-${zi.itemId}`}>
+                        <Plus className="w-3 h-3 text-slate-400" />
+                        <span className="truncate flex-1 text-slate-700">{zi.name}</span>
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">{zi.lastValue} {zi.units}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
+            )}
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <span className="text-xs font-semibold text-slate-700 block mb-2">Grafana Monitoring</span>
+            <div><label className="text-xs text-slate-500 block mb-1">Dashboard</label>
+              <select value={form.grafanaPowerDashboardUid} onChange={(e) => { setForm({ ...form, grafanaPowerDashboardUid: e.target.value, grafanaPowerPanelId: "" }); }} className={inputCls} data-testid="select-device-grafana-dashboard">
+                <option value="">— None —</option>
+                {deviceGrafanaDashboards.map((d: any) => <option key={d.uid} value={d.uid}>{d.title}</option>)}
+              </select>
+              {deviceGrafanaDashboardsLoading && <span className="text-[10px] text-slate-400">Loading dashboards...</span>}
             </div>
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <div><label className="text-xs text-slate-500 block mb-1">Power Dashboard UID</label>
-                <input value={form.grafanaPowerDashboardUid} onChange={(e) => setForm({ ...form, grafanaPowerDashboardUid: e.target.value })} placeholder="Grafana dashboard UID" className={inputCls} data-testid="input-device-power-dashboard" /></div>
-              <div><label className="text-xs text-slate-500 block mb-1">Power Panel ID</label>
-                <input value={form.grafanaPowerPanelId} onChange={(e) => setForm({ ...form, grafanaPowerPanelId: e.target.value })} placeholder="Panel ID" className={inputCls} data-testid="input-device-power-panel" /></div>
-            </div>
+            {form.grafanaPowerDashboardUid && (
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div><label className="text-xs text-slate-500 block mb-1">Panel</label>
+                  <select value={form.grafanaPowerPanelId} onChange={(e) => setForm({ ...form, grafanaPowerPanelId: e.target.value })} className={inputCls} data-testid="select-device-grafana-panel">
+                    <option value="">— Select Panel —</option>
+                    {deviceGrafanaPanels.map((p: any) => <option key={p.id} value={p.id}>{p.title || `Panel ${p.id}`}</option>)}
+                  </select>
+                  {deviceGrafanaPanelsLoading && <span className="text-[10px] text-slate-400">Loading...</span>}
+                </div>
+                <div><label className="text-xs text-slate-500 block mb-1">Host Variable</label>
+                  <input value={form.grafanaVar} onChange={(e) => setForm({ ...form, grafanaVar: e.target.value })} placeholder="e.g. switch-01" className={inputCls} data-testid="input-device-grafana-var" /></div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>

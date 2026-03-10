@@ -202,6 +202,49 @@ export async function isZabbixConfigured(): Promise<boolean> {
   return config !== null;
 }
 
+export async function getZabbixAllHosts(): Promise<any[]> {
+  const result = await zabbixRequest("host.get", {
+    output: ["hostid", "host", "name", "status"],
+    sortfield: "name",
+  });
+  return result || [];
+}
+
+export async function getZabbixHostItems(hostId: string): Promise<any[]> {
+  const result = await zabbixRequest("item.get", {
+    output: ["itemid", "name", "lastvalue", "lastclock", "key_", "units", "status"],
+    hostids: hostId,
+    sortfield: "name",
+    limit: 500,
+  });
+  return (result || []).map((item: any) => ({
+    itemId: item.itemid,
+    name: item.name,
+    key: item.key_,
+    lastValue: item.lastvalue,
+    units: item.units || "",
+    status: item.status,
+    lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : null,
+  }));
+}
+
+export async function getZabbixItemValues(itemIds: string[]): Promise<any[]> {
+  if (itemIds.length === 0) return [];
+  const result = await zabbixRequest("item.get", {
+    output: ["itemid", "name", "lastvalue", "lastclock", "key_", "units"],
+    itemids: itemIds,
+    sortfield: "name",
+  });
+  return (result || []).map((item: any) => ({
+    itemId: item.itemid,
+    name: item.name,
+    key: item.key_,
+    lastValue: item.lastvalue,
+    units: item.units || "",
+    lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : null,
+  }));
+}
+
 export async function testZabbixConnection(): Promise<{ success: boolean; message: string; version?: string }> {
   const config = await getZabbixConfig();
   if (!config) return { success: false, message: "Zabbix not configured. Set the Zabbix URL and API Token in Settings > Integrations." };
