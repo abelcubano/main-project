@@ -1,7 +1,19 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { JSDOM } from "jsdom";
+import createDOMPurify from "dompurify";
 import { storage } from "./storage";
 import { sendDispatchEmail, sendInvoiceEmail, sendInvitationEmail, sendTicketNotificationEmail, testSmtpConnection, verifyEmailConnection, type DispatchRequest } from "./email";
+
+const window = new JSDOM("").window;
+const DOMPurify = createDOMPurify(window as any);
+
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["p", "br", "b", "i", "u", "s", "strong", "em", "ul", "ol", "li", "a", "h1", "h2", "h3", "blockquote", "pre", "code", "span", "div", "font"],
+    ALLOWED_ATTR: ["href", "target", "rel", "style", "class", "color", "size", "face"],
+  });
+}
 import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
@@ -539,6 +551,25 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[ADMIN] Get billing settings error:", error);
       res.status(500).json({ error: "Failed to fetch billing settings" });
+    }
+  });
+
+  app.get("/api/admin/ticket-from-addresses", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getBillingSettings();
+      const supportEmail = settings.supportEmailAddress || "info@911dc.us";
+      let configured: { label: string; email: string }[] = [];
+      try {
+        const raw = (settings as any).ticketFromAddresses;
+        if (raw) configured = JSON.parse(raw);
+      } catch {}
+      const addresses = [
+        { label: "Support", email: supportEmail },
+        ...configured,
+      ];
+      res.json(addresses);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get from addresses" });
     }
   });
 
@@ -1111,10 +1142,12 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Access denied" });
         }
       }
+      const rawBody = req.body.body || "";
+      const sanitizedBody = rawBody.startsWith("<") ? sanitizeHtml(rawBody) : rawBody;
       const replyData: any = {
         ticketId,
         userId: user.id,
-        body: req.body.body,
+        body: sanitizedBody,
         isInternal: user.role === "admin" ? (req.body.isInternal || false) : false,
       };
       const validation = insertTicketReplySchema.safeParse(replyData);
@@ -1130,6 +1163,19 @@ export async function registerRoutes(
           const customer = ticket.customerId ? await storage.getCustomer(ticket.customerId) : null;
 
           if (user.role === "admin") {
+            const isHtml = !!req.body.isHtml;
+            let selectedFrom: string | undefined = undefined;
+            if (req.body.fromAddress) {
+              const supportEmail = settings.supportEmailAddress || "info@911dc.us";
+              let configuredAddrs: string[] = [supportEmail.toLowerCase()];
+              try {
+                const parsed = JSON.parse((settings as any).ticketFromAddresses || "[]");
+                configuredAddrs.push(...parsed.map((a: any) => a.email?.toLowerCase()));
+              } catch {}
+              if (configuredAddrs.includes(req.body.fromAddress.toLowerCase())) {
+                selectedFrom = req.body.fromAddress;
+              }
+            }
             const notifiedEmails = new Set<string>();
             if (ticket.customerId) {
               const customerUsers = await storage.getUsersByCustomer(ticket.customerId);
@@ -1139,9 +1185,11 @@ export async function registerRoutes(
                   recipientEmail: recipient.email,
                   ticketNumber: ticket.ticketNumber,
                   subject: ticket.subject,
-                  replyBody: req.body.body,
+                  replyBody: sanitizedBody,
                   replyAuthor: user.name,
                   customerName: customer?.name || "Customer",
+                  fromAddress: selectedFrom,
+                  isHtml,
                 }, settings);
                 notifiedEmails.add(recipient.email.toLowerCase());
               }
@@ -1151,9 +1199,11 @@ export async function registerRoutes(
                 recipientEmail: ticket.contactEmail,
                 ticketNumber: ticket.ticketNumber,
                 subject: ticket.subject,
-                replyBody: req.body.body,
+                replyBody: sanitizedBody,
                 replyAuthor: user.name,
                 customerName: customer?.name || "Customer",
+                fromAddress: selectedFrom,
+                isHtml,
               }, settings);
             }
           } else {
@@ -1167,7 +1217,7 @@ export async function registerRoutes(
               recipientEmail,
               ticketNumber: ticket.ticketNumber,
               subject: ticket.subject,
-              replyBody: req.body.body,
+              replyBody: sanitizedBody,
               replyAuthor: user.name,
               customerName: customer?.name || user.companyName || "Customer",
             }, settings);

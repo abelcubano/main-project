@@ -208,8 +208,8 @@ function replaceTemplatePlaceholders(template: string, vars: Record<string, stri
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || "");
 }
 
-function wrapInEmailHtml(bodyText: string): string {
-  const bodyHtml = escapeHtml(bodyText).replace(/\n/g, "<br>");
+function wrapInEmailHtml(bodyText: string, isRawHtml = false): string {
+  const bodyHtml = isRawHtml ? bodyText : escapeHtml(bodyText).replace(/\n/g, "<br>");
   return `<!DOCTYPE html>
 <html><head><style>
 body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
@@ -221,7 +221,7 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #1e3a5f; }
 </style></head><body>
 <div class="container">
 <div class="header"><h1>911-DC</h1></div>
-<div class="content"><p>${bodyHtml}</p>
+<div class="content"><div>${bodyHtml}</div>
 <div class="footer">911-DC | Datacenter Operations & SmartHands Services | Miami, FL</div>
 </div></div></body></html>`;
 }
@@ -361,8 +361,12 @@ export interface TicketNotificationData {
   replyBody: string;
   replyAuthor: string;
   customerName: string;
+  senderName?: string;
   isNewTicket?: boolean;
   isAcknowledgment?: boolean;
+  isKnownCustomer?: boolean;
+  fromAddress?: string;
+  isHtml?: boolean;
 }
 
 export async function sendTicketNotificationEmail(
@@ -370,7 +374,8 @@ export async function sendTicketNotificationEmail(
   settings?: BillingSettings
 ): Promise<{ success: boolean; error?: string }> {
   const transport = settings ? createTransporterFromSettings(settings) : defaultTransporter;
-  const fromAddress = settings?.supportEmailAddress || settings?.smtpUser || process.env.MAIL_FROM || "abel.monzon@911dc.us";
+  const defaultFrom = settings?.supportEmailAddress || settings?.smtpUser || process.env.MAIL_FROM || "abel.monzon@911dc.us";
+  const fromAddress = data.fromAddress || defaultFrom;
 
   const vars: Record<string, string> = {
     ticketNumber: String(data.ticketNumber),
@@ -378,6 +383,7 @@ export async function sendTicketNotificationEmail(
     replyBody: data.replyBody,
     replyAuthor: data.replyAuthor,
     customerName: data.customerName,
+    senderName: data.senderName || data.customerName,
   };
 
   const subjectTemplate = settings?.ticketEmailSubject || "[Ticket #{{ticketNumber}}] {{subject}}";
@@ -387,8 +393,17 @@ export async function sendTicketNotificationEmail(
   let emailBody: string;
 
   if (data.isAcknowledgment) {
-    emailSubject = `[Ticket #${data.ticketNumber}] ${data.subject}`;
-    emailBody = data.replyBody;
+    if (data.isKnownCustomer) {
+      const ackSubjectTpl = (settings as any)?.ticketAckSubjectCustomer || "[Ticket #{{ticketNumber}}] {{subject}}";
+      const ackBodyTpl = (settings as any)?.ticketAckTemplateCustomer || "Hello {{customerName}},\n\nThank you for contacting 911-DC Support. We have received your request and created ticket #{{ticketNumber}}.\n\nSubject: {{subject}}\n\nA support agent will review your request and respond shortly. You can view your ticket in the customer portal.\n\nThank you,\n911-DC Support";
+      emailSubject = replaceTemplatePlaceholders(ackSubjectTpl, vars);
+      emailBody = replaceTemplatePlaceholders(ackBodyTpl, vars);
+    } else {
+      const ackSubjectTpl = (settings as any)?.ticketAckSubjectUnknown || "[Ticket #{{ticketNumber}}] {{subject}}";
+      const ackBodyTpl = (settings as any)?.ticketAckTemplateUnknown || "Hello {{senderName}},\n\nThank you for contacting 911-DC Support. We have received your request and created ticket #{{ticketNumber}}.\n\nSubject: {{subject}}\n\nA support agent will review your request and respond shortly. You can reply to this email to add more information to your ticket.\n\nThank you,\n911-DC Support";
+      emailSubject = replaceTemplatePlaceholders(ackSubjectTpl, vars);
+      emailBody = replaceTemplatePlaceholders(ackBodyTpl, vars);
+    }
   } else if (data.isNewTicket) {
     emailSubject = `[New Ticket #${data.ticketNumber}] ${data.subject}`;
     emailBody = `New ticket #${data.ticketNumber} has been submitted by ${data.replyAuthor} (${data.customerName}).\n\nSubject: ${data.subject}\n\n${data.replyBody}\n\nPlease review and respond.\n\n911-DC Support`;
@@ -397,14 +412,21 @@ export async function sendTicketNotificationEmail(
     emailBody = replaceTemplatePlaceholders(bodyTemplate, vars);
   }
 
-  const htmlBody = wrapInEmailHtml(emailBody);
+  let htmlBody: string;
+  if (data.isHtml) {
+    htmlBody = wrapInEmailHtml(data.replyBody, true);
+  } else {
+    htmlBody = wrapInEmailHtml(emailBody);
+  }
+
+  const textBody = emailBody.replace(/<[^>]*>/g, "");
 
   try {
     await transport.sendMail({
       from: `"911-DC Support" <${fromAddress}>`,
       to: data.recipientEmail,
       subject: emailSubject,
-      text: emailBody,
+      text: textBody,
       html: htmlBody,
     });
     emailLog(`[EMAIL] Ticket notification sent to ${data.recipientEmail} for ticket #${data.ticketNumber}`);

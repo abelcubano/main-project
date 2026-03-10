@@ -1,4 +1,6 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback, lazy, Suspense } from "react";
+import DOMPurify from "dompurify";
+const RichTextEditor = lazy(() => import("@/components/RichTextEditor"));
 import { useLocation } from "wouter";
 import {
   Activity,
@@ -1813,12 +1815,16 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
   const [customers, setCustomers] = useState<any[]>([]);
   const [updatingField, setUpdatingField] = useState(false);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [fromAddresses, setFromAddresses] = useState<{ label: string; email: string }[]>([]);
+  const [selectedFrom, setSelectedFrom] = useState("");
 
   useEffect(() => {
     fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
     fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : []).then(users => setAdminUsers(users.filter((u: any) => u.role === "admin"))).catch(() => {});
+    fetch("/api/admin/ticket-from-addresses", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : []).then(addrs => { setFromAddresses(addrs); if (addrs.length > 0) setSelectedFrom(addrs[0].email); }).catch(() => {});
   }, []);
 
   useEffect(() => { setTicketDetail(null); setSelectedTicket(null); }, [filter, deptFilter]);
@@ -1840,13 +1846,18 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
     } catch {} finally { setLoadingDetail(false); }
   }
 
+  function isReplyEmpty(html: string) {
+    const text = html.replace(/<[^>]*>/g, "").trim();
+    return !text;
+  }
+
   async function handleReply() {
-    if (!replyBody.trim() || !ticketDetail) return;
+    if (isReplyEmpty(replyBody) || !ticketDetail) return;
     setSending(true);
     try {
       const res = await fetch(`/api/tickets/${ticketDetail.id}/replies`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ body: replyBody, isInternal: replyInternal }),
+        body: JSON.stringify({ body: replyBody, isInternal: replyInternal, isHtml: true, fromAddress: selectedFrom || undefined }),
       });
       if (res.ok) { setReplyBody(""); setReplyInternal(false); loadTicketDetail(ticketDetail.id); onRefresh(); toast({ title: replyInternal ? "Internal note added" : "Reply sent" }); }
     } catch {} finally { setSending(false); }
@@ -1896,7 +1907,11 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
                 <div className="text-xs text-slate-500 mb-2">
                   Opened by <span className="font-medium text-slate-700">{ticketDetail.creatorName || "Unknown"}</span> ({ticketDetail.customerName || "Unknown"}) &middot; {new Date(ticketDetail.createdAt).toLocaleString()}
                 </div>
-                <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{ticketDetail.body}</div>
+                {ticketDetail.body?.startsWith("<") ? (
+                  <div className="text-[13px] text-slate-800 leading-relaxed ticket-html-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(ticketDetail.body) }} />
+                ) : (
+                  <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{ticketDetail.body}</div>
+                )}
               </div>
               {ticketDetail.replies?.map((reply: any) => (
                 <div key={reply.id} className={`border rounded-lg p-4 mb-2 shadow-sm ${reply.isInternal ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
@@ -1906,25 +1921,45 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
                     {reply.authorRole === "admin" && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-medium">Staff</span>}
                     <span className="text-xs text-slate-400">{new Date(reply.createdAt).toLocaleString()}</span>
                   </div>
-                  <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{reply.body}</div>
+                  {reply.body?.startsWith("<") ? (
+                    <div className="text-[13px] text-slate-800 leading-relaxed ticket-html-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(reply.body) }} />
+                  ) : (
+                    <div className="text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">{reply.body}</div>
+                  )}
                 </div>
               ))}
             </div>
             <div className="border-t border-slate-200 p-4 bg-slate-50 flex-shrink-0">
-              <textarea
-                value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
-                placeholder={replyInternal ? "Add internal note (not visible to customer)..." : "Type your reply..."}
-                className={`w-full h-20 text-[13px] p-3 border rounded-md outline-none resize-none ${replyInternal ? "bg-amber-50 border-amber-200 focus:border-amber-400" : "bg-white border-slate-200 focus:border-blue-400"} focus:ring-1 focus:ring-blue-100`}
-                data-testid="input-ticket-reply"
-              />
+              <Suspense fallback={<div className="h-[140px] border rounded-md bg-white animate-pulse" />}>
+                <RichTextEditor
+                  value={replyBody}
+                  onChange={setReplyBody}
+                  placeholder={replyInternal ? "Add internal note (not visible to customer)..." : "Type your reply..."}
+                  className={replyInternal ? "internal-note" : ""}
+                />
+              </Suspense>
               <div className="flex items-center gap-3 mt-2">
                 <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                  <input type="checkbox" checked={replyInternal} onChange={(e) => setReplyInternal(e.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" />
+                  <input type="checkbox" checked={replyInternal} onChange={(e) => setReplyInternal(e.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" data-testid="checkbox-internal-note" />
                   Internal Note
                 </label>
+                {!replyInternal && fromAddresses.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500">From:</span>
+                    <select
+                      value={selectedFrom}
+                      onChange={(e) => setSelectedFrom(e.target.value)}
+                      className="text-xs px-2 py-1 border border-slate-200 rounded bg-white outline-none focus:border-blue-400"
+                      data-testid="select-reply-from"
+                    >
+                      {fromAddresses.map(a => (
+                        <option key={a.email} value={a.email}>{a.label} ({a.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex-1" />
-                <button onClick={handleReply} disabled={!replyBody.trim() || sending} className={btnPrimary} data-testid="button-send-reply">
+                <button onClick={handleReply} disabled={isReplyEmpty(replyBody) || sending} className={btnPrimary} data-testid="button-send-reply">
                   <Send className="w-4 h-4" />
                   {sending ? "Sending..." : replyInternal ? "Add Note" : "Send Reply"}
                 </button>
@@ -2091,6 +2126,9 @@ type BillingSettingsData = {
   smtpHost?: string; smtpPort?: number; smtpUser?: string; smtpPassword?: string; smtpSecure?: boolean;
   imapHost?: string; imapPort?: number; imapUser?: string; imapPassword?: string; imapSecure?: boolean;
   supportEmailAddress?: string; ticketEmailSubject?: string; ticketEmailTemplate?: string;
+  ticketAckSubjectCustomer?: string; ticketAckTemplateCustomer?: string;
+  ticketAckSubjectUnknown?: string; ticketAckTemplateUnknown?: string;
+  ticketFromAddresses?: string;
 };
 
 const BILLING_PLACEHOLDERS = [
@@ -2107,6 +2145,18 @@ const INVITATION_PLACEHOLDERS = [
   { var: "{{userEmail}}", desc: "User email address" },
   { var: "{{companyName}}", desc: "Company name" },
   { var: "{{portalUrl}}", desc: "Portal login URL" },
+];
+
+const ACK_CUSTOMER_PLACEHOLDERS = [
+  { var: "{{ticketNumber}}", desc: "Ticket number" },
+  { var: "{{subject}}", desc: "Ticket subject" },
+  { var: "{{customerName}}", desc: "Customer name" },
+];
+
+const ACK_UNKNOWN_PLACEHOLDERS = [
+  { var: "{{ticketNumber}}", desc: "Ticket number" },
+  { var: "{{subject}}", desc: "Ticket subject" },
+  { var: "{{senderName}}", desc: "Sender name from email" },
 ];
 
 function SettingsView({ token, activeTab }: { token: string | null; activeTab: "billing" | "email" | "email-server" | "infrastructure" | "integrations" }) {
@@ -2134,6 +2184,9 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
   const [zabbixSearchQuery, setZabbixSearchQuery] = useState("");
   const [zabbixSearchResults, setZabbixSearchResults] = useState<any[]>([]);
   const [zabbixTesting, setZabbixTesting] = useState(false);
+  const [fromAddressList, setFromAddressList] = useState<{ label: string; email: string }[]>([]);
+  const [newFromLabel, setNewFromLabel] = useState("");
+  const [newFromEmail, setNewFromEmail] = useState("");
 
   async function loadEquipment() {
     setInfraLoading(true);
@@ -2211,7 +2264,11 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
     setLoading(true);
     try {
       const res = await fetch("/api/admin/billing-settings", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setSettings(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+        try { setFromAddressList(JSON.parse(data.ticketFromAddresses || "[]")); } catch { setFromAddressList([]); }
+      }
     } catch { toast({ title: "Error", description: "Failed to load settings", variant: "destructive" }); }
     finally { setLoading(false); }
   }
@@ -2235,6 +2292,9 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
           imapPassword: settings.imapPassword, imapSecure: settings.imapSecure,
           supportEmailAddress: settings.supportEmailAddress, ticketEmailSubject: settings.ticketEmailSubject,
           ticketEmailTemplate: settings.ticketEmailTemplate,
+          ticketAckSubjectCustomer: settings.ticketAckSubjectCustomer, ticketAckTemplateCustomer: settings.ticketAckTemplateCustomer,
+          ticketAckSubjectUnknown: settings.ticketAckSubjectUnknown, ticketAckTemplateUnknown: settings.ticketAckTemplateUnknown,
+          ticketFromAddresses: JSON.stringify(fromAddressList),
           zabbixUrl: (settings as any).zabbixUrl, zabbixApiToken: (settings as any).zabbixApiToken,
         }),
       });
@@ -2442,6 +2502,85 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
                     <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{renderPreview(settings.invitationEmailTemplate, "invitation")}</pre>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <hr className="border-slate-200" />
+
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-3">Ticket Auto-Reply — Known Customer</h3>
+              <p className="text-xs text-slate-500 mb-3">Sent automatically when a known customer sends an email that creates a ticket.</p>
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Subject</label>
+                  <input value={settings.ticketAckSubjectCustomer || ""} onChange={(e) => setSettings({ ...settings, ticketAckSubjectCustomer: e.target.value })} className={inputCls} data-testid="input-ack-customer-subject" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Body Template</label>
+                  <textarea value={settings.ticketAckTemplateCustomer || ""} onChange={(e) => setSettings({ ...settings, ticketAckTemplateCustomer: e.target.value })} rows={6}
+                    className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 font-mono resize-y" data-testid="textarea-ack-customer-template" /></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {ACK_CUSTOMER_PLACEHOLDERS.map((p) => (
+                      <span key={p.var} className="text-sm"><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{p.var}</code> <span className="text-slate-500">{p.desc}</span></span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-3">Ticket Auto-Reply — Unknown Sender</h3>
+              <p className="text-xs text-slate-500 mb-3">Sent automatically when an unknown email address creates a ticket.</p>
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Subject</label>
+                  <input value={settings.ticketAckSubjectUnknown || ""} onChange={(e) => setSettings({ ...settings, ticketAckSubjectUnknown: e.target.value })} className={inputCls} data-testid="input-ack-unknown-subject" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">Body Template</label>
+                  <textarea value={settings.ticketAckTemplateUnknown || ""} onChange={(e) => setSettings({ ...settings, ticketAckTemplateUnknown: e.target.value })} rows={6}
+                    className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400 font-mono resize-y" data-testid="textarea-ack-unknown-template" /></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Available Placeholders</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {ACK_UNKNOWN_PLACEHOLDERS.map((p) => (
+                      <span key={p.var} className="text-sm"><code className="font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{p.var}</code> <span className="text-slate-500">{p.desc}</span></span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-slate-200" />
+
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-3">Ticket From Addresses</h3>
+              <p className="text-xs text-slate-500 mb-3">Configure which email addresses staff can send ticket replies from. The support email is always included automatically.</p>
+              <div className="space-y-3">
+                {fromAddressList.map((addr, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700 min-w-[80px]">{addr.label}</span>
+                    <span className="text-sm text-slate-500">{addr.email}</span>
+                    <div className="flex-1" />
+                    <button onClick={() => { const updated = fromAddressList.filter((_, i) => i !== idx); setFromAddressList(updated); }}
+                      className="text-red-500 hover:text-red-700 p-1" data-testid={`button-remove-from-${idx}`}><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-500 block mb-1">Label</label>
+                    <input value={newFromLabel} onChange={(e) => setNewFromLabel(e.target.value)} placeholder="e.g. Agent Name" className={inputCls} data-testid="input-new-from-label" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-500 block mb-1">Email</label>
+                    <input value={newFromEmail} onChange={(e) => setNewFromEmail(e.target.value)} placeholder="e.g. agent@911dc.us" className={inputCls} data-testid="input-new-from-email" />
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!newFromLabel.trim() || !newFromEmail.trim()) return;
+                      setFromAddressList([...fromAddressList, { label: newFromLabel.trim(), email: newFromEmail.trim() }]);
+                      setNewFromLabel(""); setNewFromEmail("");
+                    }}
+                    className={btnSecondary}
+                    data-testid="button-add-from-address"
+                  ><Plus className="w-4 h-4" />Add</button>
+                </div>
               </div>
             </div>
           </div>

@@ -262,15 +262,16 @@ async function processEmail(parsed: any, settings: BillingSettings) {
   }
 
   try {
-    const ackBody = `Hello ${senderName},\n\nThank you for contacting 911-DC Support. We have received your request and created ticket #${ticket.ticketNumber}.\n\nSubject: ${cleanSubject}\n\nA support agent will review your request and respond shortly. You can reply to this email to add more information to your ticket.\n\nThank you,\n911-DC Support`;
     await sendTicketNotificationEmail({
       recipientEmail: fromAddress,
       ticketNumber: ticket.ticketNumber,
       subject: ticket.subject,
-      replyBody: ackBody,
+      replyBody: "",
       replyAuthor: "911-DC Support",
-      customerName: senderName,
+      customerName: user?.name || senderName,
+      senderName: senderName,
       isAcknowledgment: true,
+      isKnownCustomer: !!user,
     }, settings);
     log(`Sent acknowledgment to ${fromAddress} for ticket #${ticket.ticketNumber}`);
   } catch (err: any) {
