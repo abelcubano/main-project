@@ -2473,7 +2473,8 @@ function SettingsView({ token, activeTab }: { token: string | null; activeTab: "
           ticketAckSubjectCustomer: settings.ticketAckSubjectCustomer, ticketAckTemplateCustomer: settings.ticketAckTemplateCustomer,
           ticketAckSubjectUnknown: settings.ticketAckSubjectUnknown, ticketAckTemplateUnknown: settings.ticketAckTemplateUnknown,
           ticketFromAddresses: JSON.stringify(fromAddressList),
-          zabbixUrl: (settings as any).zabbixUrl, zabbixApiToken: (settings as any).zabbixApiToken,
+          zabbixUrl: settings.zabbixUrl, zabbixApiToken: settings.zabbixApiToken,
+          grafanaUrl: settings.grafanaUrl, grafanaApiKey: settings.grafanaApiKey,
         }),
       });
       if (res.ok) { const updated = await res.json(); setSettings(updated); toast({ title: "Settings saved" }); }
