@@ -8,6 +8,7 @@ import { z } from "zod";
 import bcrypt from "bcrypt";
 import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, insertContactAccessBadgeSchema, insertInfrastructureEquipmentSchema, insertInfrastructurePortSchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
+import { startImapPoller, stopImapPoller, pollMailbox } from "./imap-poller";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
 import { searchZabbixHosts, getZabbixPortStatuses, getZabbixPowerData, testZabbixConnection, isZabbixConfigured } from "./zabbix";
 
@@ -124,6 +125,8 @@ export async function registerRoutes(
       console.warn("[STARTUP] Email service not fully configured - check MAIL_PASSWORD secret");
     }
   });
+
+  startImapPoller(60000);
 
   await seedAdminUser();
 

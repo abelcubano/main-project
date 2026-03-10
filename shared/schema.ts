@@ -488,3 +488,9 @@ export type InsertInfrastructureEquipment = z.infer<typeof insertInfrastructureE
 export type InfrastructureEquipment = typeof infrastructureEquipment.$inferSelect;
 export type InsertInfrastructurePort = z.infer<typeof insertInfrastructurePortSchema>;
 export type InfrastructurePort = typeof infrastructurePorts.$inferSelect;
+
+export const processedEmails = pgTable("processed_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: text("message_id").notNull().unique(),
+  processedAt: timestamp("processed_at").notNull().defaultNow(),
+});

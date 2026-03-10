@@ -44,7 +44,7 @@ The platform follows a modular, component-based architecture designed for scalab
 
 - **Database**: PostgreSQL
 - **UI Libraries**: Radix UI, shadcn/ui, Lucide React (icons)
-- **Email**: Nodemailer for SMTP (Titan Email configured), supports templated notifications.
+- **Email**: Nodemailer for SMTP (Titan Email configured), supports templated notifications. IMAP polling via `imapflow` + `mailparser` converts incoming emails to tickets (`server/imap-poller.ts`, polls every 60s).
 - **PDF Generation**: PDFKit for professional invoice PDFs.
 - **SNMP**: `net-snmp` (Node.js SNMP client) for device interaction.
 - **Monitoring**: Grafana (embedded panels via iframe), Zabbix (JSON-RPC API for port status and power monitoring).
