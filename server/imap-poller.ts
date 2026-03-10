@@ -234,6 +234,7 @@ async function processEmail(parsed: any, settings: BillingSettings) {
   const ticket = await storage.createTicket({
     userId: ticketUserId,
     customerId: ticketCustomerId,
+    contactEmail: fromAddress,
     subject: cleanSubject,
     body: ticketBody,
     category: ticketCategory,
@@ -258,6 +259,22 @@ async function processEmail(parsed: any, settings: BillingSettings) {
     }, settings);
   } catch (err: any) {
     log(`Email notification error for new ticket: ${err.message}`);
+  }
+
+  try {
+    const ackBody = `Hello ${senderName},\n\nThank you for contacting 911-DC Support. We have received your request and created ticket #${ticket.ticketNumber}.\n\nSubject: ${cleanSubject}\n\nA support agent will review your request and respond shortly. You can reply to this email to add more information to your ticket.\n\nThank you,\n911-DC Support`;
+    await sendTicketNotificationEmail({
+      recipientEmail: fromAddress,
+      ticketNumber: ticket.ticketNumber,
+      subject: ticket.subject,
+      replyBody: ackBody,
+      replyAuthor: "911-DC Support",
+      customerName: senderName,
+      isAcknowledgment: true,
+    }, settings);
+    log(`Sent acknowledgment to ${fromAddress} for ticket #${ticket.ticketNumber}`);
+  } catch (err: any) {
+    log(`Failed to send acknowledgment to ${fromAddress}: ${err.message}`);
   }
 }
 

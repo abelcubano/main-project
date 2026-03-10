@@ -1,4 +1,6 @@
 import { storage } from "./storage";
+import https from "https";
+import http from "http";
 
 interface ZabbixConfig {
   url: string;
@@ -15,32 +17,69 @@ async function getZabbixConfig(): Promise<ZabbixConfig | null> {
   }
 }
 
+function zabbixHttpRequest(url: string, bodyStr: string, token: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const isHttps = parsed.protocol === "https:";
+    const options: https.RequestOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port || (isHttps ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "Content-Length": Buffer.byteLength(bodyStr),
+      },
+      ...(isHttps ? { rejectUnauthorized: false } : {}),
+    };
+
+    const transport = isHttps ? https : http;
+    const req = transport.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+          reject(new Error(`HTTP ${res.statusCode}: ${data.substring(0, 500)}`));
+        } else {
+          resolve(data);
+        }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, () => { req.destroy(new Error("Request timeout (15s)")); });
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
 async function zabbixRequest(method: string, params: any): Promise<any> {
   const config = await getZabbixConfig();
   if (!config) return null;
 
   const baseUrl = config.url.replace(/\/api_jsonrpc\.php\/?$/, "");
-  const response = await fetch(`${baseUrl}/api_jsonrpc.php`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${config.token}`,
-    },
-    body: JSON.stringify({
+  const url = `${baseUrl}/api_jsonrpc.php`;
+
+  try {
+    const bodyStr = JSON.stringify({
       jsonrpc: "2.0",
       method,
       params,
       id: 1,
-    }),
-  });
+    });
 
-  if (!response.ok) return null;
-  const data = await response.json();
-  if (data.error) {
-    console.error("[ZABBIX] API error:", data.error);
-    return null;
+    const responseText = await zabbixHttpRequest(url, bodyStr, config.token);
+    const data = JSON.parse(responseText);
+
+    if (data.error) {
+      console.error("[ZABBIX] API error:", JSON.stringify(data.error));
+      return null;
+    }
+    return data.result;
+  } catch (err: any) {
+    console.error(`[ZABBIX] Request failed for ${method}: ${err.message}`);
+    throw err;
   }
-  return data.result;
 }
 
 export async function searchZabbixHosts(query: string): Promise<any[]> {
@@ -162,11 +201,25 @@ export async function isZabbixConfigured(): Promise<boolean> {
 
 export async function testZabbixConnection(): Promise<{ success: boolean; message: string; version?: string }> {
   const config = await getZabbixConfig();
-  if (!config) return { success: false, message: "Zabbix not configured" };
+  if (!config) return { success: false, message: "Zabbix not configured. Set the Zabbix URL and API Token in Settings > Integrations." };
 
-  const result = await zabbixRequest("apiinfo.version", []);
-  if (result) {
-    return { success: true, message: `Connected to Zabbix ${result}`, version: result };
+  try {
+    const result = await zabbixRequest("apiinfo.version", []);
+    if (result) {
+      return { success: true, message: `Connected to Zabbix ${result}`, version: result };
+    }
+    return { success: false, message: "Zabbix API returned no version. Check the URL and token." };
+  } catch (err: any) {
+    const msg = err.message || String(err);
+    if (msg.includes("UNABLE_TO_VERIFY") || msg.includes("self-signed") || msg.includes("certificate")) {
+      return { success: false, message: `TLS certificate error: ${msg}. The app accepts self-signed certs — check if the URL is correct.` };
+    }
+    if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND")) {
+      return { success: false, message: `Cannot reach Zabbix server: ${msg}. Verify the URL is accessible from this server.` };
+    }
+    if (msg.includes("ETIMEDOUT") || msg.includes("timeout")) {
+      return { success: false, message: `Connection timed out: ${msg}. Check network/firewall rules.` };
+    }
+    return { success: false, message: `Zabbix connection error: ${msg}` };
   }
-  return { success: false, message: "Failed to connect to Zabbix API" };
 }

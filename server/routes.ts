@@ -1077,7 +1077,12 @@ export async function registerRoutes(
         if (req.body.status) updates.status = req.body.status;
         if (req.body.priority) updates.priority = req.body.priority;
         if (req.body.assignedTo !== undefined) updates.assignedTo = req.body.assignedTo || null;
-        if (req.body.category) updates.category = req.body.category;
+        if (req.body.category) {
+          const validCategories = ["support", "sales", "billing", "provisioning", "smart_hands", "abuse", "general"];
+          if (validCategories.includes(req.body.category)) {
+            updates.category = req.body.category;
+          }
+        }
         if (req.body.status === "closed" || req.body.status === "resolved") {
           updates.closedAt = new Date();
         }
@@ -1125,6 +1130,7 @@ export async function registerRoutes(
           const customer = ticket.customerId ? await storage.getCustomer(ticket.customerId) : null;
 
           if (user.role === "admin") {
+            const notifiedEmails = new Set<string>();
             if (ticket.customerId) {
               const customerUsers = await storage.getUsersByCustomer(ticket.customerId);
               const recipients = customerUsers.filter(u => u.email && u.permSupportView);
@@ -1137,7 +1143,18 @@ export async function registerRoutes(
                   replyAuthor: user.name,
                   customerName: customer?.name || "Customer",
                 }, settings);
+                notifiedEmails.add(recipient.email.toLowerCase());
               }
+            }
+            if (ticket.contactEmail && !notifiedEmails.has(ticket.contactEmail.toLowerCase())) {
+              await sendTicketNotificationEmail({
+                recipientEmail: ticket.contactEmail,
+                ticketNumber: ticket.ticketNumber,
+                subject: ticket.subject,
+                replyBody: req.body.body,
+                replyAuthor: user.name,
+                customerName: customer?.name || "Customer",
+              }, settings);
             }
           } else {
             const supportEmail = settings.supportEmailAddress || "info@911dc.us";
@@ -1769,12 +1786,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/zabbix/test", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
-    try {
-      const result = await testZabbixConnection();
-      res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to test Zabbix connection" });
-    }
+    const result = await testZabbixConnection();
+    res.json(result);
   });
 
   app.get("/api/admin/zabbix/host/:hostId/ports", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {

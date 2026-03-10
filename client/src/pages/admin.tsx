@@ -244,6 +244,7 @@ export default function AdminPage() {
   const [allTickets, setAllTickets] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [allDevices, setAllDevices] = useState<any[]>([]);
+  const [settingsTab, setSettingsTab] = useState<"billing" | "email" | "email-server" | "infrastructure" | "integrations">("billing");
 
   function navigateToSection(section: AdminSection) {
     setCurrentSection(section);
@@ -362,7 +363,6 @@ export default function AdminPage() {
       case "clients":
         return [{ title: "Accounts", items: [
           { icon: Building2, label: "All Customers", id: "customers", active: currentView === "customers", onClick: () => setCurrentView("customers") },
-          { icon: Users, label: "All Users", id: "users", active: currentView === "users", badge: allUsers.length || undefined, onClick: () => setCurrentView("users") },
         ]}];
       case "support": {
         const statuses = [
@@ -410,14 +410,30 @@ export default function AdminPage() {
         return [{ title: "Billing", items: [
           { icon: CreditCard, label: "All Invoices", id: "invoices", active: currentView === "invoices", onClick: () => setCurrentView("invoices") },
         ]}];
-      case "settings":
-        return [{ title: "Configuration", items: [
-          { icon: Settings, label: "Billing Config", id: "settings", active: currentView === "settings", onClick: () => setCurrentView("settings") },
-        ]}];
+      case "settings": {
+        const groups: { title: string; items: any[] }[] = [];
+        const hasSettingsPerm = !user || (user as any).adminRole === "super_admin" || (user as any).adminPermSettings !== false;
+        const hasUsersPerm = !user || (user as any).adminRole === "super_admin" || (user as any).adminPermUsers !== false;
+        if (hasSettingsPerm) {
+          groups.push({ title: "Configuration", items: [
+            { icon: CreditCard, label: "Billing", id: "settings-billing", active: currentView === "settings" && settingsTab === "billing", onClick: () => { setSettingsTab("billing"); setCurrentView("settings"); } },
+            { icon: Mail, label: "Email Templates", id: "settings-email", active: currentView === "settings" && settingsTab === "email", onClick: () => { setSettingsTab("email"); setCurrentView("settings"); } },
+            { icon: Server, label: "Email Server", id: "settings-email-server", active: currentView === "settings" && settingsTab === "email-server", onClick: () => { setSettingsTab("email-server"); setCurrentView("settings"); } },
+            { icon: Network, label: "Infrastructure", id: "settings-infrastructure", active: currentView === "settings" && settingsTab === "infrastructure", onClick: () => { setSettingsTab("infrastructure"); setCurrentView("settings"); } },
+            { icon: Wifi, label: "Integrations", id: "settings-integrations", active: currentView === "settings" && settingsTab === "integrations", onClick: () => { setSettingsTab("integrations"); setCurrentView("settings"); } },
+          ]});
+        }
+        if (hasUsersPerm) {
+          groups.push({ title: "Access Control", items: [
+            { icon: Users, label: "Admin Users", id: "users", active: currentView === "users", badge: allUsers.filter(u => u.role === "admin").length || undefined, onClick: () => setCurrentView("users") },
+          ]});
+        }
+        return groups;
+      }
       default:
         return [];
     }
-  }, [currentSection, currentView, allUsers.length, ticketQueueFilter, ticketDeptFilter, allTickets]);
+  }, [currentSection, currentView, allUsers.length, ticketQueueFilter, ticketDeptFilter, allTickets, settingsTab]);
 
   const viewLabels: Record<AdminView, string> = {
     dashboard: "Dashboard",
@@ -455,7 +471,12 @@ export default function AdminPage() {
       settings: "adminPermSettings",
     };
     return (Object.entries(sectionPermMap) as [AdminSection, keyof AdminPermKeys][])
-      .filter(([, perm]) => (user as any)[perm] === false)
+      .filter(([section, perm]) => {
+        if (section === "settings") {
+          return (user as any).adminPermSettings === false && (user as any).adminPermUsers === false;
+        }
+        return (user as any)[perm] === false;
+      })
       .map(([section]) => section);
   }, [user]);
 
@@ -499,7 +520,7 @@ export default function AdminPage() {
           <CustomerDetailView token={token} customerId={selectedCustomerId} onBack={() => { setSelectedCustomerId(null); setCurrentView("customers"); }} />
         )}
         {currentView === "devices" && <DevicesView token={token} devices={allDevices} onRefresh={loadDevices} />}
-        {currentView === "settings" && <SettingsView token={token} />}
+        {currentView === "settings" && <SettingsView token={token} activeTab={settingsTab} />}
         {currentView === "tickets" && (
           <TicketsView
             token={token}
@@ -1936,8 +1957,11 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
                 </select>
               </div>
               <div>
-                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Category</label>
-                <div className="text-sm text-slate-700 capitalize">{ticketDetail.category?.replace("_", " ") || "—"}</div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Queue</label>
+                <select value={ticketDetail.category || "general"} onChange={(e) => handleUpdateTicket("category", e.target.value)}
+                  className="w-full text-sm px-2.5 py-1.5 border border-slate-200 rounded-md bg-white outline-none focus:border-blue-400" data-testid="select-ticket-category">
+                  {[{v:"support",l:"Support"},{v:"sales",l:"Sales"},{v:"billing",l:"Billing"},{v:"provisioning",l:"Provisioning"},{v:"smart_hands",l:"SmartHands"},{v:"abuse",l:"Abuse"},{v:"general",l:"General"}].map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Customer</label>
@@ -2085,9 +2109,8 @@ const INVITATION_PLACEHOLDERS = [
   { var: "{{portalUrl}}", desc: "Portal login URL" },
 ];
 
-function SettingsView({ token }: { token: string | null }) {
+function SettingsView({ token, activeTab }: { token: string | null; activeTab: "billing" | "email" | "email-server" | "infrastructure" | "integrations" }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"billing" | "email" | "email-server" | "infrastructure" | "integrations">("billing");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<BillingSettingsData>({
@@ -2194,6 +2217,7 @@ function SettingsView({ token }: { token: string | null }) {
   }
 
   useEffect(() => { loadSettings(); }, []);
+  useEffect(() => { if (activeTab === "infrastructure") loadEquipment(); }, [activeTab]);
 
   async function handleSave() {
     setSaving(true);
@@ -2239,24 +2263,8 @@ function SettingsView({ token }: { token: string | null }) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" data-testid="settings-view">
-      <div className="bg-white border-b border-slate-200 flex items-center px-5 flex-shrink-0">
-        <div className="flex gap-1">
-          <button onClick={() => setActiveTab("billing")}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "billing" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            data-testid="tab-billing-settings">Billing</button>
-          <button onClick={() => setActiveTab("email")}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            data-testid="tab-email-templates">Email Templates</button>
-          <button onClick={() => setActiveTab("email-server")}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email-server" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            data-testid="tab-email-server">Email Server</button>
-          <button onClick={() => { setActiveTab("infrastructure"); loadEquipment(); }}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "infrastructure" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            data-testid="tab-infrastructure">Infrastructure</button>
-          <button onClick={() => setActiveTab("integrations")}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "integrations" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            data-testid="tab-integrations">Integrations</button>
-        </div>
+      <div className="bg-white border-b border-slate-200 flex items-center px-5 h-12 flex-shrink-0">
+        <span className="text-sm font-semibold text-slate-800 capitalize">{activeTab.replace("-", " ")}</span>
         <div className="flex-1" />
         {(activeTab === "billing" || activeTab === "email" || activeTab === "email-server" || activeTab === "integrations") && (
           <button onClick={handleSave} disabled={saving} className={btnPrimary} data-testid="button-save-settings">

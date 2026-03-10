@@ -268,6 +268,7 @@ export const tickets = pgTable("tickets", {
   ticketNumber: serial("ticket_number").notNull().unique(),
   customerId: varchar("customer_id").references(() => customers.id),
   userId: varchar("user_id").notNull().references(() => users.id),
+  contactEmail: text("contact_email"),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
   category: text("category").notNull().default("general"),

@@ -362,6 +362,7 @@ export interface TicketNotificationData {
   replyAuthor: string;
   customerName: string;
   isNewTicket?: boolean;
+  isAcknowledgment?: boolean;
 }
 
 export async function sendTicketNotificationEmail(
@@ -382,13 +383,19 @@ export async function sendTicketNotificationEmail(
   const subjectTemplate = settings?.ticketEmailSubject || "[Ticket #{{ticketNumber}}] {{subject}}";
   const bodyTemplate = settings?.ticketEmailTemplate || "Hello {{customerName}},\n\n{{replyAuthor}} has replied to your ticket #{{ticketNumber}}:\n\nSubject: {{subject}}\n\n{{replyBody}}\n\nYou can view and respond to this ticket in your customer portal.\n\nThank you,\n911-DC Support";
 
-  const emailSubject = data.isNewTicket
-    ? `[New Ticket #${data.ticketNumber}] ${data.subject}`
-    : replaceTemplatePlaceholders(subjectTemplate, vars);
+  let emailSubject: string;
+  let emailBody: string;
 
-  const emailBody = data.isNewTicket
-    ? `New ticket #${data.ticketNumber} has been submitted by ${data.replyAuthor} (${data.customerName}).\n\nSubject: ${data.subject}\n\n${data.replyBody}\n\nPlease review and respond.\n\n911-DC Support`
-    : replaceTemplatePlaceholders(bodyTemplate, vars);
+  if (data.isAcknowledgment) {
+    emailSubject = `[Ticket #${data.ticketNumber}] ${data.subject}`;
+    emailBody = data.replyBody;
+  } else if (data.isNewTicket) {
+    emailSubject = `[New Ticket #${data.ticketNumber}] ${data.subject}`;
+    emailBody = `New ticket #${data.ticketNumber} has been submitted by ${data.replyAuthor} (${data.customerName}).\n\nSubject: ${data.subject}\n\n${data.replyBody}\n\nPlease review and respond.\n\n911-DC Support`;
+  } else {
+    emailSubject = replaceTemplatePlaceholders(subjectTemplate, vars);
+    emailBody = replaceTemplatePlaceholders(bodyTemplate, vars);
+  }
 
   const htmlBody = wrapInEmailHtml(emailBody);
 
