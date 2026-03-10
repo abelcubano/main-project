@@ -1090,6 +1090,59 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/tickets/bulk", requireAuth, requireAdmin, requireAdminPerm("support"), async (req: any, res) => {
+    try {
+      const { ticketIds, action, value } = req.body;
+      if (!Array.isArray(ticketIds) || ticketIds.length === 0) {
+        return res.status(400).json({ error: "ticketIds must be a non-empty array" });
+      }
+      if (!["status", "category", "assignedTo", "delete"].includes(action)) {
+        return res.status(400).json({ error: "Invalid action" });
+      }
+
+      if (action === "delete") {
+        const count = await storage.bulkDeleteTickets(ticketIds);
+        return res.json({ success: true, affected: count });
+      }
+
+      const validStatuses = ["new", "open", "in_progress", "waiting", "resolved", "closed"];
+      const validCategories = ["support", "sales", "billing", "provisioning", "smart_hands", "abuse", "general"];
+
+      if (action === "status" && !validStatuses.includes(value)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      if (action === "category" && !validCategories.includes(value)) {
+        return res.status(400).json({ error: "Invalid category value" });
+      }
+
+      const updates: any = {};
+      if (action === "assignedTo") {
+        if (value && value !== "unassigned") {
+          const assignee = await storage.getUser(value);
+          if (!assignee || assignee.role !== "admin") {
+            return res.status(400).json({ error: "Invalid assignee" });
+          }
+          updates.assignedTo = value;
+        } else {
+          updates.assignedTo = null;
+        }
+      } else if (action === "status") {
+        updates.status = value;
+        if (value === "resolved" || value === "closed") {
+          updates.closedAt = new Date();
+        }
+      } else {
+        updates[action] = value;
+      }
+
+      const count = await storage.bulkUpdateTickets(ticketIds, updates);
+      res.json({ success: true, affected: count });
+    } catch (error: any) {
+      console.error("[TICKETS] Bulk operation error:", error.message);
+      res.status(500).json({ error: "Bulk operation failed" });
+    }
+  });
+
   app.put("/api/tickets/:id", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {
       const ticketId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

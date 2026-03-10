@@ -21,7 +21,7 @@ import {
   infrastructureEquipment, infrastructurePorts
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, desc, isNull } from "drizzle-orm";
+import { eq, and, gt, desc, isNull, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -74,6 +74,8 @@ export interface IStorage {
   updateTicket(id: string, updates: Partial<InsertTicket>): Promise<Ticket | undefined>;
   getTicketReplies(ticketId: string): Promise<TicketReply[]>;
   createTicketReply(reply: InsertTicketReply): Promise<TicketReply>;
+  bulkUpdateTickets(ids: string[], updates: Partial<InsertTicket>): Promise<number>;
+  bulkDeleteTickets(ids: string[]): Promise<number>;
 
   getAllDevices(): Promise<Device[]>;
   getDevice(id: string): Promise<Device | undefined>;
@@ -337,6 +339,24 @@ export class DatabaseStorage implements IStorage {
   async createTicketReply(reply: InsertTicketReply): Promise<TicketReply> {
     const [created] = await db.insert(ticketReplies).values(reply).returning();
     return created;
+  }
+
+  async bulkUpdateTickets(ids: string[], updates: Partial<InsertTicket>): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await db.update(tickets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(inArray(tickets.id, ids))
+      .returning();
+    return result.length;
+  }
+
+  async bulkDeleteTickets(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    return await db.transaction(async (tx) => {
+      await tx.delete(ticketReplies).where(inArray(ticketReplies.ticketId, ids));
+      const result = await tx.delete(tickets).where(inArray(tickets.id, ids)).returning();
+      return result.length;
+    });
   }
 
   async getAllDevices(): Promise<Device[]> {

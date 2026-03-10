@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
+import DOMPurify from "dompurify";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Service as DbService, Invoice as DbInvoice, Ticket as DbTicket } from "@shared/schema";
@@ -904,7 +905,11 @@ export default function PortalPage() {
                         )}
                       </div>
                       <Separator className="bg-slate-100" />
-                      <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed" data-testid="text-ticket-body">{ticketDetail.body}</div>
+                      {ticketDetail.body?.startsWith("<") ? (
+                        <div className="text-xs text-slate-700 leading-relaxed ticket-html-content" data-testid="text-ticket-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(ticketDetail.body) }} />
+                      ) : (
+                        <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed" data-testid="text-ticket-body">{ticketDetail.body}</div>
+                      )}
                     </div>
                   </Card>
 
@@ -930,7 +935,11 @@ export default function PortalPage() {
                               </div>
                               <span className="text-[10px] text-slate-500">{new Date(reply.createdAt).toLocaleString()}</span>
                             </div>
-                            <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed ml-8">{reply.body}</div>
+                            {reply.body?.startsWith("<") ? (
+                              <div className="text-xs text-slate-700 leading-relaxed ml-8 ticket-html-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(reply.body) }} />
+                            ) : (
+                              <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed ml-8">{reply.body}</div>
+                            )}
                           </div>
                         ))
                       )}

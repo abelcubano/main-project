@@ -25,6 +25,9 @@ export function AdminTable<T extends Record<string, any>>({
   selectedId,
   getRowId,
   rowTestIdPrefix,
+  selectable,
+  selectedIds,
+  onSelectionChange,
 }: {
   data: T[];
   columns: ColumnDef<T>[];
@@ -37,6 +40,9 @@ export function AdminTable<T extends Record<string, any>>({
   selectedId?: string | number | null;
   getRowId?: (row: T) => string | number;
   rowTestIdPrefix?: string;
+  selectable?: boolean;
+  selectedIds?: Set<string | number>;
+  onSelectionChange?: (ids: Set<string | number>) => void;
 }) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -92,6 +98,28 @@ export function AdminTable<T extends Record<string, any>>({
         <table className="w-full" data-testid="admin-data-table">
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
+              {selectable && getRowId && (
+                <th style={{ width: "36px" }} className="text-center py-2.5 px-1">
+                  <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-blue-600"
+                    checked={sorted.length > 0 && selectedIds != null && sorted.every(r => selectedIds.has(getRowId(r)))}
+                    onChange={(e) => {
+                      if (!onSelectionChange || !getRowId) return;
+                      if (e.target.checked) {
+                        const allIds = new Set(selectedIds);
+                        sorted.forEach(r => allIds.add(getRowId(r)));
+                        onSelectionChange(allIds);
+                      } else {
+                        const remaining = new Set(selectedIds);
+                        sorted.forEach(r => remaining.delete(getRowId(r)));
+                        onSelectionChange(remaining);
+                      }
+                    }}
+                    data-testid="checkbox-select-all"
+                  />
+                </th>
+              )}
               {columns.map(col => (
                 <th
                   key={col.key}
@@ -118,7 +146,7 @@ export function AdminTable<T extends Record<string, any>>({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="text-center py-10 text-sm text-slate-400">
+                <td colSpan={columns.length + (selectable ? 1 : 0)} className="text-center py-10 text-sm text-slate-400">
                   {emptyMessage}
                 </td>
               </tr>
@@ -126,6 +154,7 @@ export function AdminTable<T extends Record<string, any>>({
               sorted.map((row, i) => {
                 const rowId = getRowId?.(row);
                 const isSelected = selectedId != null && rowId != null && String(rowId) === String(selectedId);
+                const isChecked = selectable && selectedIds != null && rowId != null && selectedIds.has(rowId);
                 return (
                   <tr
                     key={rowId ?? i}
@@ -133,12 +162,31 @@ export function AdminTable<T extends Record<string, any>>({
                     className={cn(
                       "border-b border-slate-100 transition-colors",
                       onRowClick && "cursor-pointer",
-                      isSelected
-                        ? "bg-blue-50 hover:bg-blue-50"
-                        : i % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/30 hover:bg-slate-50"
+                      isChecked
+                        ? "bg-blue-50/70 hover:bg-blue-50"
+                        : isSelected
+                          ? "bg-blue-50 hover:bg-blue-50"
+                          : i % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/30 hover:bg-slate-50"
                     )}
                     data-testid={`${rowTestIdPrefix ? `row-${rowTestIdPrefix}-` : "row-"}${rowId ?? i}`}
                   >
+                    {selectable && getRowId && (
+                      <td className="text-center py-2.5 px-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer accent-blue-600"
+                          checked={!!isChecked}
+                          onChange={(e) => {
+                            if (!onSelectionChange || rowId == null) return;
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) next.add(rowId);
+                            else next.delete(rowId);
+                            onSelectionChange(next);
+                          }}
+                          data-testid={`checkbox-row-${rowId ?? i}`}
+                        />
+                      </td>
+                    )}
                     {columns.map(col => (
                       <td
                         key={col.key}

@@ -1817,6 +1817,11 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [fromAddresses, setFromAddresses] = useState<{ label: string; email: string }[]>([]);
   const [selectedFrom, setSelectedFrom] = useState("");
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string | number>>(new Set());
+  const [bulkAction, setBulkAction] = useState("");
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } })
@@ -1827,7 +1832,7 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
       .then(r => r.ok ? r.json() : []).then(addrs => { setFromAddresses(addrs); if (addrs.length > 0) setSelectedFrom(addrs[0].email); }).catch(() => {});
   }, []);
 
-  useEffect(() => { setTicketDetail(null); setSelectedTicket(null); }, [filter, deptFilter]);
+  useEffect(() => { setTicketDetail(null); setSelectedTicket(null); setSelectedTicketIds(new Set()); }, [filter, deptFilter]);
 
   const filteredTickets = useMemo(() => {
     let result = tickets;
@@ -1875,6 +1880,64 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
       });
       if (res.ok) { loadTicketDetail(ticketDetail.id); onRefresh(); toast({ title: `Ticket ${field} updated` }); }
     } catch {} finally { setUpdatingField(false); }
+  }
+
+  async function handleBulkAction() {
+    if (selectedTicketIds.size === 0) return;
+    const ticketIds = Array.from(selectedTicketIds);
+    if (bulkAction === "delete") {
+      setShowBulkDeleteConfirm(true);
+      return;
+    }
+    if (!bulkAction || !bulkValue) return;
+    setBulkProcessing(true);
+    try {
+      const res = await fetch("/api/admin/tickets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ticketIds, action: bulkAction, value: bulkValue }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: `Updated ${data.affected} ticket(s)` });
+        setSelectedTicketIds(new Set());
+        setBulkAction("");
+        setBulkValue("");
+        onRefresh();
+      } else {
+        const err = await res.json();
+        toast({ title: "Bulk action failed", description: err.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Bulk action failed", variant: "destructive" });
+    } finally { setBulkProcessing(false); }
+  }
+
+  async function handleBulkDelete() {
+    const ticketIds = Array.from(selectedTicketIds);
+    setBulkProcessing(true);
+    setShowBulkDeleteConfirm(false);
+    try {
+      const res = await fetch("/api/admin/tickets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ticketIds, action: "delete" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: `Deleted ${data.affected} ticket(s)` });
+        setSelectedTicketIds(new Set());
+        setBulkAction("");
+        setTicketDetail(null);
+        setSelectedTicket(null);
+        onRefresh();
+      } else {
+        const err = await res.json();
+        toast({ title: "Delete failed", description: err.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    } finally { setBulkProcessing(false); }
   }
 
   async function handleCreateTicket() {
@@ -2043,6 +2106,48 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {selectedTicketIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border-b border-blue-200 flex-shrink-0" data-testid="bulk-actions-bar">
+          <span className="text-xs font-semibold text-blue-700">{selectedTicketIds.size} selected</span>
+          <select value={bulkAction} onChange={(e) => { setBulkAction(e.target.value); setBulkValue(""); }} className="h-7 text-xs border border-blue-200 rounded bg-white px-2 outline-none" data-testid="select-bulk-action">
+            <option value="">Choose action...</option>
+            <option value="status">Change Status</option>
+            <option value="category">Change Category</option>
+            <option value="assignedTo">Assign To</option>
+            <option value="delete">Delete</option>
+          </select>
+          {bulkAction === "status" && (
+            <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="h-7 text-xs border border-blue-200 rounded bg-white px-2 outline-none" data-testid="select-bulk-value">
+              <option value="">Select status...</option>
+              <option value="new">New</option><option value="open">Open</option>
+              <option value="in_progress">In Progress</option><option value="waiting">Waiting</option>
+              <option value="resolved">Resolved</option><option value="closed">Closed</option>
+            </select>
+          )}
+          {bulkAction === "category" && (
+            <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="h-7 text-xs border border-blue-200 rounded bg-white px-2 outline-none" data-testid="select-bulk-value">
+              <option value="">Select category...</option>
+              <option value="support">Support</option><option value="sales">Sales</option>
+              <option value="billing">Billing</option><option value="provisioning">Provisioning</option>
+              <option value="smart_hands">SmartHands</option><option value="abuse">Abuse</option>
+              <option value="general">General</option>
+            </select>
+          )}
+          {bulkAction === "assignedTo" && (
+            <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="h-7 text-xs border border-blue-200 rounded bg-white px-2 outline-none" data-testid="select-bulk-value">
+              <option value="">Select assignee...</option>
+              <option value="unassigned">Unassigned</option>
+              {adminUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+          <button onClick={handleBulkAction} disabled={bulkProcessing || (!bulkAction) || (bulkAction !== "delete" && !bulkValue)} className="h-7 px-3 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" data-testid="button-bulk-apply">
+            {bulkProcessing ? "Processing..." : "Apply"}
+          </button>
+          <button onClick={() => setSelectedTicketIds(new Set())} className="h-7 px-3 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50" data-testid="button-bulk-clear">
+            Clear
+          </button>
+        </div>
+      )}
       <AdminTable
         data={filteredTickets}
         columns={ticketColumns}
@@ -2052,6 +2157,9 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
         getRowId={(row) => row.id}
         rowTestIdPrefix="ticket"
         emptyMessage="No tickets match this filter"
+        selectable
+        selectedIds={selectedTicketIds}
+        onSelectionChange={setSelectedTicketIds}
         actions={
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-slate-700">{queueTitle}{filterSuffix} ({filteredTickets.length})</span>
@@ -2111,6 +2219,21 @@ function TicketsView({ token, tickets, filter, deptFilter, userId, onRefresh }: 
             <button onClick={handleCreateTicket} disabled={!newTicket.subject.trim() || !newTicket.customerId || creating}
               className={`w-full ${btnPrimary} justify-center`} data-testid="button-create-ticket">
               {creating ? "Creating..." : "Create Ticket"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedTicketIds.size} Ticket(s)?</DialogTitle>
+            <DialogDescription>This will permanently delete the selected tickets and all their replies. This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={() => setShowBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50" data-testid="button-cancel-bulk-delete">Cancel</button>
+            <button onClick={handleBulkDelete} disabled={bulkProcessing} className="px-4 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" data-testid="button-confirm-bulk-delete">
+              {bulkProcessing ? "Deleting..." : "Delete"}
             </button>
           </div>
         </DialogContent>
