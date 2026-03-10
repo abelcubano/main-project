@@ -31,9 +31,16 @@ import {
   Ticket,
   Trash2,
   Save,
+  Search,
   Users,
   Wifi,
   X,
+  Zap,
+  Router,
+  Plug,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2068,7 +2075,7 @@ const INVITATION_PLACEHOLDERS = [
 
 function SettingsView({ token }: { token: string | null }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"billing" | "email" | "email-server">("billing");
+  const [activeTab, setActiveTab] = useState<"billing" | "email" | "email-server" | "infrastructure" | "integrations">("billing");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<BillingSettingsData>({
@@ -2077,6 +2084,93 @@ function SettingsView({ token }: { token: string | null }) {
     invitationEmailSubject: "", invitationEmailTemplate: "",
   });
   const [previewType, setPreviewType] = useState<"billing" | "invitation" | null>(null);
+  const [equipment, setEquipment] = useState<any[]>([]);
+  const [infraLoading, setInfraLoading] = useState(false);
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<any | null>(null);
+  const [expandedEquipment, setExpandedEquipment] = useState<string | null>(null);
+  const [equipmentPorts, setEquipmentPorts] = useState<any[]>([]);
+  const [showBulkPortForm, setShowBulkPortForm] = useState(false);
+  const [bulkPortForm, setBulkPortForm] = useState({ count: 24, pattern: "Gi0/{n}", portType: "ethernet", speed: "1Gbps" });
+  const [equipmentForm, setEquipmentForm] = useState({
+    name: "", equipmentType: "switch", manufacturer: "", model: "", serialNumber: "",
+    managementIp: "", facility: "", rack: "", rackPosition: "", rackUnits: "", totalPorts: "", status: "active", notes: "", zabbixHostId: "",
+  });
+  const [zabbixSearchQuery, setZabbixSearchQuery] = useState("");
+  const [zabbixSearchResults, setZabbixSearchResults] = useState<any[]>([]);
+  const [zabbixTesting, setZabbixTesting] = useState(false);
+
+  async function loadEquipment() {
+    setInfraLoading(true);
+    try {
+      const res = await fetch("/api/admin/infrastructure", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setEquipment(await res.json());
+    } catch {} finally { setInfraLoading(false); }
+  }
+
+  async function loadEquipmentPorts(eqId: string) {
+    try {
+      const res = await fetch(`/api/admin/infrastructure/${eqId}/ports`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setEquipmentPorts(await res.json());
+    } catch {}
+  }
+
+  async function handleSaveEquipment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!equipmentForm.name.trim()) return;
+    try {
+      const body: any = { ...equipmentForm, totalPorts: equipmentForm.totalPorts ? parseInt(equipmentForm.totalPorts) : null, rackUnits: equipmentForm.rackUnits ? parseInt(equipmentForm.rackUnits) : null };
+      const url = editingEquipment ? `/api/admin/infrastructure/${editingEquipment.id}` : "/api/admin/infrastructure";
+      const res = await fetch(url, { method: editingEquipment ? "PUT" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      if (res.ok) { toast({ title: editingEquipment ? "Equipment updated" : "Equipment created" }); setShowEquipmentModal(false); loadEquipment(); }
+      else { const err = await res.json(); toast({ title: "Error", description: err.error || "Failed", variant: "destructive" }); }
+    } catch { toast({ title: "Error", description: "Failed to save equipment", variant: "destructive" }); }
+  }
+
+  async function handleDeleteEquipment(id: string) {
+    if (!confirm("Delete this equipment and all its ports?")) return;
+    try {
+      const res = await fetch(`/api/admin/infrastructure/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { toast({ title: "Equipment deleted" }); loadEquipment(); if (expandedEquipment === id) setExpandedEquipment(null); }
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+  }
+
+  async function handleBulkCreatePorts(eqId: string) {
+    try {
+      const res = await fetch(`/api/admin/infrastructure/${eqId}/ports/bulk`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(bulkPortForm),
+      });
+      if (res.ok) { toast({ title: `${bulkPortForm.count} ports created` }); setShowBulkPortForm(false); loadEquipmentPorts(eqId); loadEquipment(); }
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+  }
+
+  async function handleDeletePort(portId: string) {
+    if (!expandedEquipment) return;
+    try {
+      const res = await fetch(`/api/admin/infrastructure/ports/${portId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { toast({ title: "Port deleted" }); loadEquipmentPorts(expandedEquipment); loadEquipment(); }
+    } catch {}
+  }
+
+  async function searchZabbixHosts(query: string) {
+    if (!query.trim()) { setZabbixSearchResults([]); return; }
+    try {
+      const res = await fetch(`/api/admin/zabbix/hosts?search=${encodeURIComponent(query)}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setZabbixSearchResults(await res.json());
+    } catch {}
+  }
+
+  async function testZabbixConnection() {
+    setZabbixTesting(true);
+    try {
+      const res = await fetch("/api/admin/zabbix/test", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (res.ok) toast({ title: "Zabbix Connected", description: data.message || "Connection successful" });
+      else toast({ title: "Zabbix Connection Failed", description: data.error || "Check your configuration", variant: "destructive" });
+    } catch { toast({ title: "Error", variant: "destructive" }); }
+    finally { setZabbixTesting(false); }
+  }
 
   async function loadSettings() {
     setLoading(true);
@@ -2105,6 +2199,7 @@ function SettingsView({ token }: { token: string | null }) {
           imapPassword: settings.imapPassword, imapSecure: settings.imapSecure,
           supportEmailAddress: settings.supportEmailAddress, ticketEmailSubject: settings.ticketEmailSubject,
           ticketEmailTemplate: settings.ticketEmailTemplate,
+          zabbixUrl: (settings as any).zabbixUrl, zabbixApiToken: (settings as any).zabbixApiToken,
         }),
       });
       if (res.ok) { const updated = await res.json(); setSettings(updated); toast({ title: "Settings saved" }); }
@@ -2143,11 +2238,19 @@ function SettingsView({ token }: { token: string | null }) {
           <button onClick={() => setActiveTab("email-server")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "email-server" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
             data-testid="tab-email-server">Email Server</button>
+          <button onClick={() => { setActiveTab("infrastructure"); loadEquipment(); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "infrastructure" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            data-testid="tab-infrastructure">Infrastructure</button>
+          <button onClick={() => setActiveTab("integrations")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "integrations" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            data-testid="tab-integrations">Integrations</button>
         </div>
         <div className="flex-1" />
-        <button onClick={handleSave} disabled={saving} className={btnPrimary} data-testid="button-save-settings">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Save Settings
-        </button>
+        {(activeTab === "billing" || activeTab === "email" || activeTab === "email-server" || activeTab === "integrations") && (
+          <button onClick={handleSave} disabled={saving} className={btnPrimary} data-testid="button-save-settings">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Save Settings
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -2323,6 +2426,205 @@ function SettingsView({ token }: { token: string | null }) {
             </div>
           </div>
         )}
+        {activeTab === "infrastructure" && (
+          <div className="max-w-5xl" data-testid="infrastructure-panel">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Network Infrastructure</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Switches, routers, patch panels, PDUs and their ports</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={loadEquipment} className={btnSecondary} data-testid="button-refresh-infrastructure"><RefreshCw className="w-3.5 h-3.5" />Refresh</button>
+                <button onClick={() => { setEditingEquipment(null); setEquipmentForm({ name: "", equipmentType: "switch", manufacturer: "", model: "", serialNumber: "", managementIp: "", facility: "", rack: "", rackPosition: "", rackUnits: "", totalPorts: "", status: "active", notes: "", zabbixHostId: "" }); setShowEquipmentModal(true); }} className={btnPrimary} data-testid="button-add-equipment"><Plus className="w-4 h-4" />Add Equipment</button>
+              </div>
+            </div>
+            {infraLoading ? <div className="text-center py-8 text-slate-400 text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading...</div> : equipment.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-sm text-slate-500">No infrastructure equipment configured. Add switches, routers, or PDUs to get started.</div>
+            ) : (
+              <div className="space-y-2">
+                {equipment.map((eq: any) => (
+                  <div key={eq.id} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden" data-testid={`equipment-${eq.id}`}>
+                    <div className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => { if (expandedEquipment === eq.id) { setExpandedEquipment(null); } else { setExpandedEquipment(eq.id); loadEquipmentPorts(eq.id); } }}>
+                      {expandedEquipment === eq.id ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {eq.equipmentType === "switch" && <Network className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                        {eq.equipmentType === "router" && <Router className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+                        {eq.equipmentType === "pdu" && <Plug className="w-4 h-4 text-amber-600 flex-shrink-0" />}
+                        {eq.equipmentType === "patch_panel" && <Cable className="w-4 h-4 text-teal-600 flex-shrink-0" />}
+                        {!["switch", "router", "pdu", "patch_panel"].includes(eq.equipmentType) && <Server className="w-4 h-4 text-slate-600 flex-shrink-0" />}
+                        <span className="text-sm font-semibold text-slate-900 truncate">{eq.name}</span>
+                        <span className="text-xs text-slate-400 capitalize">{eq.equipmentType.replace("_", " ")}</span>
+                      </div>
+                      {eq.manufacturer && <span className="text-xs text-slate-500 hidden sm:block">{eq.manufacturer}{eq.model ? ` ${eq.model}` : ""}</span>}
+                      {eq.facility && <span className="text-xs text-slate-400 hidden sm:block">{eq.facility}{eq.rack ? ` / ${eq.rack}` : ""}</span>}
+                      <span className="text-xs font-mono text-slate-500">{eq.usedPorts || 0}/{eq.totalPortsActual || eq.totalPorts || 0} ports</span>
+                      <StatusBadge status={eq.status} showDot />
+                      <button onClick={(e) => { e.stopPropagation(); setEditingEquipment(eq); setEquipmentForm({ name: eq.name || "", equipmentType: eq.equipmentType || "switch", manufacturer: eq.manufacturer || "", model: eq.model || "", serialNumber: eq.serialNumber || "", managementIp: eq.managementIp || "", facility: eq.facility || "", rack: eq.rack || "", rackPosition: eq.rackPosition || "", rackUnits: eq.rackUnits?.toString() || "", totalPorts: eq.totalPorts?.toString() || "", status: eq.status || "active", notes: eq.notes || "", zabbixHostId: eq.zabbixHostId || "" }); setShowEquipmentModal(true); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium" data-testid={`button-edit-equipment-${eq.id}`}>Edit</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium" data-testid={`button-delete-equipment-${eq.id}`}>Delete</button>
+                    </div>
+                    {expandedEquipment === eq.id && (
+                      <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-700">Ports / Outlets</span>
+                          <div className="flex gap-2">
+                            <button onClick={() => setShowBulkPortForm(!showBulkPortForm)} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="button-bulk-ports"><Plus className="w-3 h-3" />Generate Ports</button>
+                          </div>
+                        </div>
+                        {showBulkPortForm && (
+                          <div className="mb-3 p-3 bg-white rounded-md border border-slate-200 space-y-2">
+                            <div className="grid grid-cols-4 gap-2">
+                              <div><label className="text-[10px] text-slate-500 block mb-0.5">Count</label>
+                                <input type="number" min={1} max={96} value={bulkPortForm.count} onChange={(e) => setBulkPortForm({ ...bulkPortForm, count: parseInt(e.target.value) || 1 })} className={inputCls} data-testid="input-bulk-count" /></div>
+                              <div><label className="text-[10px] text-slate-500 block mb-0.5">Pattern</label>
+                                <input value={bulkPortForm.pattern} onChange={(e) => setBulkPortForm({ ...bulkPortForm, pattern: e.target.value })} placeholder="Gi0/{n}" className={inputCls} data-testid="input-bulk-pattern" /></div>
+                              <div><label className="text-[10px] text-slate-500 block mb-0.5">Type</label>
+                                <select value={bulkPortForm.portType} onChange={(e) => setBulkPortForm({ ...bulkPortForm, portType: e.target.value })} className={inputCls}>
+                                  <option value="ethernet">Ethernet</option><option value="sfp">SFP</option><option value="sfp+">SFP+</option><option value="qsfp">QSFP</option><option value="power">Power</option><option value="fiber">Fiber</option><option value="console">Console</option>
+                                </select></div>
+                              <div><label className="text-[10px] text-slate-500 block mb-0.5">Speed</label>
+                                <input value={bulkPortForm.speed} onChange={(e) => setBulkPortForm({ ...bulkPortForm, speed: e.target.value })} placeholder="1Gbps" className={inputCls} /></div>
+                            </div>
+                            <div className="text-[10px] text-slate-500">Preview: {bulkPortForm.pattern.replace("{n}", "1")}, {bulkPortForm.pattern.replace("{n}", "2")}, ... {bulkPortForm.pattern.replace("{n}", String(bulkPortForm.count))}</div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleBulkCreatePorts(eq.id)} className={btnPrimary} data-testid="button-generate-ports">Generate</button>
+                              <button onClick={() => setShowBulkPortForm(false)} className={btnSecondary}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
+                        {equipmentPorts.length === 0 ? <div className="text-xs text-slate-400 italic py-2">No ports configured. Use "Generate Ports" to create them in bulk.</div> : (
+                          <div className="max-h-80 overflow-auto">
+                            <table className="w-full" data-testid="table-ports">
+                              <thead><tr className="bg-white border-b border-slate-200 sticky top-0">
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">Port</th>
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">Type</th>
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">Speed</th>
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">VLAN</th>
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">Status</th>
+                                <th className="text-left text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2">Connected</th>
+                                <th className="text-center text-[10px] font-semibold text-slate-600 uppercase tracking-wider py-1.5 px-2"></th>
+                              </tr></thead>
+                              <tbody>
+                                {equipmentPorts.map((port: any, i: number) => (
+                                  <tr key={port.id} className={`border-b border-slate-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`} data-testid={`row-port-${port.id}`}>
+                                    <td className="text-[12px] text-slate-900 py-1.5 px-2 font-mono">{port.portName}</td>
+                                    <td className="text-[12px] text-slate-500 py-1.5 px-2 capitalize">{port.portType}</td>
+                                    <td className="text-[12px] text-slate-500 py-1.5 px-2">{port.speed || "—"}</td>
+                                    <td className="text-[12px] text-slate-500 py-1.5 px-2">{port.vlan || "—"}</td>
+                                    <td className="py-1.5 px-2">
+                                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${port.status === "available" ? "bg-green-50 text-green-700" : port.status === "in_use" ? "bg-blue-50 text-blue-700" : port.status === "reserved" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${port.status === "available" ? "bg-green-500" : port.status === "in_use" ? "bg-blue-500" : port.status === "reserved" ? "bg-amber-500" : "bg-slate-400"}`} />
+                                        {port.status}
+                                      </span>
+                                    </td>
+                                    <td className="text-[12px] text-slate-500 py-1.5 px-2">{port.connectedDeviceId ? "Connected" : "—"}</td>
+                                    <td className="py-1.5 px-2 text-center">
+                                      {port.status !== "in_use" && <button onClick={() => handleDeletePort(port.id)} className="text-red-600 hover:text-red-700"><Trash2 className="w-3 h-3" /></button>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Dialog open={showEquipmentModal} onOpenChange={setShowEquipmentModal}>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingEquipment ? "Edit Equipment" : "Add Equipment"}</DialogTitle>
+                  <DialogDescription>{editingEquipment ? "Update infrastructure equipment." : "Register new network gear."}</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSaveEquipment} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-xs text-slate-500 block mb-1">Name *</label>
+                      <input value={equipmentForm.name} onChange={(e) => setEquipmentForm({ ...equipmentForm, name: e.target.value })} className={inputCls} data-testid="input-equipment-name" /></div>
+                    <div><label className="text-xs text-slate-500 block mb-1">Type</label>
+                      <select value={equipmentForm.equipmentType} onChange={(e) => setEquipmentForm({ ...equipmentForm, equipmentType: e.target.value })} className={inputCls} data-testid="select-equipment-type">
+                        <option value="switch">Switch</option><option value="router">Router</option><option value="patch_panel">Patch Panel</option>
+                        <option value="pdu">PDU</option><option value="firewall">Firewall</option><option value="other">Other</option>
+                      </select></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-xs text-slate-500 block mb-1">Manufacturer</label>
+                      <input value={equipmentForm.manufacturer} onChange={(e) => setEquipmentForm({ ...equipmentForm, manufacturer: e.target.value })} placeholder="Cisco" className={inputCls} /></div>
+                    <div><label className="text-xs text-slate-500 block mb-1">Model</label>
+                      <input value={equipmentForm.model} onChange={(e) => setEquipmentForm({ ...equipmentForm, model: e.target.value })} placeholder="C9300-48P" className={inputCls} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-xs text-slate-500 block mb-1">Serial Number</label>
+                      <input value={equipmentForm.serialNumber} onChange={(e) => setEquipmentForm({ ...equipmentForm, serialNumber: e.target.value })} className={inputCls} /></div>
+                    <div><label className="text-xs text-slate-500 block mb-1">Management IP</label>
+                      <input value={equipmentForm.managementIp} onChange={(e) => setEquipmentForm({ ...equipmentForm, managementIp: e.target.value })} placeholder="10.0.0.1" className={inputCls} /></div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3">
+                    <span className="text-xs font-semibold text-slate-700 block mb-2">Location</span>
+                    <div className="grid grid-cols-4 gap-3">
+                      <div><label className="text-xs text-slate-500 block mb-1">Facility</label><input value={equipmentForm.facility} onChange={(e) => setEquipmentForm({ ...equipmentForm, facility: e.target.value })} className={inputCls} /></div>
+                      <div><label className="text-xs text-slate-500 block mb-1">Rack</label><input value={equipmentForm.rack} onChange={(e) => setEquipmentForm({ ...equipmentForm, rack: e.target.value })} className={inputCls} /></div>
+                      <div><label className="text-xs text-slate-500 block mb-1">Position (U)</label><input value={equipmentForm.rackPosition} onChange={(e) => setEquipmentForm({ ...equipmentForm, rackPosition: e.target.value })} className={inputCls} /></div>
+                      <div><label className="text-xs text-slate-500 block mb-1">Height (U)</label><input value={equipmentForm.rackUnits} onChange={(e) => setEquipmentForm({ ...equipmentForm, rackUnits: e.target.value })} className={inputCls} /></div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-xs text-slate-500 block mb-1">Total Ports</label>
+                      <input type="number" value={equipmentForm.totalPorts} onChange={(e) => setEquipmentForm({ ...equipmentForm, totalPorts: e.target.value })} className={inputCls} /></div>
+                    <div><label className="text-xs text-slate-500 block mb-1">Status</label>
+                      <select value={equipmentForm.status} onChange={(e) => setEquipmentForm({ ...equipmentForm, status: e.target.value })} className={inputCls}>
+                        <option value="active">Active</option><option value="inactive">Inactive</option><option value="maintenance">Maintenance</option>
+                      </select></div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3">
+                    <span className="text-xs font-semibold text-slate-700 block mb-2">Monitoring</span>
+                    <div><label className="text-xs text-slate-500 block mb-1">Zabbix Host ID</label>
+                      <div className="relative">
+                        <input value={equipmentForm.zabbixHostId} onChange={(e) => { setEquipmentForm({ ...equipmentForm, zabbixHostId: e.target.value }); searchZabbixHosts(e.target.value); }} placeholder="Search or enter Zabbix host ID..." className={inputCls} data-testid="input-equipment-zabbix" />
+                        {zabbixSearchResults.length > 0 && equipmentForm.zabbixHostId && (
+                          <div className="absolute z-10 top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-auto">
+                            {zabbixSearchResults.map((h: any) => (
+                              <button key={h.hostid} type="button" onClick={() => { setEquipmentForm({ ...equipmentForm, zabbixHostId: h.hostid }); setZabbixSearchResults([]); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                                <span className="font-medium text-slate-900">{h.host}</span> <span className="text-slate-400 ml-1">({h.hostid})</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div><label className="text-xs text-slate-500 block mb-1">Notes</label>
+                    <input value={equipmentForm.notes} onChange={(e) => setEquipmentForm({ ...equipmentForm, notes: e.target.value })} className={inputCls} /></div>
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => setShowEquipmentModal(false)} className={btnSecondary}>Cancel</button>
+                    <button type="submit" className={btnPrimary} data-testid="button-save-equipment">{editingEquipment ? "Update" : "Create"}</button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+        {activeTab === "integrations" && (
+          <div className="max-w-xl space-y-6" data-testid="integrations-panel">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-1">Zabbix Monitoring</h3>
+              <p className="text-xs text-slate-500 mb-3">Connect to your Zabbix server for real-time switch port status and power consumption monitoring.</p>
+              <div className="space-y-3">
+                <div><label className="text-xs text-slate-500 block mb-1">Zabbix API URL</label>
+                  <input value={(settings as any).zabbixUrl || ""} onChange={(e) => setSettings({ ...settings, zabbixUrl: e.target.value } as any)} placeholder="https://zabbix.example.com/api_jsonrpc.php" className={inputCls} data-testid="input-zabbix-url" /></div>
+                <div><label className="text-xs text-slate-500 block mb-1">API Token</label>
+                  <input type="password" value={(settings as any).zabbixApiToken || ""} onChange={(e) => setSettings({ ...settings, zabbixApiToken: e.target.value } as any)} placeholder="Enter Zabbix API token" className={inputCls} data-testid="input-zabbix-token" /></div>
+                <button type="button" onClick={testZabbixConnection} disabled={zabbixTesting} className={btnSecondary} data-testid="button-test-zabbix">
+                  {zabbixTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}Test Zabbix Connection
+                </button>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-xs text-slate-600">
+                  <strong>Note:</strong> After configuring the Zabbix URL and token, click "Save Settings" above, then use "Test Zabbix Connection" to verify the connection. Once configured, you can link Zabbix hosts to infrastructure equipment and devices for real-time monitoring.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2341,15 +2643,38 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
   const [customers, setCustomers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [newIp, setNewIp] = useState({ ipAddress: "", description: "", type: "public", vlan: "", ptrRecord: "" });
-  const [newInterface, setNewInterface] = useState({ name: "", status: "up", connectedPort: "", vlan: "", speed: "" });
+  const [newInterface, setNewInterface] = useState({ name: "", status: "up", connectedPort: "", vlan: "", speed: "", infrastructurePortId: "" });
   const [showIpForm, setShowIpForm] = useState(false);
   const [showInterfaceForm, setShowInterfaceForm] = useState(false);
+  const [availablePorts, setAvailablePorts] = useState<any[]>([]);
+  const [portStatuses, setPortStatuses] = useState<any[]>([]);
+  const [powerData, setPowerData] = useState<any>(null);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     fetch("/api/admin/customers", { headers: h }).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
     fetch("/api/services", { headers: h }).then(r => r.ok ? r.json() : []).then(setServices).catch(() => {});
   }, [token]);
+
+  async function loadAvailablePorts() {
+    try {
+      const res = await fetch("/api/admin/infrastructure/ports/available", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setAvailablePorts(await res.json());
+    } catch {}
+  }
+
+  async function loadMonitoringData(device: any) {
+    if (!device?.zabbixHostId) { setPortStatuses([]); setPowerData(null); return; }
+    const h = { Authorization: `Bearer ${token}` };
+    try {
+      const [ports, power] = await Promise.all([
+        fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/ports`, { headers: h }).then(r => r.ok ? r.json() : []),
+        fetch(`/api/admin/zabbix/host/${device.zabbixHostId}/power`, { headers: h }).then(r => r.ok ? r.json() : null),
+      ]);
+      setPortStatuses(ports);
+      setPowerData(power);
+    } catch { setPortStatuses([]); setPowerData(null); }
+  }
 
   async function loadDeviceDetail(id: string) {
     setLoadingDetail(true);
@@ -2360,7 +2685,7 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
         fetch(`/api/admin/devices/${id}/ips`, { headers: h }).then(r => r.ok ? r.json() : []),
         fetch(`/api/admin/devices/${id}/interfaces`, { headers: h }).then(r => r.ok ? r.json() : []),
       ]);
-      if (dev) { setDeviceDetail(dev); setSelectedDevice(dev); }
+      if (dev) { setDeviceDetail(dev); setSelectedDevice(dev); loadMonitoringData(dev); }
       setDeviceIps(ips);
       setDeviceInterfaces(ifaces);
       const children = devices.filter(d => d.parentDeviceId === id);
@@ -2398,11 +2723,13 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
   async function handleAddInterface() {
     if (!newInterface.name.trim() || !deviceDetail) return;
     try {
+      const body: any = { ...newInterface };
+      if (!body.infrastructurePortId) delete body.infrastructurePortId;
       const res = await fetch(`/api/admin/devices/${deviceDetail.id}/interfaces`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(newInterface),
+        body: JSON.stringify(body),
       });
-      if (res.ok) { setNewInterface({ name: "", status: "up", connectedPort: "", vlan: "", speed: "" }); setShowInterfaceForm(false); loadDeviceDetail(deviceDetail.id); toast({ title: "Interface added" }); }
+      if (res.ok) { setNewInterface({ name: "", status: "up", connectedPort: "", vlan: "", speed: "", infrastructurePortId: "" }); setShowInterfaceForm(false); loadDeviceDetail(deviceDetail.id); toast({ title: "Interface added" }); }
     } catch { toast({ title: "Error", description: "Failed to add interface", variant: "destructive" }); }
   }
 
@@ -2502,11 +2829,36 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2"><Cable className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold text-slate-900">Network Interfaces ({deviceInterfaces.length})</span></div>
-                <button onClick={() => setShowInterfaceForm(!showInterfaceForm)} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid="button-add-interface"><Plus className="w-3.5 h-3.5" />Add Interface</button>
+                <button onClick={() => { setShowInterfaceForm(!showInterfaceForm); if (!showInterfaceForm) loadAvailablePorts(); }} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1" data-testid="button-add-interface"><Plus className="w-3.5 h-3.5" />Add Interface</button>
               </div>
               <div className="p-4">
                 {showInterfaceForm && (
                   <div className="mb-3 p-3 bg-slate-50 rounded-md border border-slate-200 space-y-2">
+                    {availablePorts.length > 0 && (
+                      <div>
+                        <label className="text-xs text-slate-500 block mb-1">Assign Infrastructure Port (optional)</label>
+                        <select value={newInterface.infrastructurePortId} onChange={(e) => {
+                          const portId = e.target.value;
+                          if (portId) {
+                            const port = availablePorts.find((p: any) => p.id === portId);
+                            if (port) setNewInterface({ ...newInterface, infrastructurePortId: portId, name: port.portName, speed: port.speed || "", vlan: port.vlan || "" });
+                          } else {
+                            setNewInterface({ ...newInterface, infrastructurePortId: "" });
+                          }
+                        }} className={inputCls} data-testid="select-infra-port">
+                          <option value="">— Manual Entry —</option>
+                          {(() => {
+                            const grouped: Record<string, any[]> = {};
+                            availablePorts.forEach((p: any) => { const key = p.equipmentName || "Unknown"; if (!grouped[key]) grouped[key] = []; grouped[key].push(p); });
+                            return Object.entries(grouped).map(([eqName, ports]) => (
+                              <optgroup key={eqName} label={eqName}>
+                                {ports.map((p: any) => <option key={p.id} value={p.id}>{p.portName}{p.speed ? ` (${p.speed})` : ""}{p.portType === "power" ? " [Power]" : ""}</option>)}
+                              </optgroup>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+                    )}
                     <div className="grid grid-cols-3 gap-2">
                       <input value={newInterface.name} onChange={(e) => setNewInterface({ ...newInterface, name: e.target.value })} placeholder="eth0" className={inputCls} data-testid="input-new-interface" />
                       <select value={newInterface.status} onChange={(e) => setNewInterface({ ...newInterface, status: e.target.value })} className={inputCls}>
@@ -2571,14 +2923,65 @@ function DevicesView({ token, devices, onRefresh }: { token: string | null; devi
             )}
             {deviceDetail.grafanaUrl && (
               <div className="bg-white border border-slate-200 rounded-lg shadow-sm col-span-full">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Activity className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold text-slate-900">Monitoring</span></div>
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Activity className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold text-slate-900">Network Traffic</span></div>
                 <div className="p-1">
                   <iframe
                     src={`${deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPanelId || 1}&from=now-24h&to=now`}
                     className="w-full h-[300px] border-0 rounded"
-                    title="Grafana Monitoring"
+                    title="Network Traffic"
                   />
                 </div>
+              </div>
+            )}
+            {portStatuses.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="widget-port-status">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Cable className="w-4 h-4 text-blue-600" /><span className="text-sm font-semibold text-slate-900">Switch Port Status (Zabbix)</span></div>
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {portStatuses.map((ps: any) => (
+                    <div key={ps.itemId} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-slate-50/50">
+                      <div className={`w-2.5 h-2.5 rounded-full ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
+                      <span className="text-[12px] text-slate-700 truncate flex-1" title={ps.name}>{ps.name.replace(/^.*:\s*/, "")}</span>
+                      <span className={`text-[10px] font-semibold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {powerData && (powerData.watts || powerData.amps || powerData.volts) && (
+              <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="widget-power">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-600" /><span className="text-sm font-semibold text-slate-900">Power Consumption (Zabbix)</span></div>
+                <div className="p-4 grid grid-cols-3 gap-4">
+                  {powerData.watts && (
+                    <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                      <div className="text-2xl font-bold text-yellow-700">{powerData.watts.value.toFixed(1)}</div>
+                      <div className="text-xs text-yellow-600">{powerData.watts.unit || "W"}</div>
+                      <div className="text-[10px] text-slate-500 mt-1 truncate">{powerData.watts.name}</div>
+                    </div>
+                  )}
+                  {powerData.amps && (
+                    <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <div className="text-2xl font-bold text-blue-700">{powerData.amps.value.toFixed(2)}</div>
+                      <div className="text-xs text-blue-600">{powerData.amps.unit || "A"}</div>
+                      <div className="text-[10px] text-slate-500 mt-1 truncate">{powerData.amps.name}</div>
+                    </div>
+                  )}
+                  {powerData.volts && (
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                      <div className="text-2xl font-bold text-green-700">{powerData.volts.value.toFixed(1)}</div>
+                      <div className="text-xs text-green-600">{powerData.volts.unit || "V"}</div>
+                      <div className="text-[10px] text-slate-500 mt-1 truncate">{powerData.volts.name}</div>
+                    </div>
+                  )}
+                </div>
+                {deviceDetail.grafanaUrl && deviceDetail.grafanaPowerDashboardUid && (
+                  <div className="p-1 border-t border-slate-100">
+                    <iframe
+                      src={`${deviceDetail.grafanaUrl}/d-solo/${deviceDetail.grafanaPowerDashboardUid}?orgId=${deviceDetail.grafanaOrgId || 1}&panelId=${deviceDetail.grafanaPowerPanelId || 1}&from=now-24h&to=now`}
+                      className="w-full h-[250px] border-0 rounded"
+                      title="Power Consumption Graph"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2635,8 +3038,9 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
   const [form, setForm] = useState({
     name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "",
     facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "",
-    tags: "", notes: "",
+    tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "",
   });
+  const [deviceZabbixSearch, setDeviceZabbixSearch] = useState<any[]>([]);
 
   useEffect(() => {
     if (editing) {
@@ -2646,10 +3050,13 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
         parentDeviceId: editing.parentDeviceId || "", facility: editing.facility || "", zone: editing.zone || "",
         cage: editing.cage || "", row: editing.row || "", rack: editing.rack || "", rackPosition: editing.rackPosition || "",
         rackUnits: editing.rackUnits?.toString() || "", tags: editing.tags || "", notes: editing.notes || "",
+        zabbixHostId: editing.zabbixHostId || "", grafanaPowerDashboardUid: editing.grafanaPowerDashboardUid || "",
+        grafanaPowerPanelId: editing.grafanaPowerPanelId || "",
       });
     } else {
-      setForm({ name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "", facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "", tags: "", notes: "" });
+      setForm({ name: "", description: "", deviceType: "server", status: "active", customerId: "", serviceId: "", parentDeviceId: "", facility: "", zone: "", cage: "", row: "", rack: "", rackPosition: "", rackUnits: "", tags: "", notes: "", zabbixHostId: "", grafanaPowerDashboardUid: "", grafanaPowerPanelId: "" });
     }
+    setDeviceZabbixSearch([]);
   }, [editing, open]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -2728,6 +3135,29 @@ function DeviceModal({ open, onOpenChange, editing, customers, services, devices
           </div>
           <div><label className="text-xs text-slate-500 block mb-1">Tags (comma-separated)</label><input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className={inputCls} /></div>
           <div><label className="text-xs text-slate-500 block mb-1">Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} /></div>
+          <div className="border-t border-slate-100 pt-3">
+            <span className="text-xs font-semibold text-slate-700 block mb-2">Monitoring</span>
+            <div><label className="text-xs text-slate-500 block mb-1">Zabbix Host ID</label>
+              <div className="relative">
+                <input value={form.zabbixHostId} onChange={async (e) => { setForm({ ...form, zabbixHostId: e.target.value }); if (e.target.value.length >= 2) { try { const res = await fetch(`/api/admin/zabbix/hosts?search=${encodeURIComponent(e.target.value)}`, { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setDeviceZabbixSearch(await res.json()); } catch {} } else { setDeviceZabbixSearch([]); } }} placeholder="Search or enter Zabbix host ID..." className={inputCls} data-testid="input-device-zabbix" />
+                {deviceZabbixSearch.length > 0 && form.zabbixHostId && (
+                  <div className="absolute z-10 top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-auto">
+                    {deviceZabbixSearch.map((h: any) => (
+                      <button key={h.hostid} type="button" onClick={() => { setForm({ ...form, zabbixHostId: h.hostid }); setDeviceZabbixSearch([]); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                        <span className="font-medium text-slate-900">{h.host}</span> <span className="text-slate-400 ml-1">({h.hostid})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div><label className="text-xs text-slate-500 block mb-1">Power Dashboard UID</label>
+                <input value={form.grafanaPowerDashboardUid} onChange={(e) => setForm({ ...form, grafanaPowerDashboardUid: e.target.value })} placeholder="Grafana dashboard UID" className={inputCls} data-testid="input-device-power-dashboard" /></div>
+              <div><label className="text-xs text-slate-500 block mb-1">Power Panel ID</label>
+                <input value={form.grafanaPowerPanelId} onChange={(e) => setForm({ ...form, grafanaPowerPanelId: e.target.value })} placeholder="Panel ID" className={inputCls} data-testid="input-device-power-panel" /></div>
+            </div>
+          </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={() => onOpenChange(false)} className={btnSecondary}>Cancel</button>
             <button type="submit" disabled={saving} className={btnPrimary} data-testid="button-save-device">{saving ? "Saving..." : editing ? "Update" : "Create"}</button>

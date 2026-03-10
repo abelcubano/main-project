@@ -180,6 +180,8 @@ export const billingSettings = pgTable("billing_settings", {
   supportEmailAddress: text("support_email_address").notNull().default("info@911dc.us"),
   ticketEmailSubject: text("ticket_email_subject").notNull().default("[Ticket #{{ticketNumber}}] {{subject}}"),
   ticketEmailTemplate: text("ticket_email_template").notNull().default("Hello {{customerName}},\n\n{{replyAuthor}} has replied to your ticket #{{ticketNumber}}:\n\nSubject: {{subject}}\n\n{{replyBody}}\n\nYou can view and respond to this ticket in your customer portal.\n\nThank you,\n911-DC Support"),
+  zabbixUrl: text("zabbix_url"),
+  zabbixApiToken: text("zabbix_api_token"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -333,6 +335,9 @@ export const devices = pgTable("devices", {
   grafanaPanelId: text("grafana_panel_id"),
   grafanaOrgId: text("grafana_org_id"),
   grafanaVar: text("grafana_var"),
+  grafanaPowerDashboardUid: text("grafana_power_dashboard_uid"),
+  grafanaPowerPanelId: text("grafana_power_panel_id"),
+  zabbixHostId: text("zabbix_host_id"),
   tags: text("tags"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -358,6 +363,7 @@ export const deviceInterfaces = pgTable("device_interfaces", {
   connectedPort: text("connected_port"),
   vlan: text("vlan"),
   speed: text("speed"),
+  infrastructurePortId: varchar("infrastructure_port_id"),
 });
 
 export const customerContacts = pgTable("customer_contacts", {
@@ -434,3 +440,51 @@ export const insertContactAccessBadgeSchema = createInsertSchema(contactAccessBa
 
 export type InsertContactAccessBadge = z.infer<typeof insertContactAccessBadgeSchema>;
 export type ContactAccessBadge = typeof contactAccessBadges.$inferSelect;
+
+export const infrastructureEquipment = pgTable("infrastructure_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  equipmentNumber: serial("equipment_number").notNull().unique(),
+  name: text("name").notNull(),
+  equipmentType: text("equipment_type").notNull().default("switch"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  managementIp: text("management_ip"),
+  facility: text("facility"),
+  rack: text("rack"),
+  rackPosition: text("rack_position"),
+  rackUnits: integer("rack_units"),
+  totalPorts: integer("total_ports"),
+  status: text("status").notNull().default("active"),
+  zabbixHostId: text("zabbix_host_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const infrastructurePorts = pgTable("infrastructure_ports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  equipmentId: varchar("equipment_id").notNull().references(() => infrastructureEquipment.id),
+  portName: text("port_name").notNull(),
+  portType: text("port_type").notNull().default("ethernet"),
+  speed: text("speed"),
+  vlan: text("vlan"),
+  status: text("status").notNull().default("available"),
+  connectedDeviceId: varchar("connected_device_id").references(() => devices.id),
+  connectedInterfaceId: varchar("connected_interface_id"),
+  notes: text("notes"),
+});
+
+export const insertInfrastructureEquipmentSchema = createInsertSchema(infrastructureEquipment).omit({
+  id: true,
+  equipmentNumber: true,
+  createdAt: true,
+});
+
+export const insertInfrastructurePortSchema = createInsertSchema(infrastructurePorts).omit({
+  id: true,
+});
+
+export type InsertInfrastructureEquipment = z.infer<typeof insertInfrastructureEquipmentSchema>;
+export type InfrastructureEquipment = typeof infrastructureEquipment.$inferSelect;
+export type InsertInfrastructurePort = z.infer<typeof insertInfrastructurePortSchema>;
+export type InfrastructurePort = typeof infrastructurePorts.$inferSelect;

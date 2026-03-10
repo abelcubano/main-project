@@ -33,6 +33,8 @@ The platform follows a modular, component-based architecture designed for scalab
     - **Admin Role Hierarchy**: Admin users have roles (Super Admin, Datacenter Technician, Security, Billing Admin, Support Agent, Read-Only) with section-level permissions (Dashboard, Clients, Support, Devices, Orders, Sales, Settings, Users, Reports). Nav sections hidden for unauthorized roles.
     - **Contact Access Badges**: Authorized contacts can be granted facility/device access badges (escorted/unescorted/restricted) with expiration dates. Security team sees who can access which devices/locations.
     - **Service & Device Management**: Comprehensive tracking of datacenter services and devices, including facility location, SNMP/PDU configuration, and Grafana monitoring links.
+    - **Network Infrastructure Management**: Centralized inventory of network gear (switches, routers, patch panels, PDUs) with individual port/outlet tracking. Ports have lifecycle status (available/in_use/reserved/disabled). Device interfaces can be assigned to infrastructure ports, which auto-updates port status. Bulk port generation with naming patterns (e.g., "Gi0/{n}"). Managed via Settings > Infrastructure tab.
+    - **Zabbix Monitoring Integration**: Optional Zabbix API connection (configured in Settings > Integrations) for real-time switch port status and power consumption monitoring. Devices and equipment can be linked to Zabbix hosts. Admin device detail view shows port status widgets and power consumption gauges. Customer portal shows monitoring data per service via service-scoped endpoints.
     - **Billing System**: Automated invoice generation (draft/approval workflow), configurable billing settings, and PDF invoice generation.
     - **Ticketing System**: Support ticket creation, management, and reply threads with internal notes functionality.
     - **SNMP/PDU Management**: Remote monitoring and control of PDU outlets via SNMP.
@@ -45,5 +47,5 @@ The platform follows a modular, component-based architecture designed for scalab
 - **Email**: Nodemailer for SMTP (Titan Email configured), supports templated notifications.
 - **PDF Generation**: PDFKit for professional invoice PDFs.
 - **SNMP**: `net-snmp` (Node.js SNMP client) for device interaction.
-- **Monitoring**: Grafana (embedded panels via iframe).
+- **Monitoring**: Grafana (embedded panels via iframe), Zabbix (JSON-RPC API for port status and power monitoring).
 - **Payment Gateway**: Stripe (dependency included for future integration).

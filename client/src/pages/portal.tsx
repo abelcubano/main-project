@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -326,6 +326,78 @@ function PduControls({ service, token, canManage }: { service: Service; token: s
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function DeviceMonitoringWidgets({ serviceId, token }: { serviceId: string; token: string | null }) {
+  const [portStatus, setPortStatus] = useState<any[]>([]);
+  const [powerData, setPowerData] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch(`/api/services/${serviceId}/port-status`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`/api/services/${serviceId}/power`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([ports, power]) => {
+      setPortStatus(ports);
+      setPowerData(power);
+      setLoaded(true);
+    });
+  }, [serviceId, token]);
+
+  if (!loaded) return null;
+  if (portStatus.length === 0 && !powerData) return null;
+
+  return (
+    <>
+      {portStatus.length > 0 && (
+        <div className="mt-3" data-testid={`port-status-${serviceId}`}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Cable className="h-3.5 w-3.5 text-blue-600" />
+            <span className="text-xs font-semibold text-slate-900">Port Status</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            {portStatus.map((ps: any) => (
+              <div key={ps.itemId || ps.name} className="flex items-center gap-1.5 p-1.5 rounded border border-slate-100 bg-slate-50/50">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ps.status === "up" ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-[11px] text-slate-700 truncate flex-1">{ps.name?.replace(/^.*:\s*/, "") || "Port"}</span>
+                <span className={`text-[9px] font-bold uppercase ${ps.status === "up" ? "text-green-600" : "text-red-600"}`}>{ps.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {powerData && (powerData.watts || powerData.amps || powerData.volts) && (
+        <div className="mt-3" data-testid={`power-data-${serviceId}`}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Power className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-xs font-semibold text-slate-900">Power Consumption</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {powerData.watts && (
+              <div className="text-center p-2 bg-yellow-50 rounded border border-yellow-100">
+                <div className="text-lg font-bold text-yellow-700">{powerData.watts.value?.toFixed(1) || "—"}</div>
+                <div className="text-[9px] text-yellow-600">{powerData.watts.unit || "W"}</div>
+              </div>
+            )}
+            {powerData.amps && (
+              <div className="text-center p-2 bg-blue-50 rounded border border-blue-100">
+                <div className="text-lg font-bold text-blue-700">{powerData.amps.value?.toFixed(2) || "—"}</div>
+                <div className="text-[9px] text-blue-600">{powerData.amps.unit || "A"}</div>
+              </div>
+            )}
+            {powerData.volts && (
+              <div className="text-center p-2 bg-green-50 rounded border border-green-100">
+                <div className="text-lg font-bold text-green-700">{powerData.volts.value?.toFixed(1) || "—"}</div>
+                <div className="text-[9px] text-green-600">{powerData.volts.unit || "V"}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -663,6 +735,7 @@ export default function PortalPage() {
                     </div>
                     <div className="p-4 space-y-3">
                       <GrafanaPanel service={s} />
+                      <DeviceMonitoringWidgets serviceId={s.id} token={token} />
                       <PduControls service={s} token={token} canManage={canManageTechnical} />
                     </div>
                   </Card>

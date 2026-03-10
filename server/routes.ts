@@ -6,9 +6,10 @@ import { generateInvoicePdf } from "./pdf";
 import { runMonthlyBilling } from "./billing";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, insertContactAccessBadgeSchema, PERMISSION_FIELDS } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertServiceSchema, insertInvoiceSchema, insertCustomerSchema, insertTicketSchema, insertTicketReplySchema, insertDeviceSchema, insertDeviceIpSchema, insertDeviceInterfaceSchema, insertCustomerContactSchema, insertCustomerNoteSchema, insertContactAccessBadgeSchema, insertInfrastructureEquipmentSchema, insertInfrastructurePortSchema, PERMISSION_FIELDS } from "@shared/schema";
 import { getPduPortStatus, rebootPduPort } from "./snmp";
 import { canViewBilling, canViewServices, canViewTechnical, canManageTechnical, canViewSupport, canCreateSupport, canSubmitSmarthands, canMakePayments, canAccessPortal } from "./permissions";
+import { searchZabbixHosts, getZabbixPortStatuses, getZabbixPowerData, testZabbixConnection, isZabbixConfigured } from "./zabbix";
 
 const dispatchRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -1426,7 +1427,19 @@ export async function registerRoutes(
       const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const validation = insertDeviceInterfaceSchema.safeParse({ ...req.body, deviceId });
       if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      if (req.body.infrastructurePortId) {
+        const port = await storage.getPort(req.body.infrastructurePortId);
+        if (!port) return res.status(400).json({ error: "Infrastructure port not found" });
+        if (port.status !== "available") return res.status(400).json({ error: "Infrastructure port is not available" });
+      }
       const iface = await storage.createDeviceInterface(validation.data);
+      if (req.body.infrastructurePortId) {
+        await storage.updatePort(req.body.infrastructurePortId, {
+          status: "in_use",
+          connectedDeviceId: deviceId,
+          connectedInterfaceId: iface.id,
+        });
+      }
       res.json(iface);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create device interface" });
@@ -1436,6 +1449,14 @@ export async function registerRoutes(
   app.delete("/api/admin/devices/:deviceId/interfaces/:ifaceId", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
     try {
       const ifaceId = Array.isArray(req.params.ifaceId) ? req.params.ifaceId[0] : req.params.ifaceId;
+      const iface = await storage.getDeviceInterface(ifaceId);
+      if (iface?.infrastructurePortId) {
+        await storage.updatePort(iface.infrastructurePortId, {
+          status: "available",
+          connectedDeviceId: null,
+          connectedInterfaceId: null,
+        });
+      }
       await storage.deleteDeviceInterface(ifaceId);
       res.json({ success: true });
     } catch (error: any) {
@@ -1588,6 +1609,260 @@ export async function registerRoutes(
       res.json(sanitized);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch devices" });
+    }
+  });
+
+  // Infrastructure Equipment CRUD
+  app.get("/api/admin/infrastructure", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const equipment = await storage.getAllEquipment();
+      const withPortCounts = await Promise.all(equipment.map(async (e) => {
+        const ports = await storage.getEquipmentPorts(e.id);
+        const usedPorts = ports.filter(p => p.status === "in_use").length;
+        return { ...e, usedPorts, totalPortsActual: ports.length };
+      }));
+      res.json(withPortCounts);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch infrastructure equipment" });
+    }
+  });
+
+  app.post("/api/admin/infrastructure", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const validation = insertInfrastructureEquipmentSchema.safeParse(req.body);
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const equipment = await storage.createEquipment(validation.data);
+      res.json(equipment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create equipment" });
+    }
+  });
+
+  app.get("/api/admin/infrastructure/:id", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const equipment = await storage.getEquipment(id);
+      if (!equipment) return res.status(404).json({ error: "Equipment not found" });
+      res.json(equipment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch equipment" });
+    }
+  });
+
+  app.put("/api/admin/infrastructure/:id", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const equipment = await storage.updateEquipment(id, req.body);
+      if (!equipment) return res.status(404).json({ error: "Equipment not found" });
+      res.json(equipment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update equipment" });
+    }
+  });
+
+  app.delete("/api/admin/infrastructure/:id", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const deleted = await storage.deleteEquipment(id);
+      if (!deleted) return res.status(404).json({ error: "Equipment not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete equipment" });
+    }
+  });
+
+  // Infrastructure Ports
+  app.get("/api/admin/infrastructure/:id/ports", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const equipmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const ports = await storage.getEquipmentPorts(equipmentId);
+      const allDevices = await storage.getAllDevices();
+      const enriched = ports.map(p => {
+        const device = p.connectedDeviceId ? allDevices.find(d => d.id === p.connectedDeviceId) : null;
+        return { ...p, connectedDeviceName: device?.name || null };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch ports" });
+    }
+  });
+
+  app.post("/api/admin/infrastructure/:id/ports", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const equipmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const validation = insertInfrastructurePortSchema.safeParse({ ...req.body, equipmentId });
+      if (!validation.success) return res.status(400).json({ error: "Validation failed", details: validation.error.flatten().fieldErrors });
+      const port = await storage.createPort(validation.data);
+      res.json(port);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create port" });
+    }
+  });
+
+  app.post("/api/admin/infrastructure/:id/ports/bulk", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const equipmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { count, pattern, portType, speed } = req.body;
+      if (!count || !pattern) return res.status(400).json({ error: "Count and pattern are required" });
+      const ports = [];
+      for (let i = 1; i <= count; i++) {
+        const portName = pattern.replace("{n}", String(i));
+        ports.push({ equipmentId, portName, portType: portType || "ethernet", speed: speed || null, status: "available" as const });
+      }
+      const created = await storage.bulkCreatePorts(ports as any);
+      res.json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to bulk create ports" });
+    }
+  });
+
+  app.put("/api/admin/infrastructure/ports/:portId", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const portId = Array.isArray(req.params.portId) ? req.params.portId[0] : req.params.portId;
+      const port = await storage.updatePort(portId, req.body);
+      if (!port) return res.status(404).json({ error: "Port not found" });
+      res.json(port);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update port" });
+    }
+  });
+
+  app.delete("/api/admin/infrastructure/ports/:portId", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const portId = Array.isArray(req.params.portId) ? req.params.portId[0] : req.params.portId;
+      const deleted = await storage.deletePort(portId);
+      if (!deleted) return res.status(404).json({ error: "Port not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete port" });
+    }
+  });
+
+  app.get("/api/admin/infrastructure/ports/available", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+    try {
+      const equipmentId = req.query.equipmentId as string | undefined;
+      const ports = await storage.getAvailablePorts(equipmentId);
+      const allEquipment = await storage.getAllEquipment();
+      const grouped = ports.map(p => {
+        const equip = allEquipment.find(e => e.id === p.equipmentId);
+        return { ...p, equipmentName: equip?.name || "Unknown", equipmentType: equip?.equipmentType || "unknown" };
+      });
+      res.json(grouped);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch available ports" });
+    }
+  });
+
+  // Zabbix API routes
+  app.get("/api/admin/zabbix/hosts", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+    try {
+      const query = (req.query.search as string) || "";
+      if (!query) return res.json([]);
+      const hosts = await searchZabbixHosts(query);
+      res.json(hosts);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to search Zabbix hosts" });
+    }
+  });
+
+  app.get("/api/admin/zabbix/test", requireAuth, requireAdmin, requireAdminPerm("settings"), async (req, res) => {
+    try {
+      const result = await testZabbixConnection();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to test Zabbix connection" });
+    }
+  });
+
+  app.get("/api/admin/zabbix/host/:hostId/ports", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+    try {
+      const hostId = Array.isArray(req.params.hostId) ? req.params.hostId[0] : req.params.hostId;
+      const portStatuses = await getZabbixPortStatuses(hostId);
+      res.json(portStatuses);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch port statuses" });
+    }
+  });
+
+  app.get("/api/admin/zabbix/host/:hostId/power", requireAuth, requireAdmin, requireAdminPerm("devices"), async (req, res) => {
+    try {
+      const hostId = Array.isArray(req.params.hostId) ? req.params.hostId[0] : req.params.hostId;
+      const powerData = await getZabbixPowerData(hostId);
+      res.json(powerData);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch power data" });
+    }
+  });
+
+  // Customer portal: device port status and power (from Zabbix) - by device ID
+  app.get("/api/devices/:id/port-status", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const device = await storage.getDevice(deviceId);
+      if (!device) return res.status(404).json({ error: "Device not found" });
+      if (req.user.role !== "admin" && device.customerId !== req.user.customerId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (!device.zabbixHostId) return res.json([]);
+      const portStatuses = await getZabbixPortStatuses(device.zabbixHostId);
+      res.json(portStatuses);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch port status" });
+    }
+  });
+
+  app.get("/api/devices/:id/power", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const deviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const device = await storage.getDevice(deviceId);
+      if (!device) return res.status(404).json({ error: "Device not found" });
+      if (req.user.role !== "admin" && device.customerId !== req.user.customerId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (!device.zabbixHostId) return res.json({ watts: null, amps: null, volts: null, kWh: null, allItems: [] });
+      const powerData = await getZabbixPowerData(device.zabbixHostId);
+      res.json(powerData);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch power data" });
+    }
+  });
+
+  // Customer portal: service-scoped monitoring (resolves service → devices with Zabbix)
+  app.get("/api/services/:id/port-status", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const allDevices = await storage.getAllDevices();
+      const serviceDevices = allDevices.filter(d => d.serviceId === serviceId && d.zabbixHostId);
+      if (req.user.role !== "admin") {
+        const customerDevices = serviceDevices.filter(d => d.customerId === req.user.customerId);
+        if (customerDevices.length === 0) return res.json([]);
+        const results = await Promise.all(customerDevices.map(d => getZabbixPortStatuses(d.zabbixHostId!)));
+        return res.json(results.flat());
+      }
+      const results = await Promise.all(serviceDevices.map(d => getZabbixPortStatuses(d.zabbixHostId!)));
+      res.json(results.flat());
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch port status" });
+    }
+  });
+
+  app.get("/api/services/:id/power", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const allDevices = await storage.getAllDevices();
+      const serviceDevices = allDevices.filter(d => d.serviceId === serviceId && d.zabbixHostId);
+      if (req.user.role !== "admin") {
+        const customerDevices = serviceDevices.filter(d => d.customerId === req.user.customerId);
+        if (customerDevices.length === 0) return res.json({ watts: null, amps: null, volts: null, kWh: null, allItems: [] });
+        const first = customerDevices[0];
+        const powerData = await getZabbixPowerData(first.zabbixHostId!);
+        return res.json(powerData);
+      }
+      if (serviceDevices.length === 0) return res.json({ watts: null, amps: null, volts: null, kWh: null, allItems: [] });
+      const powerData = await getZabbixPowerData(serviceDevices[0].zabbixHostId!);
+      res.json(powerData);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch power data" });
     }
   });
 

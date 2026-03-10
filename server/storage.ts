@@ -13,9 +13,12 @@ import {
   type CustomerContact, type InsertCustomerContact,
   type CustomerNote, type InsertCustomerNote,
   type ContactAccessBadge, type InsertContactAccessBadge,
+  type InfrastructureEquipment, type InsertInfrastructureEquipment,
+  type InfrastructurePort, type InsertInfrastructurePort,
   users, sessions, services, invoices, invoiceItems, customers, billingSettings,
   tickets, ticketReplies, devices, deviceIps, deviceInterfaces,
-  customerContacts, customerNotes, contactAccessBadges
+  customerContacts, customerNotes, contactAccessBadges,
+  infrastructureEquipment, infrastructurePorts
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, desc, isNull } from "drizzle-orm";
@@ -83,6 +86,7 @@ export interface IStorage {
   createDeviceIp(ip: InsertDeviceIp): Promise<DeviceIp>;
   deleteDeviceIp(id: string): Promise<boolean>;
   getDeviceInterfaces(deviceId: string): Promise<DeviceInterface[]>;
+  getDeviceInterface(id: string): Promise<DeviceInterface | undefined>;
   createDeviceInterface(iface: InsertDeviceInterface): Promise<DeviceInterface>;
   deleteDeviceInterface(id: string): Promise<boolean>;
 
@@ -100,6 +104,19 @@ export interface IStorage {
   getAccessBadgesByFacility(facility: string): Promise<ContactAccessBadge[]>;
   createContactAccessBadge(badge: InsertContactAccessBadge): Promise<ContactAccessBadge>;
   deleteContactAccessBadge(id: string): Promise<boolean>;
+
+  getAllEquipment(): Promise<InfrastructureEquipment[]>;
+  getEquipment(id: string): Promise<InfrastructureEquipment | undefined>;
+  createEquipment(data: InsertInfrastructureEquipment): Promise<InfrastructureEquipment>;
+  updateEquipment(id: string, updates: Partial<InsertInfrastructureEquipment>): Promise<InfrastructureEquipment | undefined>;
+  deleteEquipment(id: string): Promise<boolean>;
+  getEquipmentPorts(equipmentId: string): Promise<InfrastructurePort[]>;
+  getPort(id: string): Promise<InfrastructurePort | undefined>;
+  createPort(data: InsertInfrastructurePort): Promise<InfrastructurePort>;
+  bulkCreatePorts(ports: InsertInfrastructurePort[]): Promise<InfrastructurePort[]>;
+  updatePort(id: string, updates: Partial<InsertInfrastructurePort>): Promise<InfrastructurePort | undefined>;
+  deletePort(id: string): Promise<boolean>;
+  getAvailablePorts(equipmentId?: string): Promise<InfrastructurePort[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -378,6 +395,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(deviceInterfaces).where(eq(deviceInterfaces.deviceId, deviceId));
   }
 
+  async getDeviceInterface(id: string): Promise<DeviceInterface | undefined> {
+    const [iface] = await db.select().from(deviceInterfaces).where(eq(deviceInterfaces.id, id));
+    return iface;
+  }
+
   async createDeviceInterface(iface: InsertDeviceInterface): Promise<DeviceInterface> {
     const [created] = await db.insert(deviceInterfaces).values(iface).returning();
     return created;
@@ -441,6 +463,69 @@ export class DatabaseStorage implements IStorage {
   async deleteContactAccessBadge(id: string): Promise<boolean> {
     const result = await db.delete(contactAccessBadges).where(eq(contactAccessBadges.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getAllEquipment(): Promise<InfrastructureEquipment[]> {
+    return db.select().from(infrastructureEquipment).orderBy(desc(infrastructureEquipment.createdAt));
+  }
+
+  async getEquipment(id: string): Promise<InfrastructureEquipment | undefined> {
+    const [eq_] = await db.select().from(infrastructureEquipment).where(eq(infrastructureEquipment.id, id));
+    return eq_;
+  }
+
+  async createEquipment(data: InsertInfrastructureEquipment): Promise<InfrastructureEquipment> {
+    const [created] = await db.insert(infrastructureEquipment).values(data).returning();
+    return created;
+  }
+
+  async updateEquipment(id: string, updates: Partial<InsertInfrastructureEquipment>): Promise<InfrastructureEquipment | undefined> {
+    const [updated] = await db.update(infrastructureEquipment).set(updates).where(eq(infrastructureEquipment.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEquipment(id: string): Promise<boolean> {
+    await db.delete(infrastructurePorts).where(eq(infrastructurePorts.equipmentId, id));
+    const result = await db.delete(infrastructureEquipment).where(eq(infrastructureEquipment.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getEquipmentPorts(equipmentId: string): Promise<InfrastructurePort[]> {
+    return db.select().from(infrastructurePorts).where(eq(infrastructurePorts.equipmentId, equipmentId));
+  }
+
+  async getPort(id: string): Promise<InfrastructurePort | undefined> {
+    const [port] = await db.select().from(infrastructurePorts).where(eq(infrastructurePorts.id, id));
+    return port;
+  }
+
+  async createPort(data: InsertInfrastructurePort): Promise<InfrastructurePort> {
+    const [created] = await db.insert(infrastructurePorts).values(data).returning();
+    return created;
+  }
+
+  async bulkCreatePorts(ports: InsertInfrastructurePort[]): Promise<InfrastructurePort[]> {
+    if (ports.length === 0) return [];
+    return db.insert(infrastructurePorts).values(ports).returning();
+  }
+
+  async updatePort(id: string, updates: Partial<InsertInfrastructurePort>): Promise<InfrastructurePort | undefined> {
+    const [updated] = await db.update(infrastructurePorts).set(updates).where(eq(infrastructurePorts.id, id)).returning();
+    return updated;
+  }
+
+  async deletePort(id: string): Promise<boolean> {
+    const result = await db.delete(infrastructurePorts).where(eq(infrastructurePorts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAvailablePorts(equipmentId?: string): Promise<InfrastructurePort[]> {
+    if (equipmentId) {
+      return db.select().from(infrastructurePorts).where(
+        and(eq(infrastructurePorts.equipmentId, equipmentId), eq(infrastructurePorts.status, "available"))
+      );
+    }
+    return db.select().from(infrastructurePorts).where(eq(infrastructurePorts.status, "available"));
   }
 }
 
