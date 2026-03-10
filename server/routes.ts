@@ -2087,6 +2087,29 @@ export async function registerRoutes(
     } catch { res.json({ grafanaUrl: null }); }
   });
 
+  app.get("/api/services/:id/devices-info", requireAuth, requirePortalAccess, async (req: any, res) => {
+    try {
+      const serviceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const allDevices = await storage.getAllDevices();
+      let serviceDevices = allDevices.filter(d => d.serviceId === serviceId);
+      if (req.user.role !== "admin") {
+        serviceDevices = serviceDevices.filter(d => d.customerId === req.user.customerId);
+      }
+      const deviceInfos = await Promise.all(serviceDevices.map(async (d) => {
+        const ips = await storage.getDeviceIps(d.id);
+        return {
+          id: d.id, name: d.name, deviceType: d.deviceType, status: d.status,
+          facility: d.facility, rack: d.rack, rackPosition: d.rackPosition,
+          hasZabbix: !!d.zabbixHostId, hasGrafana: !!d.grafanaPowerDashboardUid,
+          ips: ips.map(ip => ({ ipAddress: ip.ipAddress, description: ip.description, type: ip.type, vlan: ip.vlan })),
+        };
+      }));
+      res.json(deviceInfos);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch device info" });
+    }
+  });
+
   // Customer portal: service-scoped monitoring (resolves service → devices with Zabbix)
   app.get("/api/services/:id/port-status", requireAuth, requirePortalAccess, async (req: any, res) => {
     try {

@@ -332,6 +332,64 @@ function PduControls({ service, token, canManage }: { service: Service; token: s
   );
 }
 
+function ServiceDeviceDetails({ serviceId, token }: { serviceId: string; token: string | null }) {
+  const [devices, setDevices] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/services/${serviceId}/devices-info`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : []).then(d => { setDevices(d); setLoaded(true); }).catch(() => setLoaded(true));
+  }, [serviceId, token]);
+
+  if (!loaded || devices.length === 0) return null;
+
+  const allIps = devices.flatMap((d: any) => d.ips.map((ip: any) => ({ ...ip, deviceName: d.name })));
+
+  return (
+    <div className="space-y-2" data-testid={`device-details-${serviceId}`}>
+      {allIps.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Globe className="h-3.5 w-3.5 text-indigo-600" />
+            <span className="text-xs font-semibold text-slate-900">IP Addresses</span>
+          </div>
+          <div className="space-y-1">
+            {allIps.map((ip: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-slate-100 bg-slate-50/50">
+                <span className="text-[11px] font-mono font-semibold text-slate-800">{ip.ipAddress}</span>
+                {ip.type && <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${ip.type === "public" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{ip.type}</span>}
+                {ip.vlan && <span className="text-[9px] text-slate-400">VLAN {ip.vlan}</span>}
+                {ip.description && <span className="text-[10px] text-slate-500 ml-auto">{ip.description}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {devices.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Server className="h-3.5 w-3.5 text-slate-500" />
+            <span className="text-xs font-semibold text-slate-900">Devices</span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {devices.map((d: any) => (
+              <div key={d.id} className="px-2.5 py-1.5 rounded border border-slate-100 bg-slate-50/50">
+                <span className="text-[11px] font-medium text-slate-800">{d.name}</span>
+                <div className="text-[9px] text-slate-400 mt-0.5">
+                  {d.facility && <span>{d.facility}</span>}
+                  {d.rack && <span> / Rack {d.rack}</span>}
+                  {d.rackPosition && <span> U{d.rackPosition}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DeviceMonitoringWidgets({ serviceId, token }: { serviceId: string; token: string | null }) {
   const [monitoringItems, setMonitoringItems] = useState<any[]>([]);
   const [powerData, setPowerData] = useState<any>(null);
@@ -795,12 +853,12 @@ export default function PortalPage() {
                 <h1 className="text-lg font-semibold text-slate-900">Network</h1>
                 <p className="text-xs text-slate-500 mt-0.5">Traffic monitoring and power management</p>
               </div>
-              {services.filter(s => s.grafanaUrl || s.snmpHost).length === 0 ? (
+              {services.filter(s => s.grafanaUrl || s.grafanaDashboardUid || s.snmpHost || globalGrafanaUrl).length === 0 ? (
                 <Card className="border-slate-200 bg-white p-8 text-center">
                   <div className="text-xs text-slate-500">No network monitoring configured for your services</div>
                 </Card>
               ) : (
-                services.filter(s => s.grafanaUrl || s.snmpHost).map((s) => (
+                services.map((s) => (
                   <Card key={s.id} className="border-slate-200 bg-white overflow-hidden" data-testid={`network-service-${s.id}`}>
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -808,9 +866,13 @@ export default function PortalPage() {
                         <span className="text-sm font-semibold text-slate-900">{s.name}</span>
                         <StatusBadge status={s.status} />
                       </div>
-                      <span className="text-[10px] text-slate-500">{s.location}</span>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-500">{s.location}</span>
+                        {s.details && <div className="text-[9px] text-slate-400 mt-0.5">{s.details}</div>}
+                      </div>
                     </div>
                     <div className="p-4 space-y-3">
+                      <ServiceDeviceDetails serviceId={s.id} token={token} />
                       <GrafanaPanel service={s} globalGrafanaUrl={globalGrafanaUrl} />
                       <DeviceMonitoringWidgets serviceId={s.id} token={token} />
                       <PduControls service={s} token={token} canManage={canManageTechnical} />
