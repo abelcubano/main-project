@@ -2101,6 +2101,9 @@ export async function registerRoutes(
           id: d.id, name: d.name, deviceType: d.deviceType, status: d.status,
           facility: d.facility, rack: d.rack, rackPosition: d.rackPosition,
           hasZabbix: !!d.zabbixHostId, hasGrafana: !!d.grafanaPowerDashboardUid,
+          grafanaDashboardUid: d.grafanaPowerDashboardUid || null,
+          grafanaPanelId: d.grafanaPowerPanelId || null,
+          grafanaVar: d.grafanaVar || null,
           ips: ips.map(ip => ({ ipAddress: ip.ipAddress, description: ip.description, type: ip.type, vlan: ip.vlan })),
         };
       }));

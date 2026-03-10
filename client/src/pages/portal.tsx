@@ -332,7 +332,7 @@ function PduControls({ service, token, canManage }: { service: Service; token: s
   );
 }
 
-function ServiceDeviceDetails({ serviceId, token }: { serviceId: string; token: string | null }) {
+function ServiceDeviceDetails({ serviceId, token, globalGrafanaUrl }: { serviceId: string; token: string | null; globalGrafanaUrl?: string }) {
   const [devices, setDevices] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -345,9 +345,10 @@ function ServiceDeviceDetails({ serviceId, token }: { serviceId: string; token: 
   if (!loaded || devices.length === 0) return null;
 
   const allIps = devices.flatMap((d: any) => d.ips.map((ip: any) => ({ ...ip, deviceName: d.name })));
+  const grafanaDevices = devices.filter((d: any) => d.grafanaDashboardUid && (globalGrafanaUrl || d.grafanaUrl));
 
   return (
-    <div className="space-y-2" data-testid={`device-details-${serviceId}`}>
+    <div className="space-y-3" data-testid={`device-details-${serviceId}`}>
       {allIps.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
@@ -366,6 +367,9 @@ function ServiceDeviceDetails({ serviceId, token }: { serviceId: string; token: 
           </div>
         </div>
       )}
+      {grafanaDevices.map((d: any) => (
+        <DeviceGrafanaPanel key={d.id} device={d} globalGrafanaUrl={globalGrafanaUrl} />
+      ))}
       {devices.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
@@ -386,6 +390,46 @@ function ServiceDeviceDetails({ serviceId, token }: { serviceId: string; token: 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DeviceGrafanaPanel({ device, globalGrafanaUrl }: { device: any; globalGrafanaUrl?: string }) {
+  const [timeRange, setTimeRange] = useState("24h");
+
+  const grafanaBaseUrl = globalGrafanaUrl || device.grafanaUrl;
+  if (!grafanaBaseUrl || !device.grafanaDashboardUid || !device.grafanaPanelId) return null;
+
+  const timeRanges: Record<string, { from: string; to: string }> = {
+    "6h": { from: "now-6h", to: "now" },
+    "24h": { from: "now-24h", to: "now" },
+    "7d": { from: "now-7d", to: "now" },
+    "30d": { from: "now-30d", to: "now" },
+  };
+
+  const range = timeRanges[timeRange];
+  let src = `${grafanaBaseUrl}/d-solo/${device.grafanaDashboardUid}?panelId=${device.grafanaPanelId}&from=${range.from}&to=${range.to}&theme=light`;
+  if (device.grafanaVar) src += `&var-host=${encodeURIComponent(device.grafanaVar)}`;
+
+  return (
+    <div data-testid={`grafana-device-${device.id}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <BarChart3 className="h-3.5 w-3.5 text-blue-600" />
+          <span className="text-xs font-semibold text-slate-900">{device.name} — Grafana</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {(["6h", "24h", "7d", "30d"] as const).map((r) => (
+            <button key={r} onClick={() => setTimeRange(r)}
+              className={`px-2 py-0.5 text-[10px] rounded ${timeRange === r ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              data-testid={`button-timerange-${r}-${device.id}`}>{r}</button>
+          ))}
+        </div>
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+        <iframe src={src} width="100%" height="200" frameBorder="0" className="block"
+          title={`Graph for ${device.name}`} allow="fullscreen" data-testid={`iframe-grafana-device-${device.id}`} />
+      </div>
     </div>
   );
 }
@@ -872,7 +916,7 @@ export default function PortalPage() {
                       </div>
                     </div>
                     <div className="p-4 space-y-3">
-                      <ServiceDeviceDetails serviceId={s.id} token={token} />
+                      <ServiceDeviceDetails serviceId={s.id} token={token} globalGrafanaUrl={globalGrafanaUrl} />
                       <GrafanaPanel service={s} globalGrafanaUrl={globalGrafanaUrl} />
                       <DeviceMonitoringWidgets serviceId={s.id} token={token} />
                       <PduControls service={s} token={token} canManage={canManageTechnical} />
