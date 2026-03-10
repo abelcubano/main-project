@@ -345,7 +345,17 @@ function ServiceDeviceDetails({ serviceId, token, globalGrafanaUrl }: { serviceI
   if (!loaded || devices.length === 0) return null;
 
   const allIps = devices.flatMap((d: any) => d.ips.map((ip: any) => ({ ...ip, deviceName: d.name })));
-  const grafanaDevices = devices.filter((d: any) => d.grafanaDashboardUid && (globalGrafanaUrl || d.grafanaUrl));
+  const grafanaPanels: { device: any; dashboardUid: string; panelId: string; label: string }[] = [];
+  devices.forEach((d: any) => {
+    const baseUrl = globalGrafanaUrl || d.grafanaUrl;
+    if (!baseUrl) return;
+    if (d.grafanaDashboardUid && d.grafanaPanelId) {
+      grafanaPanels.push({ device: d, dashboardUid: d.grafanaDashboardUid, panelId: d.grafanaPanelId, label: `${d.name} — Network Traffic` });
+    }
+    if (d.grafanaPowerDashboardUid && d.grafanaPowerPanelId) {
+      grafanaPanels.push({ device: d, dashboardUid: d.grafanaPowerDashboardUid, panelId: d.grafanaPowerPanelId, label: `${d.name} — Power` });
+    }
+  });
 
   return (
     <div className="space-y-3" data-testid={`device-details-${serviceId}`}>
@@ -367,8 +377,8 @@ function ServiceDeviceDetails({ serviceId, token, globalGrafanaUrl }: { serviceI
           </div>
         </div>
       )}
-      {grafanaDevices.map((d: any) => (
-        <DeviceGrafanaPanel key={d.id} device={d} globalGrafanaUrl={globalGrafanaUrl} />
+      {grafanaPanels.map((gp, idx) => (
+        <DeviceGrafanaPanel key={`${gp.device.id}-${idx}`} device={gp.device} dashboardUid={gp.dashboardUid} panelId={gp.panelId} label={gp.label} globalGrafanaUrl={globalGrafanaUrl} />
       ))}
       {devices.length > 0 && (
         <div>
@@ -394,11 +404,11 @@ function ServiceDeviceDetails({ serviceId, token, globalGrafanaUrl }: { serviceI
   );
 }
 
-function DeviceGrafanaPanel({ device, globalGrafanaUrl }: { device: any; globalGrafanaUrl?: string }) {
+function DeviceGrafanaPanel({ device, dashboardUid, panelId, label, globalGrafanaUrl }: { device: any; dashboardUid: string; panelId: string; label: string; globalGrafanaUrl?: string }) {
   const [timeRange, setTimeRange] = useState("24h");
 
   const grafanaBaseUrl = globalGrafanaUrl || device.grafanaUrl;
-  if (!grafanaBaseUrl || !device.grafanaDashboardUid || !device.grafanaPanelId) return null;
+  if (!grafanaBaseUrl) return null;
 
   const timeRanges: Record<string, { from: string; to: string }> = {
     "6h": { from: "now-6h", to: "now" },
@@ -408,7 +418,8 @@ function DeviceGrafanaPanel({ device, globalGrafanaUrl }: { device: any; globalG
   };
 
   const range = timeRanges[timeRange];
-  let src = `${grafanaBaseUrl}/d-solo/${device.grafanaDashboardUid}?panelId=${device.grafanaPanelId}&from=${range.from}&to=${range.to}&theme=light`;
+  let src = `${grafanaBaseUrl}/d-solo/${dashboardUid}?panelId=${panelId}&from=${range.from}&to=${range.to}&theme=light`;
+  if (device.grafanaOrgId) src += `&orgId=${device.grafanaOrgId}`;
   if (device.grafanaVar) src += `&var-host=${encodeURIComponent(device.grafanaVar)}`;
 
   return (
@@ -416,7 +427,7 @@ function DeviceGrafanaPanel({ device, globalGrafanaUrl }: { device: any; globalG
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <BarChart3 className="h-3.5 w-3.5 text-blue-600" />
-          <span className="text-xs font-semibold text-slate-900">{device.name} — Grafana</span>
+          <span className="text-xs font-semibold text-slate-900">{label}</span>
         </div>
         <div className="flex items-center gap-1">
           {(["6h", "24h", "7d", "30d"] as const).map((r) => (
@@ -428,7 +439,7 @@ function DeviceGrafanaPanel({ device, globalGrafanaUrl }: { device: any; globalG
       </div>
       <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
         <iframe src={src} width="100%" height="200" frameBorder="0" className="block"
-          title={`Graph for ${device.name}`} allow="fullscreen" data-testid={`iframe-grafana-device-${device.id}`} />
+          title={label} allow="fullscreen" data-testid={`iframe-grafana-device-${device.id}`} />
       </div>
     </div>
   );

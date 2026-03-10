@@ -2100,10 +2100,15 @@ export async function registerRoutes(
         return {
           id: d.id, name: d.name, deviceType: d.deviceType, status: d.status,
           facility: d.facility, rack: d.rack, rackPosition: d.rackPosition,
-          hasZabbix: !!d.zabbixHostId, hasGrafana: !!d.grafanaPowerDashboardUid,
-          grafanaDashboardUid: d.grafanaPowerDashboardUid || null,
-          grafanaPanelId: d.grafanaPowerPanelId || null,
+          hasZabbix: !!d.zabbixHostId,
+          hasGrafana: !!(d.grafanaDashboardUid || d.grafanaPowerDashboardUid),
+          grafanaDashboardUid: d.grafanaDashboardUid || null,
+          grafanaPanelId: d.grafanaPanelId || null,
+          grafanaOrgId: d.grafanaOrgId || null,
           grafanaVar: d.grafanaVar || null,
+          grafanaUrl: d.grafanaUrl || null,
+          grafanaPowerDashboardUid: d.grafanaPowerDashboardUid || null,
+          grafanaPowerPanelId: d.grafanaPowerPanelId || null,
           ips: ips.map(ip => ({ ipAddress: ip.ipAddress, description: ip.description, type: ip.type, vlan: ip.vlan })),
         };
       }));
