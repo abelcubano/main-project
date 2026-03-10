@@ -17,20 +17,23 @@ async function getZabbixConfig(): Promise<ZabbixConfig | null> {
   }
 }
 
-function zabbixHttpRequest(url: string, bodyStr: string, token: string): Promise<string> {
+function zabbixHttpRequest(url: string, bodyStr: string, token?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const isHttps = parsed.protocol === "https:";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Content-Length": String(Buffer.byteLength(bodyStr)),
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const options: https.RequestOptions = {
       hostname: parsed.hostname,
       port: parsed.port || (isHttps ? 443 : 80),
       path: parsed.pathname + parsed.search,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "Content-Length": Buffer.byteLength(bodyStr),
-      },
+      headers,
       ...(isHttps ? { rejectUnauthorized: false } : {}),
     };
 
@@ -203,12 +206,29 @@ export async function testZabbixConnection(): Promise<{ success: boolean; messag
   const config = await getZabbixConfig();
   if (!config) return { success: false, message: "Zabbix not configured. Set the Zabbix URL and API Token in Settings > Integrations." };
 
+  const baseUrl = config.url.replace(/\/api_jsonrpc\.php\/?$/, "");
+  const url = `${baseUrl}/api_jsonrpc.php`;
+
   try {
-    const result = await zabbixRequest("apiinfo.version", []);
-    if (result) {
-      return { success: true, message: `Connected to Zabbix ${result}`, version: result };
+    const versionBody = JSON.stringify({ jsonrpc: "2.0", method: "apiinfo.version", params: [], id: 1 });
+    const versionText = await zabbixHttpRequest(url, versionBody);
+    const versionData = JSON.parse(versionText);
+    if (versionData.error) {
+      return { success: false, message: `Zabbix API error: ${versionData.error.data || versionData.error.message}` };
     }
-    return { success: false, message: "Zabbix API returned no version. Check the URL and token." };
+    const version = versionData.result;
+    if (!version) {
+      return { success: false, message: "Zabbix API returned no version. Check the URL." };
+    }
+
+    const authBody = JSON.stringify({ jsonrpc: "2.0", method: "host.get", params: { limit: 1, output: ["hostid"] }, id: 2 });
+    const authText = await zabbixHttpRequest(url, authBody, config.token);
+    const authData = JSON.parse(authText);
+    if (authData.error) {
+      return { success: false, message: `Zabbix v${version} reachable, but token is invalid: ${authData.error.data || authData.error.message}` };
+    }
+
+    return { success: true, message: `Connected to Zabbix ${version}`, version };
   } catch (err: any) {
     const msg = err.message || String(err);
     if (msg.includes("UNABLE_TO_VERIFY") || msg.includes("self-signed") || msg.includes("certificate")) {
