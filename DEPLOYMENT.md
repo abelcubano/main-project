@@ -11,7 +11,8 @@ The 911-DC platform is a full-stack application:
 | Frontend | React + Vite + TypeScript | `client/` |
 | Backend | Express.js + TypeScript | `server/` |
 | Database | PostgreSQL + Drizzle ORM | `shared/schema.ts` |
-| Email | Nodemailer (SMTP) | `server/email.ts` |
+| Email (SMTP) | Nodemailer | `server/email.ts` |
+| Email (IMAP) | imapflow + mailparser | `server/imap-poller.ts` |
 
 ---
 
@@ -168,10 +169,23 @@ npm run db:push
 
 This creates the following tables:
 - `users` - User accounts with bcrypt-hashed passwords and role-based access (admin/user)
+- `customers` - Customer accounts with company details and billing info
+- `customer_contacts` - Contact persons for each customer with access badge tracking
+- `customer_notes` - Internal notes on customer accounts
+- `contact_access_badges` - Facility/device access badges for authorized contacts
 - `services` - Customer services linked to users (colocation, SmartHands, connectivity, etc.)
 - `invoices` - Customer invoices with totals, due dates, and status tracking
 - `invoice_items` - Individual line items for each invoice
+- `billing_settings` - Global billing, email (SMTP/IMAP), and integration settings
+- `tickets` - Support tickets with priority, status, and assignment tracking
+- `ticket_replies` - Reply threads and internal notes on tickets
+- `devices` - Datacenter devices with rack location, SNMP, and monitoring config
+- `device_ips` - IP address assignments for devices
+- `device_interfaces` - Network interfaces linked to infrastructure ports
 - `dispatch_requests` - SmartHands dispatch requests for datacenter operations
+- `infrastructure_equipment` - Network gear inventory (switches, routers, PDUs, patch panels)
+- `infrastructure_ports` - Individual ports/outlets on infrastructure equipment
+- `processed_emails` - IMAP deduplication tracking (prevents duplicate ticket creation)
 
 ---
 
@@ -369,7 +383,9 @@ audit2allow -a
 
 ## Email Configuration
 
-The dispatch system uses SMTP via Titan Email. Configuration in `server/email.ts`:
+### SMTP (Outbound Email)
+
+The dispatch and notification system uses SMTP via Titan Email. Configuration in `server/email.ts`:
 
 | Setting | Value |
 |---------|-------|
@@ -392,6 +408,31 @@ const transporter = nodemailer.createTransport({
   },
 });
 ```
+
+### IMAP (Inbound Email to Tickets)
+
+The IMAP poller (`server/imap-poller.ts`) runs as a background service that checks the support inbox every 60 seconds and automatically converts incoming emails into support tickets.
+
+**Dependencies:** `imapflow`, `mailparser`
+
+IMAP settings are configured in the Admin Console under **Settings > Email Server**:
+
+| Setting | Description |
+|---------|-------------|
+| IMAP Host | Your email provider's IMAP server (e.g., `imap.titan.email`) |
+| IMAP Port | Usually `993` for SSL/TLS |
+| IMAP User | The support email account username |
+| IMAP Password | The support email account password |
+| IMAP Secure | Enable for SSL/TLS connections (default: on) |
+
+**How it works:**
+1. Polls the INBOX for unseen emails every 60 seconds
+2. Emails from known, active users create new tickets or add replies to existing ones
+3. Replies are matched by `[Ticket #N]` in the subject line
+4. Authorization is enforced: users can only reply to tickets belonging to their customer account
+5. Each processed email's `Message-ID` is stored in the `processed_emails` table to prevent duplicates
+6. Emails from unknown addresses or inactive users are skipped (logged for review)
+7. Processed emails are marked as read (IMAP `\Seen` flag)
 
 ---
 
@@ -435,6 +476,8 @@ If `package.json` was updated with new libraries, install them:
 npm install
 ```
 
+This is required every time new packages are added. The build bundles some dependencies into `dist/index.cjs`, but others (like `imapflow`, `mailparser`, `net-snmp`, `pdfkit`, `bcrypt`) are kept external and must exist in `node_modules` on the server. If you skip this step after a code pull that adds new packages, the service will crash with a "Cannot find module" error.
+
 ### Step 4: Apply Database Changes (If Any)
 
 If the database schema was modified (changes in `shared/schema.ts`), push the updated schema:
@@ -444,6 +487,18 @@ npm run db:push
 ```
 
 This will create any new tables or columns without deleting existing data.
+
+If `db:push` hangs or fails, you can apply migrations manually via SQL. Connect to the database and run the required statements. For example, the `processed_emails` table (added for IMAP deduplication) can be created with:
+
+```sql
+psql -U dc911 -d dc911db -h localhost
+
+CREATE TABLE IF NOT EXISTS processed_emails (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id TEXT NOT NULL UNIQUE,
+  processed_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
 
 ### Step 5: Rebuild the Application
 
@@ -553,6 +608,16 @@ psql -U dc911 dc911db < backup_20260204.sql
 2. Check SMTP credentials in email provider dashboard
 3. Review server logs for SMTP errors
 4. Test with a different email provider if needed
+
+### IMAP poller not working
+
+1. Check logs for `[IMAP]` entries: `journalctl -u 911dc | grep IMAP`
+2. Verify IMAP settings are configured in Admin Console > Settings > Email Server
+3. Ensure the IMAP host is reachable from the server: `telnet imap.titan.email 993`
+4. Check that `imapflow` and `mailparser` are installed: `ls node_modules/imapflow node_modules/mailparser`
+5. If you see "Cannot find module 'imapflow'" errors, run `npm install` and restart the service
+6. Verify the `processed_emails` table exists: `psql -U dc911 -d dc911db -c "\dt processed_emails"`
+7. If emails are being skipped, check that the sender's email matches a user account in the system (case-insensitive)
 
 ### Permission issues
 
